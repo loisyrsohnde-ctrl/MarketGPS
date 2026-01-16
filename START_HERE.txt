@@ -1,0 +1,113 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        📍 COMMENCE PAR ICI 📍                                ║
+║                       MarketGPS - Architecture Finale                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+🎯 TU DOIS SAVOIR
+═══════════════════════════════════════════════════════════════════════════════
+
+1. FRONTEND = Next.js (EXCLUSIVEMENT)
+   ✅ Port: 3000
+   ✅ Dossier: /frontend
+   ✅ Tech: React 18 + TypeScript + Tailwind
+
+2. BACKEND = FastAPI (Python)
+   ✅ Port: 8501
+   ✅ Dossier: /backend
+   ✅ Tech: FastAPI + Pydantic + Supabase
+
+3. STREAMLIT = OBSOLÈTE ET ARCHIVÉ
+   ❌ NE PAS UTILISER
+   📦 Voir: _archive/streamlit_old/
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📖 DOCUMENTATION À LIRE
+═══════════════════════════════════════════════════════════════════════════════
+
+1. QUICK_START.md
+   → Comment démarrer le projet (5 min)
+
+2. PROJECT_STRUCTURE.md
+   → Comprendre l'architecture complète
+
+3. CLEANUP_SUMMARY.md
+   → Résumé du nettoyage effectué
+
+4. CHANGELOG.md
+   → Journal des changements
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚡ DÉMARRAGE RAPIDE (COPY-PASTE)
+═══════════════════════════════════════════════════════════════════════════════
+
+Terminal 1 - Frontend:
+  cd frontend
+  npm install
+  npm run dev
+  # ➜ http://localhost:3000
+
+Terminal 2 - Backend:
+  cd backend
+  python -m venv venv
+  source venv/bin/activate
+  pip install -r requirements.txt
+  python main.py
+  # ➜ http://localhost:8501
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔌 API Configuration
+═══════════════════════════════════════════════════════════════════════════════
+
+Fichier: frontend/lib/config.ts
+  ✅ Configuration centralisée de tous les endpoints API
+  ✅ Toutes les requêtes passent par frontend/lib/api-client.ts
+
+Exemple d'utilisation dans un composant React:
+  import { apiClient } from '@/lib/api-client';
+  
+  const data = await apiClient.get('/api/assets/top-scored');
+  await apiClient.post('/api/watchlist/add', { asset_id: '123' });
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚠️  POINTS IMPORTANTS
+═══════════════════════════════════════════════════════════════════════════════
+
+✗ Vieux code Streamlit archivé dans _archive/streamlit_old/
+✓ Frontend = Next.js seulement (ne pas réutiliser Streamlit)
+✓ Backend = FastAPI
+✓ Toujours configurer NEXT_PUBLIC_API_URL dans frontend/.env.local
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🆘 PROBLÈME ?
+═══════════════════════════════════════════════════════════════════════════════
+
+Backend ne répond pas?
+  → Vérifier: http://localhost:8501/health
+
+Boutons "Suivre" ne fonctionnent pas?
+  → Vérifier NEXT_PUBLIC_API_URL dans frontend/.env.local
+  → Vérifier CORS dans backend/main.py
+
+Port déjà utilisé?
+  → lsof -ti:3000 | xargs kill -9    (Frontend)
+  → lsof -ti:8501 | xargs kill -9    (Backend)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ C'EST BON, CONTINUE!
+═══════════════════════════════════════════════════════════════════════════════
+
+Maintenant:
+1. Lis QUICK_START.md
+2. Lance le frontend et backend
+3. Vérifie que tout fonctionne
+
+Besoin d'aide détaillée? Voir PROJECT_STRUCTURE.md
+
+═══════════════════════════════════════════════════════════════════════════════
+Date: 12 Janvier 2026 | Status: ✅ Architecture Nettoyée
