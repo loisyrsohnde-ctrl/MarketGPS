@@ -40,11 +40,6 @@ export default function SettingsLayout({ children }: LayoutProps) {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('demo') === 'true') {
-        setUser({ email: 'demo@marketgps.io', display_name: 'Demo User' });
-        return;
-      }
       try {
         const session = await getSession();
         if (session?.user) {

@@ -141,19 +141,6 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            {/* Divider */}
-            <div className="my-8 flex items-center gap-4">
-              <div className="flex-1 h-px bg-glass-border" />
-              <span className="text-sm text-text-muted">ou</span>
-              <div className="flex-1 h-px bg-glass-border" />
-            </div>
-
-            {/* Demo link */}
-            <Link href="/dashboard?demo=true">
-              <Button variant="outline" className="w-full">
-                Accéder à la démo
-              </Button>
-            </Link>
           </GlassCard>
 
           {/* Sign up link */}
@@ -172,7 +159,7 @@ export default function LoginPage() {
       {/* Footer */}
       <footer className="p-6 text-center">
         <p className="text-xs text-text-dim">
-          © 2024 MarketGPS. Outil d&apos;analyse statistique et éducatif.
+          © 2024 MarketGPS. Plateforme d&apos;analyse quantitative.
         </p>
       </footer>
     </div>

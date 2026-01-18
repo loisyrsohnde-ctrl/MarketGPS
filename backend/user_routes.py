@@ -68,6 +68,19 @@ class UserEntitlements(BaseModel):
     dailyRequestsLimit: int
 
 
+class UserNotification(BaseModel):
+    id: str
+    type: str  # 'success', 'warning', 'info', 'alert'
+    title: str
+    description: str
+    time: str
+    read: bool
+
+
+class MarkNotificationsReadRequest(BaseModel):
+    notification_ids: Optional[list] = None  # If None, mark all as read
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Helper Functions
 # ═══════════════════════════════════════════════════════════════════════════
@@ -218,6 +231,20 @@ async def update_profile(
                 (user_id,)
             )
             row = cursor.fetchone()
+
+            # Create notification for profile update
+            update_type = []
+            if request.displayName is not None:
+                update_type.append("nom")
+            if request.avatar is not None:
+                update_type.append("avatar")
+            
+            create_notification(
+                user_id=user_id,
+                type="success",
+                title="Profil mis à jour",
+                description=f"Votre {' et '.join(update_type)} a été modifié avec succès"
+            )
 
             return {
                 "id": row[0],
@@ -441,6 +468,14 @@ async def change_password(
             )
             conn.commit()
 
+        # Create security notification
+        create_notification(
+            user_id=user_id,
+            type="success",
+            title="Mot de passe modifié",
+            description="Votre mot de passe a été changé avec succès"
+        )
+
         return {"success": True}
 
     except HTTPException:
@@ -513,6 +548,188 @@ async def delete_account(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# User Notifications (Messages) Endpoints
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _ensure_notifications_table(conn):
+    """Ensure the user_notifications table exists."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_notifications (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            type TEXT NOT NULL CHECK(type IN ('success', 'warning', 'info', 'alert')),
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            read INTEGER DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES user_profiles(user_id)
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_notifications_user 
+        ON user_notifications(user_id, created_at DESC)
+    """)
+    conn.commit()
+
+
+def _format_time_ago(created_at: str) -> str:
+    """Format a timestamp as human-readable relative time."""
+    try:
+        created = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+        now = datetime.now()
+        diff = now - created.replace(tzinfo=None)
+        
+        if diff.days > 30:
+            return f"Il y a {diff.days // 30} mois"
+        elif diff.days > 0:
+            return f"Il y a {diff.days} jour{'s' if diff.days > 1 else ''}"
+        elif diff.seconds > 3600:
+            hours = diff.seconds // 3600
+            return f"Il y a {hours} heure{'s' if hours > 1 else ''}"
+        elif diff.seconds > 60:
+            minutes = diff.seconds // 60
+            return f"Il y a {minutes} min"
+        else:
+            return "À l'instant"
+    except:
+        return "Récemment"
+
+
+@router.get("/notifications/messages", response_model=list)
+async def get_notification_messages(
+    user_id: Optional[str] = Depends(_get_user_id_from_header),
+    limit: int = 20,
+):
+    """
+    Get user notification messages (not preferences).
+    Returns the most recent notifications.
+    """
+    try:
+        with db._get_conn() as conn:
+            _ensure_notifications_table(conn)
+            
+            cursor = conn.execute(
+                """SELECT id, type, title, description, created_at, read 
+                   FROM user_notifications 
+                   WHERE user_id = ?
+                   ORDER BY created_at DESC
+                   LIMIT ?""",
+                (user_id, limit)
+            )
+            rows = cursor.fetchall()
+            
+            return [
+                {
+                    "id": row[0],
+                    "type": row[1],
+                    "title": row[2],
+                    "description": row[3],
+                    "time": _format_time_ago(row[4]),
+                    "read": bool(row[5]),
+                }
+                for row in rows
+            ]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/notifications/read")
+async def mark_notifications_read(
+    request: MarkNotificationsReadRequest,
+    user_id: Optional[str] = Depends(_get_user_id_from_header),
+):
+    """
+    Mark notifications as read.
+    If notification_ids is None, marks all user notifications as read.
+    """
+    try:
+        with db._get_conn() as conn:
+            _ensure_notifications_table(conn)
+            
+            if request.notification_ids:
+                # Mark specific notifications as read
+                placeholders = ','.join(['?' for _ in request.notification_ids])
+                conn.execute(
+                    f"""UPDATE user_notifications 
+                       SET read = 1 
+                       WHERE user_id = ? AND id IN ({placeholders})""",
+                    (user_id, *request.notification_ids)
+                )
+            else:
+                # Mark all as read
+                conn.execute(
+                    "UPDATE user_notifications SET read = 1 WHERE user_id = ?",
+                    (user_id,)
+                )
+            conn.commit()
+            
+        return {"success": True}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/notifications/unread-count")
+async def get_unread_count(
+    user_id: Optional[str] = Depends(_get_user_id_from_header),
+):
+    """
+    Get the count of unread notifications.
+    Used for the badge in the UI.
+    """
+    try:
+        with db._get_conn() as conn:
+            _ensure_notifications_table(conn)
+            
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM user_notifications WHERE user_id = ? AND read = 0",
+                (user_id,)
+            )
+            row = cursor.fetchone()
+            
+            return {"count": row[0] if row else 0}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def create_notification(
+    user_id: str,
+    type: str,
+    title: str,
+    description: str,
+) -> dict:
+    """
+    Create a new notification for a user.
+    This is a utility function to be called from other parts of the application.
+    """
+    import uuid
+    notification_id = str(uuid.uuid4())
+    created_at = datetime.now().isoformat()
+    
+    with db._get_conn() as conn:
+        _ensure_notifications_table(conn)
+        
+        conn.execute(
+            """INSERT INTO user_notifications 
+               (id, user_id, type, title, description, created_at, read)
+               VALUES (?, ?, ?, ?, ?, ?, 0)""",
+            (notification_id, user_id, type, title, description, created_at)
+        )
+        conn.commit()
+    
+    return {
+        "id": notification_id,
+        "type": type,
+        "title": title,
+        "description": description,
+        "time": "À l'instant",
+        "read": False,
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════

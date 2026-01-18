@@ -227,7 +227,7 @@ export default function SignupPage() {
       {/* Footer */}
       <footer className="p-6 text-center">
         <p className="text-xs text-text-dim">
-          © 2024 MarketGPS. Outil d&apos;analyse statistique et éducatif.
+          © 2024 MarketGPS. Plateforme d&apos;analyse quantitative.
         </p>
       </footer>
     </div>

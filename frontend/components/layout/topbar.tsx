@@ -4,8 +4,22 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { SearchInput } from '@/components/ui/input';
-import { Bell, Settings, User } from 'lucide-react';
+import { Bell, Settings, User, CheckCircle, AlertCircle, TrendingUp, Info, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNotifications } from '@/hooks/useNotifications';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NOTIFICATION TYPES (re-exported for compatibility)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface Notification {
+  id: string;
+  type: 'success' | 'warning' | 'info' | 'alert';
+  title: string;
+  description: string;
+  time: string;
+  read: boolean;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TOPBAR COMPONENT
@@ -26,6 +40,9 @@ export function Topbar({ user, onSearch, sidebarCollapsed = false }: TopbarProps
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
+  // Use the notifications hook to fetch real notifications from backend
+  const { notifications, unreadCount, loading, markAllAsRead } = useNotifications();
+
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
@@ -35,6 +52,10 @@ export function Topbar({ user, onSearch, sidebarCollapsed = false }: TopbarProps
   const handleClearSearch = () => {
     setSearchQuery('');
     onSearch?.('');
+  };
+
+  const handleMarkAllAsRead = async () => {
+    await markAllAsRead();
   };
 
   const userInitial = user?.display_name?.[0] || user?.email?.[0] || 'U';
@@ -80,10 +101,12 @@ export function Topbar({ user, onSearch, sidebarCollapsed = false }: TopbarProps
               )}
             >
               <Bell className="w-5 h-5" />
-              {/* Notification badge */}
-              <span className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center bg-score-red text-[10px] font-bold text-white rounded-full">
-                3
-              </span>
+              {/* Notification badge - only show if there are unread notifications */}
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center bg-score-red text-[10px] font-bold text-white rounded-full">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
 
             {/* Notifications dropdown */}
@@ -95,25 +118,43 @@ export function Topbar({ user, onSearch, sidebarCollapsed = false }: TopbarProps
                   exit={{ opacity: 0, y: 10 }}
                   className="absolute right-0 top-full mt-2 w-80 bg-bg-elevated border border-glass-border rounded-xl shadow-glass-lg overflow-hidden"
                 >
-                  <div className="p-4 border-b border-glass-border">
+                  <div className="p-4 border-b border-glass-border flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-text-primary">Notifications</h3>
+                    {unreadCount > 0 && (
+                      <button 
+                        onClick={handleMarkAllAsRead}
+                        className="text-xs text-accent hover:text-accent-light transition-colors"
+                      >
+                        Tout marquer comme lu
+                      </button>
+                    )}
                   </div>
                   <div className="p-2 max-h-80 overflow-y-auto">
-                    <NotificationItem
-                      title="Score mis à jour"
-                      description="Le score de AAPL a été recalculé"
-                      time="Il y a 5 min"
-                    />
-                    <NotificationItem
-                      title="Nouvel actif disponible"
-                      description="NVDA a été ajouté à l'univers"
-                      time="Il y a 1h"
-                    />
-                    <NotificationItem
-                      title="Alerte watchlist"
-                      description="MSFT a dépassé votre seuil"
-                      time="Il y a 2h"
-                    />
+                    {loading ? (
+                      <div className="py-8 text-center">
+                        <Loader2 className="w-6 h-6 text-accent mx-auto mb-2 animate-spin" />
+                        <p className="text-sm text-text-muted">Chargement...</p>
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <div className="py-8 text-center">
+                        <Bell className="w-8 h-8 text-text-muted mx-auto mb-2 opacity-50" />
+                        <p className="text-sm text-text-muted">Aucune notification</p>
+                        <p className="text-xs text-text-dim mt-1">
+                          Les alertes et mises à jour apparaîtront ici
+                        </p>
+                      </div>
+                    ) : (
+                      notifications.map((notification) => (
+                        <NotificationItem
+                          key={notification.id}
+                          type={notification.type}
+                          title={notification.title}
+                          description={notification.description}
+                          time={notification.time}
+                          read={notification.read}
+                        />
+                      ))
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -214,17 +255,44 @@ export function Topbar({ user, onSearch, sidebarCollapsed = false }: TopbarProps
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface NotificationItemProps {
+  type: 'success' | 'warning' | 'info' | 'alert';
   title: string;
   description: string;
   time: string;
+  read?: boolean;
 }
 
-function NotificationItem({ title, description, time }: NotificationItemProps) {
+function NotificationItem({ type, title, description, time, read = false }: NotificationItemProps) {
+  const iconMap = {
+    success: CheckCircle,
+    warning: AlertCircle,
+    info: Info,
+    alert: TrendingUp,
+  };
+  
+  const colorMap = {
+    success: 'text-score-green',
+    warning: 'text-score-yellow',
+    info: 'text-accent',
+    alert: 'text-score-red',
+  };
+  
+  const Icon = iconMap[type];
+  
   return (
-    <div className="p-3 rounded-lg hover:bg-surface transition-colors cursor-pointer">
-      <p className="text-sm font-medium text-text-primary">{title}</p>
-      <p className="text-xs text-text-muted mt-0.5">{description}</p>
-      <p className="text-[10px] text-text-dim mt-1">{time}</p>
+    <div className={cn(
+      "p-3 rounded-lg hover:bg-surface transition-colors cursor-pointer flex gap-3",
+      !read && "bg-accent/5"
+    )}>
+      <Icon className={cn("w-5 h-5 flex-shrink-0 mt-0.5", colorMap[type])} />
+      <div className="flex-1 min-w-0">
+        <p className={cn("text-sm font-medium", read ? "text-text-secondary" : "text-text-primary")}>{title}</p>
+        <p className="text-xs text-text-muted mt-0.5 truncate">{description}</p>
+        <p className="text-[10px] text-text-dim mt-1">{time}</p>
+      </div>
+      {!read && (
+        <div className="w-2 h-2 rounded-full bg-accent flex-shrink-0 mt-2" />
+      )}
     </div>
   );
 }

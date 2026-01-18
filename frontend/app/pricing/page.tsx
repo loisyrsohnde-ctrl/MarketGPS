@@ -295,7 +295,7 @@ export default function PricingPage() {
             <span className="font-bold text-text-primary">MarketGPS</span>
           </div>
           <p className="text-xs text-text-dim">
-            © 2024 MarketGPS. Outil d&apos;analyse statistique et éducatif.
+            © 2024 MarketGPS. Plateforme d&apos;analyse quantitative.
           </p>
         </div>
       </footer>

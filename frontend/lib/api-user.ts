@@ -28,6 +28,15 @@ export interface UserEntitlements {
   dailyRequestsLimit: number;
 }
 
+export interface UserNotification {
+  id: string;
+  type: 'success' | 'warning' | 'info' | 'alert';
+  title: string;
+  description: string;
+  time: string;
+  read: boolean;
+}
+
 /**
  * Récupérer le profil utilisateur
  */
@@ -173,5 +182,43 @@ export async function getUserEntitlements(): Promise<UserEntitlements> {
       status: 'active',
       dailyRequestsLimit: 10,
     };
+  }
+}
+
+/**
+ * Récupérer les notifications (messages) de l'utilisateur
+ */
+export async function getNotificationMessages(limit: number = 20): Promise<UserNotification[]> {
+  try {
+    return await apiClient.get(`/users/notifications/messages?limit=${limit}`);
+  } catch (error) {
+    console.error('Failed to fetch notification messages:', error);
+    return [];
+  }
+}
+
+/**
+ * Marquer des notifications comme lues
+ */
+export async function markNotificationsAsRead(notificationIds?: string[]): Promise<{ success: boolean }> {
+  try {
+    return await apiClient.post('/users/notifications/read', { 
+      notification_ids: notificationIds || null 
+    });
+  } catch (error) {
+    console.error('Failed to mark notifications as read:', error);
+    throw error;
+  }
+}
+
+/**
+ * Récupérer le nombre de notifications non lues
+ */
+export async function getUnreadNotificationCount(): Promise<{ count: number }> {
+  try {
+    return await apiClient.get('/users/notifications/unread-count');
+  } catch (error) {
+    console.error('Failed to fetch unread count:', error);
+    return { count: 0 };
   }
 }

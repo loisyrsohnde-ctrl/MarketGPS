@@ -772,6 +772,18 @@ async def add_to_watchlist(
         )
         
         if success:
+            # Create notification for watchlist addition
+            try:
+                from user_routes import create_notification
+                create_notification(
+                    user_id=resolved_user_id,
+                    type="info",
+                    title="Actif ajouté à la watchlist",
+                    description=f"{request.ticker} a été ajouté à votre liste de surveillance"
+                )
+            except Exception:
+                pass  # Don't fail the main operation if notification fails
+            
             return {"status": "success", "ticker": request.ticker}
         else:
             raise HTTPException(status_code=400, detail="Failed to add to watchlist")

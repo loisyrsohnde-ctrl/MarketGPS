@@ -150,12 +150,12 @@ export default function LandingPage() {
               <div className="mt-10 flex flex-wrap gap-4">
                 <Link href="/signup">
                   <Button size="lg">
-                    Créer un compte
+                    Commencer gratuitement
                   </Button>
                 </Link>
-                <Link href="/dashboard?demo=true">
+                <Link href="/pricing">
                   <Button variant="outline" size="lg">
-                    Voir une démo
+                    Voir les offres
                   </Button>
                 </Link>
               </div>
@@ -351,7 +351,7 @@ export default function LandingPage() {
             </div>
 
             <p className="text-xs text-text-dim">
-              © 2024 MarketGPS. Outil d&apos;analyse statistique et éducatif.
+              © 2024 MarketGPS. Plateforme d&apos;analyse quantitative.
             </p>
           </div>
 

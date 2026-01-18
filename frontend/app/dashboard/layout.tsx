@@ -20,19 +20,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [user, setUser] = useState<{ email: string; display_name?: string } | null>(null);
-  const [isDemo, setIsDemo] = useState(false);
 
   // Check auth on mount
   useEffect(() => {
     const checkAuth = async () => {
-      // Check for demo mode
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('demo') === 'true') {
-        setIsDemo(true);
-        setUser({ email: 'demo@marketgps.io', display_name: 'Demo User' });
-        return;
-      }
-
       // Check Supabase session
       try {
         const session = await getSession();
@@ -71,11 +62,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [router]);
 
   const handleLogout = async () => {
-    if (isDemo) {
-      router.push('/');
-      return;
-    }
-    
     try {
       await signOut();
       router.push('/');
@@ -119,19 +105,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         )}
       >
         <div className="p-6">
-          {/* Demo banner */}
-          {isDemo && (
-            <div className="mb-6 p-4 rounded-xl bg-score-yellow/10 border border-score-yellow/30">
-              <p className="text-sm text-score-yellow">
-                🎭 Mode démo actif.{' '}
-                <a href="/signup" className="underline hover:no-underline">
-                  Créez un compte
-                </a>{' '}
-                pour accéder à toutes les fonctionnalités.
-              </p>
-            </div>
-          )}
-
           {children}
         </div>
       </main>

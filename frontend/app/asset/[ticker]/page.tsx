@@ -738,9 +738,9 @@ export default function AssetDetailPage() {
       {/* Disclaimer */}
       <div className="p-4 rounded-xl bg-surface/50 border border-glass-border">
         <p className="text-xs text-text-dim text-center">
-          ⚠️ MarketGPS est un outil d&apos;analyse statistique et éducatif. Les scores ne constituent pas
-          des conseils financiers. Les performances passées ne garantissent pas les résultats futurs.
-          Capital à risque.
+          ⚠️ Les informations fournies sont à titre informatif uniquement et ne constituent pas 
+          des conseils en investissement. Les performances passées ne garantissent pas les résultats futurs.
+          Investir comporte des risques de perte en capital.
         </p>
       </div>
     </div>
