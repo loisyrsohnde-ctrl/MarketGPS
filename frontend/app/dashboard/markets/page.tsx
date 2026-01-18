@@ -10,7 +10,7 @@ import { Pill, ScoreBadge } from '@/components/ui/badge';
 import { AssetLogo } from '@/components/cards/asset-card';
 import { api } from '@/lib/api';
 import { cn, formatNumberSafe } from '@/lib/utils';
-import type { Asset, MarketFilter, AssetType } from '@/types';
+import type { Asset, MarketScope, AssetType } from '@/types';
 import {
   TrendingUp,
   TrendingDown,
@@ -32,7 +32,7 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface MarketOverview {
-  scope: MarketFilter;
+  scope: MarketScope;
   name: string;
   description: string;
   icon: React.ReactNode;
@@ -70,7 +70,7 @@ const ASSET_TYPES: { type: AssetType | null; label: string; icon: React.ReactNod
 ];
 
 export default function MarketsPage() {
-  const [selectedMarket, setSelectedMarket] = useState<MarketFilter>('US_EU');
+  const [selectedMarket, setSelectedMarket] = useState<MarketScope>('US_EU');
 
   // Fetch scope counts
   const { data: scopeCounts, isLoading: isLoadingCounts } = useQuery({

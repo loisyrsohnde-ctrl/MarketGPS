@@ -123,6 +123,15 @@ class SQLiteStore:
                     );
                     CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
                     CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+
+                    -- User sessions (API-specific)
+                    CREATE TABLE IF NOT EXISTS user_sessions (
+                        user_id TEXT NOT NULL,
+                        session_token TEXT PRIMARY KEY,
+                        created_at TEXT DEFAULT (datetime('now')),
+                        expires_at TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
                     
                     -- User settings
                     CREATE TABLE IF NOT EXISTS user_settings (
@@ -159,6 +168,13 @@ class SQLiteStore:
                         created_at TEXT DEFAULT (datetime('now')),
                         updated_at TEXT DEFAULT (datetime('now'))
                     );
+                    CREATE TABLE IF NOT EXISTS user_sessions (
+                        user_id TEXT NOT NULL,
+                        session_token TEXT PRIMARY KEY,
+                        created_at TEXT DEFAULT (datetime('now')),
+                        expires_at TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
                     INSERT OR IGNORE INTO user_settings (user_id) VALUES ('default');
                 """)
 
@@ -251,6 +267,26 @@ class SQLiteStore:
         """Public method to ensure all schema tables exist."""
         self._init_schema()
         self._ensure_auth_tables()
+        self._ensure_strategy_tables()
+
+    def _ensure_strategy_tables(self):
+        """Ensure strategy tables exist (idempotent)."""
+        migration_path = Path(__file__).parent / \
+            "migrations" / "add_strategy_tables.sql"
+        if not migration_path.exists():
+            return
+
+        with self._get_connection() as conn:
+            # Check if main table exists
+            result = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='strategy_templates'"
+            ).fetchone()
+
+            if not result:
+                logger.info("Creating strategy tables...")
+                with open(migration_path, "r") as f:
+                    conn.executescript(f.read())
+                logger.info("Strategy tables created successfully")
 
     def reset_schema(self):
         """Force reset the database schema."""
@@ -897,14 +933,15 @@ class SQLiteStore:
                     WHERE symbol = ? AND market_scope = ?
                     LIMIT 1
                 """, (ticker, market_scope)).fetchone()
-                
+
                 if not asset_row:
-                    logger.warning(f"Asset not found for ticker {ticker} in scope {market_scope}")
+                    logger.warning(
+                        f"Asset not found for ticker {ticker} in scope {market_scope}")
                     return False
-                
+
                 asset_id = asset_row["asset_id"]
                 market_code = asset_row["market_code"] if asset_row["market_code"] else "US"
-                
+
                 # Insert with asset_id
                 conn.execute("""
                     INSERT INTO watchlist (asset_id, ticker, user_id, market_scope, market_code, notes, added_at)
@@ -1971,3 +2008,154 @@ class SQLiteStore:
                 ORDER BY asset_type
             """, (market_scope,)).fetchall()
             return [row["asset_type"] for row in rows]
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # LONG-TERM SCORING (ADD-ON)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def ensure_longterm_schema(self) -> bool:
+        """
+        Ensure long-term scoring columns exist in scores_latest and scores_staging.
+        Idempotent - safe to call multiple times.
+
+        Returns:
+            True if columns already existed or were added successfully
+        """
+        try:
+            with self._get_connection() as conn:
+                # Check if lt_score column exists in scores_latest
+                columns = conn.execute(
+                    "PRAGMA table_info(scores_latest)").fetchall()
+                column_names = [c["name"] for c in columns]
+
+                if "lt_score" not in column_names:
+                    logger.info(
+                        "Adding long-term scoring columns to scores_latest...")
+                    conn.execute(
+                        "ALTER TABLE scores_latest ADD COLUMN lt_score REAL")
+                    conn.execute(
+                        "ALTER TABLE scores_latest ADD COLUMN lt_confidence REAL")
+                    conn.execute(
+                        "ALTER TABLE scores_latest ADD COLUMN lt_breakdown TEXT")
+                    conn.execute(
+                        "ALTER TABLE scores_latest ADD COLUMN lt_updated_at TEXT")
+
+                    # Create index
+                    conn.execute("""
+                        CREATE INDEX IF NOT EXISTS idx_scores_lt_score 
+                        ON scores_latest(lt_score DESC) WHERE lt_score IS NOT NULL
+                    """)
+                    logger.info(
+                        "Long-term scoring columns added to scores_latest")
+
+                # Check scores_staging table
+                staging_columns = conn.execute(
+                    "PRAGMA table_info(scores_staging)").fetchall()
+                staging_names = [c["name"] for c in staging_columns]
+
+                if "lt_score" not in staging_names:
+                    logger.info(
+                        "Adding long-term scoring columns to scores_staging...")
+                    conn.execute(
+                        "ALTER TABLE scores_staging ADD COLUMN lt_score REAL")
+                    conn.execute(
+                        "ALTER TABLE scores_staging ADD COLUMN lt_confidence REAL")
+                    conn.execute(
+                        "ALTER TABLE scores_staging ADD COLUMN lt_breakdown TEXT")
+                    conn.execute(
+                        "ALTER TABLE scores_staging ADD COLUMN lt_updated_at TEXT")
+                    logger.info(
+                        "Long-term scoring columns added to scores_staging")
+
+                return True
+
+        except Exception as e:
+            logger.error(f"Failed to ensure longterm schema: {e}")
+            return False
+
+    def upsert_longterm_score(
+        self,
+        asset_id: str,
+        lt_score: Optional[float],
+        lt_confidence: Optional[float],
+        lt_breakdown: Optional[str],
+        market_scope: MarketScope = "US_EU"
+    ) -> bool:
+        """
+        Update long-term score for an asset.
+        Only updates lt_* columns, does not touch existing score columns.
+
+        Args:
+            asset_id: Asset identifier
+            lt_score: Long-term score (0-100)
+            lt_confidence: Confidence score (0-100)
+            lt_breakdown: JSON string with breakdown details
+            market_scope: Market scope
+
+        Returns:
+            True if update successful
+        """
+        try:
+            with self._get_connection() as conn:
+                # Check if row exists
+                existing = conn.execute(
+                    "SELECT 1 FROM scores_latest WHERE asset_id = ?", (
+                        asset_id,)
+                ).fetchone()
+
+                if existing:
+                    # Update existing row
+                    conn.execute("""
+                        UPDATE scores_latest SET
+                            lt_score = ?,
+                            lt_confidence = ?,
+                            lt_breakdown = ?,
+                            lt_updated_at = datetime('now')
+                        WHERE asset_id = ?
+                    """, (lt_score, lt_confidence, lt_breakdown, asset_id))
+                else:
+                    # Insert new row with only lt_* columns
+                    conn.execute("""
+                        INSERT INTO scores_latest (asset_id, market_scope, lt_score, 
+                                                   lt_confidence, lt_breakdown, lt_updated_at)
+                        VALUES (?, ?, ?, ?, ?, datetime('now'))
+                    """, (asset_id, market_scope, lt_score, lt_confidence, lt_breakdown))
+
+                return True
+
+        except Exception as e:
+            logger.error(
+                f"Failed to upsert longterm score for {asset_id}: {e}")
+            return False
+
+    def get_top_longterm_scores(
+        self,
+        market_scope: MarketScope = "US_EU",
+        limit: int = 50
+    ) -> List[Dict]:
+        """
+        Get top N assets by long-term score.
+
+        Args:
+            market_scope: Market scope filter
+            limit: Number of results
+
+        Returns:
+            List of dicts with asset info and lt_score
+        """
+        sql = """
+            SELECT 
+                u.asset_id, u.symbol, u.name, u.asset_type, u.market_code,
+                s.score_total, s.lt_score, s.lt_confidence, s.lt_breakdown,
+                s.confidence, g.liquidity, g.coverage
+            FROM universe u
+            INNER JOIN scores_latest s ON u.asset_id = s.asset_id
+            LEFT JOIN gating_status g ON u.asset_id = g.asset_id
+            WHERE u.active = 1 AND u.market_scope = ? AND s.lt_score IS NOT NULL
+            ORDER BY s.lt_score DESC, s.lt_confidence DESC
+            LIMIT ?
+        """
+
+        with self._get_connection() as conn:
+            rows = conn.execute(sql, (market_scope, limit)).fetchall()
+            return [dict(row) for row in rows]

@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+export const dynamic = 'force-dynamic';
+
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { GlassCard } from '@/components/ui/glass-card';
-import { resetPasswordRequest, updatePassword } from '@/lib/supabase';
+import { resetPassword, updatePassword } from '@/lib/supabase';
 import { Mail, Lock, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -16,6 +18,14 @@ import { Mail, Lock, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react';
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-bg-primary" />}>
+      <ResetPasswordContent />
+    </Suspense>
+  );
+}
+
+function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const hasToken = searchParams.has('access_token') || searchParams.has('token');
 
@@ -40,7 +50,7 @@ function RequestReset() {
     setLoading(true);
 
     try {
-      await resetPasswordRequest(email);
+      await resetPassword(email);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de l\'envoi');

@@ -87,7 +87,7 @@ export default function AssetDetailPage() {
     queryFn: async () => {
       try {
         // Map to API period format
-        const apiPeriodMap: Record<ExtendedChartPeriod, string> = {
+        const apiPeriodMap: Record<ExtendedChartPeriod, ChartPeriod> = {
           '1d': '1d',
           '1w': '1w',
           '30d': '30d',
@@ -100,11 +100,12 @@ export default function AssetDetailPage() {
         };
         const apiPeriod = apiPeriodMap[chartPeriod];
         console.log(`Fetching chart data for ${ticker}, period: ${apiPeriod}`);
-        const data = await api.getAssetChart(ticker, apiPeriod);
-        console.log(`Received ${data.length} data points`);
+        const rawData = await api.getAssetChart(ticker, apiPeriod);
+        const points = Array.isArray(rawData) ? rawData : rawData.data || [];
+        console.log(`Received ${points.length} data points`);
         
         // Sort by date ascending
-        const sorted = data.sort((a: any, b: any) => 
+        const sorted = points.sort((a: any, b: any) => 
           new Date(a.date).getTime() - new Date(b.date).getTime()
         );
         return sorted;
@@ -232,8 +233,8 @@ export default function AssetDetailPage() {
   const calculatedMetrics = useMemo(() => {
     // Calculate momentum from RSI if not available
     let momentum = displayAsset.score_momentum;
-    if (momentum === null && displayAsset.rsi !== null) {
-      const rsi = displayAsset.rsi;
+    const rsi = displayAsset.rsi;
+    if (momentum == null && rsi != null) {
       if (rsi >= 40 && rsi <= 70) {
         momentum = 100 - Math.abs(rsi - 55) * 2;
       } else if (rsi < 40) {
@@ -245,8 +246,8 @@ export default function AssetDetailPage() {
 
     // Calculate safety from volatility if not available
     let safety = displayAsset.score_safety;
-    if (safety === null && displayAsset.vol_annual !== null) {
-      const vol = displayAsset.vol_annual;
+    const vol = displayAsset.vol_annual;
+    if (safety == null && vol != null) {
       // Lower volatility = higher safety (inverted)
       if (vol <= 5) safety = 100;
       else if (vol <= 20) safety = 100 - (vol - 5) * 3;
@@ -690,18 +691,18 @@ export default function AssetDetailPage() {
       {/* About */}
       <GlassCard>
         <h2 className="text-lg font-semibold text-text-primary mb-4">
-          À propos de {asset.name}
+          À propos de {displayAsset.name}
         </h2>
         <p className="text-text-secondary leading-relaxed">
-          {asset.asset_type === 'ETF'
-            ? `${asset.name} est un Exchange-Traded Fund (ETF) qui offre aux investisseurs une exposition diversifiée à son marché de référence. Il combine la flexibilité de négociation d'une action avec les avantages de la diversification d'un fonds.`
-            : `${asset.name} (${asset.ticker}) est une entreprise cotée sur les marchés financiers. Le score MarketGPS analyse les fondamentaux, le momentum de prix et les métriques de risque pour évaluer son potentiel d'investissement.`}
+          {displayAsset.asset_type === 'ETF'
+            ? `${displayAsset.name} est un Exchange-Traded Fund (ETF) qui offre aux investisseurs une exposition diversifiée à son marché de référence. Il combine la flexibilité de négociation d'une action avec les avantages de la diversification d'un fonds.`
+            : `${displayAsset.name} (${displayAsset.ticker}) est une entreprise cotée sur les marchés financiers. Le score MarketGPS analyse les fondamentaux, le momentum de prix et les métriques de risque pour évaluer son potentiel d'investissement.`}
         </p>
 
         {/* External links */}
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
-            href={`https://finance.yahoo.com/quote/${asset.ticker}`}
+            href={`https://finance.yahoo.com/quote/${displayAsset.ticker}`}
             target="_blank"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface text-text-secondary hover:text-accent hover:border-accent border border-glass-border transition-all text-sm"
           >
@@ -709,7 +710,7 @@ export default function AssetDetailPage() {
             Yahoo Finance
           </Link>
           <Link
-            href={`https://www.google.com/finance/quote/${asset.ticker}:${asset.market_code === 'US' ? 'NASDAQ' : asset.market_code}`}
+            href={`https://www.google.com/finance/quote/${displayAsset.ticker}:${displayAsset.market_code === 'US' ? 'NASDAQ' : displayAsset.market_code}`}
             target="_blank"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface text-text-secondary hover:text-accent hover:border-accent border border-glass-border transition-all text-sm"
           >
@@ -717,7 +718,7 @@ export default function AssetDetailPage() {
             Google Finance
           </Link>
           <Link
-            href={`https://www.tradingview.com/symbols/${asset.ticker}`}
+            href={`https://www.tradingview.com/symbols/${displayAsset.ticker}`}
             target="_blank"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface text-text-secondary hover:text-accent hover:border-accent border border-glass-border transition-all text-sm"
           >
@@ -725,7 +726,7 @@ export default function AssetDetailPage() {
             TradingView
           </Link>
           <Link
-            href={`https://www.google.com/search?q=${asset.ticker}+${asset.name}+news&tbm=nws`}
+            href={`https://www.google.com/search?q=${displayAsset.ticker}+${displayAsset.name}+news&tbm=nws`}
             target="_blank"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface text-text-secondary hover:text-accent hover:border-accent border border-glass-border transition-all text-sm"
           >

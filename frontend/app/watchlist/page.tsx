@@ -206,7 +206,7 @@ export default function WatchlistPage() {
                         <p className="font-semibold text-text-primary">{asset.ticker}</p>
                         <p className="text-xs text-text-muted truncate">{asset.name}</p>
                       </div>
-                      <ScoreGaugeBadge score={asset.score_total} size="sm" />
+                      <ScoreGaugeBadge score={asset.score_total ?? null} size="sm" />
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -275,12 +275,12 @@ export default function WatchlistPage() {
                 {/* Score + Pillars */}
                 <div className="grid md:grid-cols-2 gap-8 pt-4 border-t border-glass-border">
                   <div className="flex justify-center">
-                    <ScoreGauge score={selectedAsset.score_total} size="lg" />
+                    <ScoreGauge score={selectedAsset.score_total ?? null} size="lg" />
                   </div>
                   <div className="space-y-4 py-4">
-                    <PillarBar label="Valeur" value={selectedAsset.score_value} icon="📈" />
-                    <PillarBar label="Momentum" value={selectedAsset.score_momentum} icon="🚀" />
-                    <PillarBar label="Sécurité" value={selectedAsset.score_safety} icon="🛡️" />
+                    <PillarBar label="Valeur" value={selectedAsset.score_value ?? null} icon="📈" />
+                    <PillarBar label="Momentum" value={selectedAsset.score_momentum ?? null} icon="🚀" />
+                    <PillarBar label="Sécurité" value={selectedAsset.score_safety ?? null} icon="🛡️" />
                   </div>
                 </div>
 

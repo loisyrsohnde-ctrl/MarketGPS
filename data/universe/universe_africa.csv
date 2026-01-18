@@ -1,0 +1,51 @@
+asset_id,symbol,name,asset_type,market_code,exchange_code,currency,country,sector,industry,tier,priority_level
+NPN.JSE,NPN,Naspers Limited,EQUITY,ZA,JSE,ZAR,South Africa,Technology,Internet Services,1,1
+BTI.JSE,BTI,British American Tobacco,EQUITY,ZA,JSE,ZAR,South Africa,Consumer Goods,Tobacco,1,1
+AGL.JSE,AGL,Anglo American,EQUITY,ZA,JSE,ZAR,South Africa,Materials,Mining,1,1
+SOL.JSE,SOL,Sasol,EQUITY,ZA,JSE,ZAR,South Africa,Energy,Oil & Gas,1,1
+SBK.JSE,SBK,Standard Bank Group,EQUITY,ZA,JSE,ZAR,South Africa,Financials,Banks,1,1
+FSR.JSE,FSR,FirstRand,EQUITY,ZA,JSE,ZAR,South Africa,Financials,Banks,1,1
+MTN.JSE,MTN,MTN Group,EQUITY,ZA,JSE,ZAR,South Africa,Telecommunications,Wireless,1,1
+BID.JSE,BID,Bid Corporation,EQUITY,ZA,JSE,ZAR,South Africa,Consumer Services,Food Services,1,1
+SHP.JSE,SHP,Shoprite Holdings,EQUITY,ZA,JSE,ZAR,South Africa,Consumer Services,Retail,1,1
+DSY.JSE,DSY,Discovery,EQUITY,ZA,JSE,ZAR,South Africa,Financials,Insurance,1,1
+CFR.JSE,CFR,Compagnie Financiere Richemont,EQUITY,ZA,JSE,ZAR,South Africa,Consumer Goods,Luxury,1,1
+VOD.JSE,VOD,Vodacom Group,EQUITY,ZA,JSE,ZAR,South Africa,Telecommunications,Wireless,1,1
+ABG.JSE,ABG,Absa Group,EQUITY,ZA,JSE,ZAR,South Africa,Financials,Banks,1,1
+INP.JSE,INP,Investec,EQUITY,ZA,JSE,ZAR,South Africa,Financials,Banking & Investment,1,1
+NED.JSE,NED,Nedbank Group,EQUITY,ZA,JSE,ZAR,South Africa,Financials,Banks,1,1
+SLM.JSE,SLM,Sanlam,EQUITY,ZA,JSE,ZAR,South Africa,Financials,Insurance,1,1
+OMU.JSE,OMU,Old Mutual,EQUITY,ZA,JSE,ZAR,South Africa,Financials,Insurance,1,1
+GFI.JSE,GFI,Gold Fields,EQUITY,ZA,JSE,ZAR,South Africa,Materials,Gold Mining,1,1
+IMP.JSE,IMP,Impala Platinum,EQUITY,ZA,JSE,ZAR,South Africa,Materials,Platinum Mining,1,1
+AMS.JSE,AMS,Anglo American Platinum,EQUITY,ZA,JSE,ZAR,South Africa,Materials,Platinum Mining,1,1
+DANGCEM.NGX,DANGCEM,Dangote Cement,EQUITY,NG,NGX,NGN,Nigeria,Materials,Construction Materials,1,1
+BUACEMENT.NGX,BUACEMENT,BUA Cement,EQUITY,NG,NGX,NGN,Nigeria,Materials,Construction Materials,1,1
+ZENITHBANK.NGX,ZENITHBANK,Zenith Bank,EQUITY,NG,NGX,NGN,Nigeria,Financials,Banks,1,1
+GTCO.NGX,GTCO,Guaranty Trust Holding,EQUITY,NG,NGX,NGN,Nigeria,Financials,Banks,1,1
+MTNN.NGX,MTNN,MTN Nigeria,EQUITY,NG,NGX,NGN,Nigeria,Telecommunications,Wireless,1,1
+AIRTELAFRI.NGX,AIRTELAFRI,Airtel Africa,EQUITY,NG,NGX,NGN,Nigeria,Telecommunications,Wireless,1,1
+FBNH.NGX,FBNH,FBN Holdings,EQUITY,NG,NGX,NGN,Nigeria,Financials,Banks,1,1
+ACCESSCORP.NGX,ACCESSCORP,Access Holdings,EQUITY,NG,NGX,NGN,Nigeria,Financials,Banks,1,1
+OANDO.NGX,OANDO,Oando,EQUITY,NG,NGX,NGN,Nigeria,Energy,Oil & Gas,1,1
+SEPLAT.NGX,SEPLAT,Seplat Energy,EQUITY,NG,NGX,NGN,Nigeria,Energy,Oil & Gas,1,1
+NESTLE.NGX,NESTLE,Nestle Nigeria,EQUITY,NG,NGX,NGN,Nigeria,Consumer Goods,Food Processing,1,1
+CADBURY.NGX,CADBURY,Cadbury Nigeria,EQUITY,NG,NGX,NGN,Nigeria,Consumer Goods,Food Processing,2,2
+UNILEVER.NGX,UNILEVER,Unilever Nigeria,EQUITY,NG,NGX,NGN,Nigeria,Consumer Goods,Consumer Products,2,2
+NB.NGX,NB,Nigerian Breweries,EQUITY,NG,NGX,NGN,Nigeria,Consumer Goods,Beverages,2,2
+FLOURMILL.NGX,FLOURMILL,Flour Mills of Nigeria,EQUITY,NG,NGX,NGN,Nigeria,Consumer Goods,Food Processing,2,2
+SONATEL.BRVM,SONATEL,Sonatel,EQUITY,SN,BRVM,XOF,Senegal,Telecommunications,Telecom Operators,1,1
+SGBCI.BRVM,SGBCI,Societe Generale Cote d Ivoire,EQUITY,CI,BRVM,XOF,Ivory Coast,Financials,Banks,1,1
+BOACI.BRVM,BOACI,Bank of Africa Cote d Ivoire,EQUITY,CI,BRVM,XOF,Ivory Coast,Financials,Banks,2,2
+BICICI.BRVM,BICICI,BICICI,EQUITY,CI,BRVM,XOF,Ivory Coast,Financials,Banks,2,2
+PALMCI.BRVM,PALMCI,Palm CI,EQUITY,CI,BRVM,XOF,Ivory Coast,Consumer Goods,Agriculture,2,2
+SAPH.BRVM,SAPH,SAPH,EQUITY,CI,BRVM,XOF,Ivory Coast,Consumer Goods,Agriculture,2,2
+ONTBF.BRVM,ONTBF,ONATEL Burkina Faso,EQUITY,BF,BRVM,XOF,Burkina Faso,Telecommunications,Telecom Operators,2,2
+ETIT.BRVM,ETIT,Ecobank Transnational,EQUITY,TG,BRVM,XOF,Togo,Financials,Banks,1,1
+CORIS.BRVM,CORIS,Coris Bank International,EQUITY,BF,BRVM,XOF,Burkina Faso,Financials,Banks,2,2
+SIBC.BRVM,SIBC,Societe Ivoirienne de Banque,EQUITY,CI,BRVM,XOF,Ivory Coast,Financials,Banks,2,2
+SITAB.BRVM,SITAB,SITAB,EQUITY,CI,BRVM,XOF,Ivory Coast,Consumer Goods,Tobacco,2,2
+SUCRIVOIRE.BRVM,SUCRIVOIRE,Sucrivoire,EQUITY,CI,BRVM,XOF,Ivory Coast,Consumer Goods,Sugar,2,2
+FILTISAC.BRVM,FILTISAC,Filtisac,EQUITY,CI,BRVM,XOF,Ivory Coast,Industrials,Packaging,2,2
+TOTAL.BRVM,TOTAL,TotalEnergies CI,EQUITY,CI,BRVM,XOF,Ivory Coast,Energy,Oil & Gas,2,2
+SOLIBRA.BRVM,SOLIBRA,Solibra,EQUITY,CI,BRVM,XOF,Ivory Coast,Consumer Goods,Beverages,2,2

@@ -60,6 +60,70 @@ def verify_supabase_token(token: str) -> Optional[dict]:
         return None
 
 
+def is_auth_required() -> bool:
+    """
+    Determine if auth should be enforced.
+    Set AUTH_REQUIRED=true or ENV/APP_ENV=production in production.
+    """
+    auth_required = os.environ.get("AUTH_REQUIRED", "").lower() in ("1", "true", "yes")
+    env = os.environ.get("ENV", "").lower()
+    app_env = os.environ.get("APP_ENV", "").lower()
+    return auth_required or env in ("prod", "production") or app_env in ("prod", "production")
+
+
+def get_user_id_from_request(
+    authorization: Optional[str],
+    fallback_user_id: str = "default_user",
+) -> str:
+    """
+    Resolve user_id from Authorization header with a dev fallback.
+    In production (auth required), missing/invalid tokens are rejected.
+    """
+    auth_required = is_auth_required()
+
+    if not authorization:
+        if auth_required:
+            raise HTTPException(
+                status_code=401,
+                detail="Authorization header required",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return fallback_user_id
+
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        if auth_required:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid authorization header format",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return fallback_user_id
+
+    token = parts[1]
+    payload = verify_supabase_token(token)
+    if not payload:
+        if auth_required:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return fallback_user_id
+
+    user_id = payload.get("sub") or payload.get("user_id")
+    if not user_id:
+        if auth_required:
+            raise HTTPException(
+                status_code=401,
+                detail="Token missing user ID",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return fallback_user_id
+
+    return user_id
+
+
 def _verify_token_via_supabase(token: str) -> Optional[dict]:
     """
     Verify token by calling Supabase auth endpoint.

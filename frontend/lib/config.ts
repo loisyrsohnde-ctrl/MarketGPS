@@ -8,9 +8,17 @@
  */
 
 // Configuration API Backend
+export function getApiBaseUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    'http://localhost:8000'
+  );
+}
+
 export const API_CONFIG = {
   // À définir selon ton environnement
-  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+  BASE_URL: getApiBaseUrl(),
   
   // Endpoints principaux
   ENDPOINTS: {

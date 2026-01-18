@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import type { NotificationSettings } from '@/lib/api-user';
 import {
   User,
   Mail,
@@ -219,7 +220,7 @@ export default function SettingsPage() {
   // NOTIFICATIONS TAB HANDLERS
   // ============================================================================
 
-  const handleNotificationChange = async (key: keyof typeof notifications) => {
+  const handleNotificationChange = async (key: keyof NotificationSettings) => {
     if (!notifications) return;
 
     const updated = { ...notifications, [key]: !notifications[key] };

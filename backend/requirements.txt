@@ -13,3 +13,4 @@ pydantic-settings>=2.0.0
 pandas>=2.0.0
 pyarrow>=14.0.0
 python-multipart>=0.0.9
+exchange-calendars>=4.5.0

@@ -1,25 +1,9 @@
-# --- Python ---
-backend/venv/
-**/__pycache__/
+venv/
+.venv/
+__pycache__/
 *.py[cod]
-.env
-.env.*
-*.sqlite
-*.db
-
-# --- Next.js / Node ---
-frontend/node_modules/
-frontend/.next/
-frontend/out/
-frontend/.env.local
-frontend/.env.*.local
-
-# --- Data (souvent lourd) ---
-data/
-backend/data/
-**/*.parquet
-
-# --- OS / IDE ---
+backend/logs/
+logs/
+node_modules/
+.next/
 .DS_Store
-.idea/
-.vscode/

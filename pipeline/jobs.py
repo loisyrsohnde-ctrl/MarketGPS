@@ -200,8 +200,19 @@ def run_rotation(args) -> int:
                 results = run_africa_rotation(store, parquet, batch_size)
             else:
                 # Standard US_EU rotation
-                job = RotationJob(store=store, parquet_store=parquet, market_scope=scope)
+                # Check if longterm scoring is enabled
+                run_longterm = getattr(args, 'run_longterm_scoring', False)
+                job = RotationJob(
+                    store=store, 
+                    parquet_store=parquet, 
+                    market_scope=scope,
+                    run_longterm=run_longterm
+                )
                 results = job.run(batch_size=batch_size)
+                
+                # Log longterm scoring status
+                if run_longterm:
+                    print(f"  Long-term scoring: ENABLED")
             
             elapsed = time.time() - start_time
             
@@ -591,6 +602,13 @@ Examples:
         "--production",
         action="store_true",
         help="Use production job runner with staging → atomic publish"
+    )
+    
+    parser.add_argument(
+        "--run-longterm-scoring",
+        action="store_true",
+        dest="run_longterm_scoring",
+        help="Also compute long-term institutional scores (US_EU only)"
     )
     
     args = parser.parse_args()

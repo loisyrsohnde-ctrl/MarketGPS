@@ -15,6 +15,7 @@ from storage.parquet_store import ParquetStore
 from providers import get_provider
 from pipeline.scoring import ScoringEngine
 from pipeline.quality_adjustments import apply_quality_liquidity_adjustments
+from pipeline.scoring_longterm import compute_longterm_score
 import json
 
 logger = get_logger(__name__)
@@ -37,15 +38,29 @@ class RotationJob:
         self,
         store: Optional[SQLiteStore] = None,
         parquet_store: Optional[ParquetStore] = None,
-        market_scope: MarketScope = "US_EU"
+        market_scope: MarketScope = "US_EU",
+        run_longterm: bool = False
     ):
-        """Initialize Rotation job."""
+        """
+        Initialize Rotation job.
+        
+        Args:
+            store: SQLite store instance
+            parquet_store: Parquet store instance
+            market_scope: Market scope to operate on
+            run_longterm: If True, also compute long-term institutional scores
+        """
         self._config = get_config()
         self._store = store or SQLiteStore()
         self._parquet = parquet_store or ParquetStore(market_scope=market_scope)
         self._provider = get_provider("auto")
         self._scoring = ScoringEngine()
         self._market_scope = market_scope
+        self._run_longterm = run_longterm
+        
+        # Ensure longterm schema if enabled
+        if self._run_longterm and self._market_scope == "US_EU":
+            self._store.ensure_longterm_schema()
     
     def run(self, batch_size: Optional[int] = None) -> dict:
         """
@@ -296,6 +311,61 @@ class RotationJob:
         
         # Update stores with scope
         self._store.upsert_score(score, market_scope=self._market_scope)
+        
+        # ═══════════════════════════════════════════════════════════════════
+        # LONG-TERM SCORING (ADD-ON) - Only for US_EU when enabled
+        # ═══════════════════════════════════════════════════════════════════
+        if self._run_longterm and self._market_scope == "US_EU":
+            try:
+                # Build price_data dict
+                price_data = {
+                    "last_price": score.last_price,
+                    "sma200": score.sma200,
+                    "rsi": score.rsi,
+                    "volatility_annual": score.vol_annual,
+                    "vol_annual": score.vol_annual,
+                    "max_drawdown": score.max_drawdown,
+                    "zscore": score.zscore,
+                }
+                
+                # Build fundamentals dict
+                fund_dict = {}
+                if fundamentals:
+                    fund_dict = fundamentals.to_dict() if hasattr(fundamentals, 'to_dict') else dict(fundamentals)
+                
+                # Build gating_data dict
+                gating_data = {}
+                if gating:
+                    gating_data = {
+                        "adv_usd": gating.liquidity,
+                        "liquidity": gating.liquidity,
+                        "coverage": gating.coverage,
+                        "stale_ratio": gating.stale_ratio,
+                        "data_confidence": gating.data_confidence,
+                    }
+                
+                # Compute long-term score
+                lt_result = compute_longterm_score(
+                    asset_id=asset_id,
+                    price_data=price_data,
+                    fundamentals=fund_dict,
+                    gating_data=gating_data,
+                    market_scope=self._market_scope
+                )
+                
+                # Upsert lt_score
+                if lt_result.lt_score is not None:
+                    self._store.upsert_longterm_score(
+                        asset_id=asset_id,
+                        lt_score=lt_result.lt_score,
+                        lt_confidence=lt_result.lt_confidence,
+                        lt_breakdown=lt_result.breakdown_json(),
+                        market_scope=self._market_scope
+                    )
+                    logger.debug(f"LT score for {asset_id}: {lt_result.lt_score} (caps: {lt_result.lt_caps_applied})")
+                    
+            except Exception as e:
+                logger.warning(f"Failed to compute LT score for {asset_id}: {e}")
         
         # Update rotation state
         state = RotationState(

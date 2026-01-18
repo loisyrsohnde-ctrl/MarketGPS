@@ -7,13 +7,16 @@ import os
 import sys
 from datetime import datetime, timedelta
 from typing import Optional, List
-from fastapi import APIRouter, Query, HTTPException, Depends
+from pathlib import Path as FilePath
+from fastapi import APIRouter, Query, HTTPException, Depends, Header
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 # Add parent directory to path to import from storage
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from storage.sqlite_store import SQLiteStore
+from security import get_user_id_from_request
 from storage.parquet_store import ParquetStore
 
 # Initialize SQLite store
@@ -25,6 +28,12 @@ parquet_africa = ParquetStore(market_scope="AFRICA")
 
 # Create router
 router = APIRouter(prefix="/api", tags=["Assets"])
+
+
+def _resolve_user_id(user_id: Optional[str], authorization: Optional[str]) -> str:
+    """Resolve user_id from token in prod, or fallback in dev."""
+    fallback_user_id = user_id or "default"
+    return get_user_id_from_request(authorization, fallback_user_id=fallback_user_id)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -49,6 +58,18 @@ class AssetResponse(BaseModel):
     fx_risk: Optional[float] = None
     sector: Optional[str] = None
     industry: Optional[str] = None
+    # Long-term institutional score (ADD-ON)
+    lt_score: Optional[float] = None
+    lt_confidence: Optional[float] = None
+    # Institutional Guard fields (ADD-ON v2.0)
+    score_institutional: Optional[float] = None
+    liquidity_tier: Optional[str] = None
+    liquidity_flag: Optional[bool] = None
+    data_quality_flag: Optional[bool] = None
+    data_quality_score: Optional[float] = None
+    stale_price_flag: Optional[bool] = None
+    min_recommended_horizon_years: Optional[int] = None
+    adv_usd: Optional[float] = None
 
 
 class PaginatedResponse(BaseModel):
@@ -85,8 +106,23 @@ class AssetDetailResponse(BaseModel):
     vol_annual: Optional[float] = None
     max_drawdown: Optional[float] = None
     last_price: Optional[float] = None
+    # Institutional Guard fields (ADD-ON v2.0)
+    score_institutional: Optional[float] = None
+    liquidity_tier: Optional[str] = None
+    liquidity_flag: Optional[bool] = None
+    liquidity_penalty: Optional[float] = None
+    data_quality_flag: Optional[bool] = None
+    data_quality_score: Optional[float] = None
+    stale_price_flag: Optional[bool] = None
+    min_recommended_horizon_years: Optional[int] = None
+    institutional_explanation: Optional[str] = None
+    adv_usd: Optional[float] = None
     sector: Optional[str] = None
     industry: Optional[str] = None
+    # Long-term institutional score (ADD-ON)
+    lt_score: Optional[float] = None
+    lt_confidence: Optional[float] = None
+    lt_breakdown: Optional[dict] = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -161,6 +197,14 @@ async def get_top_scored(
                 "confidence": a.get("confidence"),
                 "coverage": a.get("coverage"),
                 "liquidity": a.get("liquidity"),
+                # Institutional Guard fields (ADD-ON - backward compatible)
+                "score_institutional": a.get("score_institutional"),
+                "liquidity_tier": a.get("liquidity_tier"),
+                "liquidity_flag": bool(a.get("liquidity_flag")) if a.get("liquidity_flag") is not None else None,
+                "data_quality_flag": bool(a.get("data_quality_flag")) if a.get("data_quality_flag") is not None else None,
+                "data_quality_score": a.get("data_quality_score"),
+                "min_recommended_horizon_years": a.get("min_recommended_horizon_years"),
+                "adv_usd": a.get("adv_usd"),
             })
         
         return {
@@ -169,6 +213,163 @@ async def get_top_scored(
             "page": (offset // limit) + 1,
             "page_size": limit,
             "total_pages": max(1, (total + limit - 1) // limit) if limit > 0 else 1,
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NEW ENDPOINT: Institutional Ranking (ADD-ON v2.0)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.get("/assets/top-scored-institutional")
+async def get_top_scored_institutional(
+    limit: int = Query(30, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    market_scope: Optional[str] = Query("US_EU", description="US_EU or AFRICA"),
+    asset_type: Optional[str] = Query(None, description="ETF, EQUITY"),
+    min_liquidity_tier: Optional[str] = Query(None, description="A, B, C - minimum tier"),
+    exclude_flagged: bool = Query(False, description="Exclude assets with liquidity/quality flags"),
+    min_horizon_years: Optional[int] = Query(None, ge=1, le=20, description="Min recommended horizon"),
+):
+    """
+    Get top scored assets ranked by score_institutional (liquidity & quality adjusted).
+    
+    ADD-ON endpoint - does not replace /assets/top-scored.
+    
+    Features:
+    - Ranks by score_institutional instead of score_total
+    - Filter by minimum liquidity tier (A = best, D = worst)
+    - Exclude flagged assets (liquidity or data quality issues)
+    - Filter by minimum recommended investment horizon
+    """
+    try:
+        scope = market_scope or "US_EU"
+        
+        # Build query with institutional columns
+        with db._get_connection() as conn:
+            # Base query
+            query = """
+                SELECT 
+                    u.asset_id,
+                    u.symbol,
+                    u.name,
+                    u.asset_type,
+                    u.market_scope,
+                    u.market_code,
+                    u.sector,
+                    u.industry,
+                    s.score_total,
+                    s.score_value,
+                    s.score_momentum,
+                    s.score_safety,
+                    s.confidence,
+                    s.score_institutional,
+                    s.liquidity_tier,
+                    s.liquidity_flag,
+                    s.liquidity_penalty,
+                    s.data_quality_flag,
+                    s.data_quality_score,
+                    s.stale_price_flag,
+                    s.min_recommended_horizon_years,
+                    s.institutional_explanation,
+                    s.adv_usd,
+                    g.coverage,
+                    g.liquidity
+                FROM universe u
+                LEFT JOIN scores_latest s ON u.asset_id = s.asset_id
+                LEFT JOIN gating_status g ON u.asset_id = g.asset_id
+                WHERE u.market_scope = ?
+                  AND u.active = 1
+                  AND s.score_institutional IS NOT NULL
+            """
+            params = [scope]
+            
+            # Asset type filter
+            if asset_type:
+                query += " AND u.asset_type = ?"
+                params.append(asset_type.upper())
+            
+            # Liquidity tier filter
+            if min_liquidity_tier:
+                tier_order = {"A": 1, "B": 2, "C": 3, "D": 4}
+                min_tier_value = tier_order.get(min_liquidity_tier.upper(), 4)
+                valid_tiers = [t for t, v in tier_order.items() if v <= min_tier_value]
+                placeholders = ",".join(["?" for _ in valid_tiers])
+                query += f" AND s.liquidity_tier IN ({placeholders})"
+                params.extend(valid_tiers)
+            
+            # Exclude flagged assets
+            if exclude_flagged:
+                query += " AND (s.liquidity_flag = 0 OR s.liquidity_flag IS NULL)"
+                query += " AND (s.data_quality_flag = 0 OR s.data_quality_flag IS NULL)"
+            
+            # Min horizon filter
+            if min_horizon_years:
+                query += " AND s.min_recommended_horizon_years >= ?"
+                params.append(min_horizon_years)
+            
+            # Get total count
+            count_query = f"SELECT COUNT(*) as total FROM ({query})"
+            total = conn.execute(count_query, params).fetchone()["total"]
+            
+            # Add ordering and pagination
+            query += " ORDER BY s.score_institutional DESC NULLS LAST"
+            query += " LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
+            
+            rows = conn.execute(query, params).fetchall()
+        
+        # Format response
+        formatted = []
+        for row in rows:
+            r = dict(row)
+            formatted.append({
+                "asset_id": r.get("asset_id"),
+                "ticker": r.get("symbol"),
+                "symbol": r.get("symbol"),
+                "name": r.get("name"),
+                "asset_type": r.get("asset_type"),
+                "market_scope": r.get("market_scope"),
+                "market_code": r.get("market_code"),
+                "sector": r.get("sector"),
+                "industry": r.get("industry"),
+                # Original scores
+                "score_total": r.get("score_total"),
+                "score_value": r.get("score_value"),
+                "score_momentum": r.get("score_momentum"),
+                "score_safety": r.get("score_safety"),
+                "confidence": r.get("confidence"),
+                "coverage": r.get("coverage"),
+                "liquidity": r.get("liquidity"),
+                # Institutional Guard fields
+                "score_institutional": r.get("score_institutional"),
+                "liquidity_tier": r.get("liquidity_tier"),
+                "liquidity_flag": bool(r.get("liquidity_flag")) if r.get("liquidity_flag") is not None else None,
+                "liquidity_penalty": r.get("liquidity_penalty"),
+                "data_quality_flag": bool(r.get("data_quality_flag")) if r.get("data_quality_flag") is not None else None,
+                "data_quality_score": r.get("data_quality_score"),
+                "stale_price_flag": bool(r.get("stale_price_flag")) if r.get("stale_price_flag") is not None else None,
+                "min_recommended_horizon_years": r.get("min_recommended_horizon_years"),
+                "institutional_explanation": r.get("institutional_explanation"),
+                "adv_usd": r.get("adv_usd"),
+            })
+        
+        return {
+            "data": formatted,
+            "total": total,
+            "page": (offset // limit) + 1,
+            "page_size": limit,
+            "total_pages": max(1, (total + limit - 1) // limit) if limit > 0 else 1,
+            "ranking_mode": "institutional",
+            "filters_applied": {
+                "market_scope": scope,
+                "asset_type": asset_type,
+                "min_liquidity_tier": min_liquidity_tier,
+                "exclude_flagged": exclude_flagged,
+                "min_horizon_years": min_horizon_years,
+            }
         }
         
     except Exception as e:
@@ -442,6 +643,17 @@ async def get_asset_details(ticker: str):
             "industry": detail.get("industry"),
             "currency": detail.get("currency"),
             "updated_at": detail.get("updated_at"),
+            # Institutional Guard fields (ADD-ON v2.0)
+            "score_institutional": detail.get("score_institutional"),
+            "liquidity_tier": detail.get("liquidity_tier"),
+            "liquidity_flag": bool(detail.get("liquidity_flag")) if detail.get("liquidity_flag") is not None else None,
+            "liquidity_penalty": detail.get("liquidity_penalty"),
+            "data_quality_flag": bool(detail.get("data_quality_flag")) if detail.get("data_quality_flag") is not None else None,
+            "data_quality_score": detail.get("data_quality_score"),
+            "stale_price_flag": bool(detail.get("stale_price_flag")) if detail.get("stale_price_flag") is not None else None,
+            "min_recommended_horizon_years": detail.get("min_recommended_horizon_years"),
+            "institutional_explanation": detail.get("institutional_explanation"),
+            "adv_usd": detail.get("adv_usd"),
         }
         
     except HTTPException:
@@ -501,12 +713,14 @@ async def get_landing_metrics(market_scope: str = Query("US_EU")):
 async def get_watchlist(
     user_id: str = Query("default"),
     market_scope: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
 ):
     """
     Get user's watchlist.
     """
     try:
-        items = db.list_watchlist(user_id=user_id, market_scope=market_scope)
+        resolved_user_id = _resolve_user_id(user_id, authorization)
+        items = db.list_watchlist(user_id=resolved_user_id, market_scope=market_scope)
         
         formatted = []
         for item in items:
@@ -543,14 +757,16 @@ class WatchlistAddRequest(BaseModel):
 async def add_to_watchlist(
     request: WatchlistAddRequest,
     user_id: str = Query("default"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
 ):
     """
     Add asset to watchlist.
     """
     try:
+        resolved_user_id = _resolve_user_id(user_id, authorization)
         success = db.add_watchlist(
             ticker=request.ticker,
-            user_id=user_id,
+            user_id=resolved_user_id,
             notes=request.notes,
             market_scope=request.market_scope
         )
@@ -570,12 +786,14 @@ async def add_to_watchlist(
 async def remove_from_watchlist(
     ticker: str,
     user_id: str = Query("default"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
 ):
     """
     Remove asset from watchlist.
     """
     try:
-        success = db.remove_watchlist(ticker=ticker, user_id=user_id)
+        resolved_user_id = _resolve_user_id(user_id, authorization)
+        success = db.remove_watchlist(ticker=ticker, user_id=resolved_user_id)
         
         if success:
             return {"status": "success", "ticker": ticker}
@@ -592,12 +810,14 @@ async def remove_from_watchlist(
 async def check_in_watchlist(
     ticker: str,
     user_id: str = Query("default"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
 ):
     """
     Check if asset is in watchlist.
     """
     try:
-        in_watchlist = db.is_in_watchlist(ticker=ticker, user_id=user_id)
+        resolved_user_id = _resolve_user_id(user_id, authorization)
+        in_watchlist = db.is_in_watchlist(ticker=ticker, user_id=resolved_user_id)
         return {"in_watchlist": in_watchlist}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -617,3 +837,48 @@ async def get_asset_types(market_scope: str = Query("US_EU")):
         return {"types": types}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Logo Endpoints
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Path to logos directory (relative to project root)
+LOGOS_DIR = FilePath(__file__).parent.parent / "data" / "logos"
+
+# 1x1 transparent PNG placeholder (base64 decoded)
+PLACEHOLDER_PNG = bytes([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+    0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+    0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+    0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+    0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
+])
+
+
+@router.get("/logos/{ticker}")
+async def get_logo(ticker: str):
+    """
+    Serve asset logo from data/logos/ directory.
+    Returns a transparent placeholder if logo doesn't exist.
+    """
+    # Normalize ticker (uppercase, remove .png extension if present)
+    clean_ticker = ticker.upper().replace(".PNG", "").replace(".png", "")
+    
+    # Try to find the logo file
+    logo_path = LOGOS_DIR / f"{clean_ticker}.png"
+    
+    if logo_path.exists() and logo_path.is_file():
+        return FileResponse(
+            path=str(logo_path),
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=86400"}  # Cache 24h
+        )
+    
+    # Return transparent placeholder if logo doesn't exist
+    return Response(
+        content=PLACEHOLDER_PNG,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=3600"}  # Cache 1h for placeholders
+    )

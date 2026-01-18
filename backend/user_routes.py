@@ -12,6 +12,7 @@ import json
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Header
+from security import get_user_id_from_request
 from pydantic import BaseModel
 
 # Add parent directory to path
@@ -72,19 +73,8 @@ class UserEntitlements(BaseModel):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _get_user_id_from_header(authorization: Optional[str] = Header(None)) -> str:
-    """Extract user ID from authorization header (JWT)"""
-    # For demo, use a default user_id
-    # In production, this would decode the JWT token
-    if not authorization:
-        return "default_user"
-
-    # Simple extraction: "Bearer <token>"
-    try:
-        token = authorization.replace("Bearer ", "")
-        # In production, decode and verify JWT
-        return "default_user"
-    except:
-        return "default_user"
+    """Extract user ID from authorization header (JWT) with dev fallback."""
+    return get_user_id_from_request(authorization, fallback_user_id="default_user")
 
 
 def _hash_password(password: str) -> str:

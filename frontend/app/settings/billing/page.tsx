@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+export const dynamic = 'force-dynamic';
+
+import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { GlassCard, GlassCardAccent } from '@/components/ui/glass-card';
@@ -22,6 +24,14 @@ import Link from 'next/link';
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function BillingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-bg-primary" />}>
+      <BillingContent />
+    </Suspense>
+  );
+}
+
+function BillingContent() {
   const searchParams = useSearchParams();
   const success = searchParams.get('success') === '1';
   const canceled = searchParams.get('canceled') === '1';

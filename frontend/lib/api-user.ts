@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from './api-client';
+import { getApiBaseUrl } from './config';
 
 export interface UserProfile {
   id: string;
@@ -66,7 +67,7 @@ export async function uploadProfileAvatar(file: File): Promise<{
     formData.append('file', file);
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/users/avatar/upload`,
+      `${getApiBaseUrl()}/users/avatar/upload`,
       {
         method: 'POST',
         body: formData,

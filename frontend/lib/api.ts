@@ -3,6 +3,7 @@
 // This file wraps all API calls. Adapt endpoints to your backend.
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { getApiBaseUrl } from './config';
 import type {
   Asset,
   AssetDetail,
@@ -21,7 +22,7 @@ import type {
 // Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = getApiBaseUrl();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Base Fetch Helper
@@ -80,6 +81,43 @@ export async function getTopScored(
   const endpoint = `/api/assets/top-scored${query ? `?${query}` : ''}`;
   
   return apiFetch<PaginatedResponse<Asset>>(endpoint, { token });
+}
+
+/**
+ * Parameters for institutional ranking endpoint
+ */
+export interface TopScoredInstitutionalParams {
+  limit?: number;
+  offset?: number;
+  market_scope?: 'US_EU' | 'AFRICA';
+  asset_type?: string | null;
+  min_liquidity_tier?: 'A' | 'B' | 'C' | null;
+  exclude_flagged?: boolean;
+  min_horizon_years?: number | null;
+}
+
+/**
+ * Get top scored assets ranked by score_institutional (ADD-ON v2.0)
+ * @endpoint GET /api/assets/top-scored-institutional
+ */
+export async function getTopScoredInstitutional(
+  params: TopScoredInstitutionalParams = {},
+  token?: string
+): Promise<PaginatedResponse<Asset> & { ranking_mode: 'institutional'; filters_applied: Record<string, any> }> {
+  const searchParams = new URLSearchParams();
+  
+  if (params.limit) searchParams.append('limit', params.limit.toString());
+  if (params.offset) searchParams.append('offset', params.offset.toString());
+  if (params.market_scope) searchParams.append('market_scope', params.market_scope);
+  if (params.asset_type) searchParams.append('asset_type', params.asset_type);
+  if (params.min_liquidity_tier) searchParams.append('min_liquidity_tier', params.min_liquidity_tier);
+  if (params.exclude_flagged) searchParams.append('exclude_flagged', 'true');
+  if (params.min_horizon_years) searchParams.append('min_horizon_years', params.min_horizon_years.toString());
+  
+  const query = searchParams.toString();
+  const endpoint = `/api/assets/top-scored-institutional${query ? `?${query}` : ''}`;
+  
+  return apiFetch(endpoint, { token });
 }
 
 /**

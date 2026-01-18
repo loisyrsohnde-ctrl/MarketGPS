@@ -43,7 +43,21 @@ export interface Asset {
   currency?: string | null;
   // Timestamps
   updated_at: string;
+  // Institutional Guard fields (ADD-ON v2.0)
+  score_institutional?: number | null;
+  liquidity_tier?: 'A' | 'B' | 'C' | 'D' | null;
+  liquidity_flag?: boolean | null;
+  liquidity_penalty?: number | null;
+  data_quality_flag?: boolean | null;
+  data_quality_score?: number | null;
+  stale_price_flag?: boolean | null;
+  min_recommended_horizon_years?: number | null;
+  institutional_explanation?: string | null;
+  adv_usd?: number | null;
 }
+
+// Institutional ranking mode type
+export type RankingMode = 'total' | 'institutional';
 
 export interface AssetDetail extends Asset {
   description?: string;

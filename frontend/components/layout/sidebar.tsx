@@ -16,6 +16,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Globe,
+  Dumbbell,
+  Briefcase,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -34,41 +36,56 @@ export function Sidebar({ scopeCounts, onLogout }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
-  const navItems = [
-    {
-      section: 'Navigation',
-      items: [
-        { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { href: '/dashboard/explorer', icon: Search, label: 'Explorer' },
-        { href: '/watchlist', icon: Star, label: 'Liste de suivi' },
-        { href: '/dashboard/markets', icon: TrendingUp, label: 'Marchés' },
-      ],
-    },
-    {
-      section: 'Marchés',
-      items: [
-        {
-          href: '/dashboard?scope=US_EU',
-          icon: 'flag-us-eu',
-          label: `US / Europe`,
-          badge: formatNumberSafe(scopeCounts?.US_EU),
-        },
-        {
-          href: '/dashboard?scope=AFRICA',
-          icon: Globe,
-          label: 'Afrique',
-          badge: formatNumberSafe(scopeCounts?.AFRICA),
-        },
-      ],
-    },
-    {
-      section: 'Paramètres',
-      items: [
-        { href: '/settings', icon: Settings, label: 'Paramètres' },
-        { href: '/settings/billing', icon: CreditCard, label: 'Abonnement' },
-      ],
-    },
-  ];
+  const navItems: Array<{
+    section: string;
+    items: Array<{
+      href: string;
+      icon: any;
+      label: string;
+      badge?: string;
+    }>;
+  }> = [
+      {
+        section: 'Navigation',
+        items: [
+          { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+          { href: '/dashboard/explorer', icon: Search, label: 'Explorer' },
+          { href: '/watchlist', icon: Star, label: 'Liste de suivi' },
+          { href: '/dashboard/markets', icon: TrendingUp, label: 'Marchés' },
+        ],
+      },
+      {
+        section: 'Marchés',
+        items: [
+          {
+            href: '/dashboard?scope=US_EU',
+            icon: 'flag-us-eu',
+            label: `US / Europe`,
+            badge: formatNumberSafe(scopeCounts?.US_EU),
+          },
+          {
+            href: '/dashboard?scope=AFRICA',
+            icon: Globe,
+            label: 'Afrique',
+            badge: formatNumberSafe(scopeCounts?.AFRICA),
+          },
+        ],
+      },
+      {
+        section: 'Stratégies',
+        items: [
+          { href: '/strategies', icon: Briefcase, label: 'Stratégies' },
+          { href: '/barbell', icon: Dumbbell, label: 'Haltères' },
+        ],
+      },
+      {
+        section: 'Paramètres',
+        items: [
+          { href: '/settings', icon: Settings, label: 'Paramètres' },
+          { href: '/settings/billing', icon: CreditCard, label: 'Abonnement' },
+        ],
+      },
+    ];
 
   return (
     <aside

@@ -3,6 +3,7 @@
 import { forwardRef, useState } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { getApiBaseUrl } from '@/lib/config';
 import { GlassCard } from '@/components/ui/glass-card';
 import { ScoreBadge } from '@/components/ui/badge';
 import { ScoreGauge, PillarBar } from '@/components/charts/score-gauge';
@@ -374,7 +375,8 @@ export function AssetLogo({ ticker, assetType, size = 'md', className }: AssetLo
     xl: 'text-xl',
   };
 
-  const logoPath = `/logos/${ticker.toUpperCase()}.png`;
+  // Fetch logos from backend API (allows dynamic logo updates via pipeline)
+  const logoPath = `${getApiBaseUrl()}/api/logos/${ticker.toUpperCase()}`;
   const forexFlags = getForexFlags(ticker);
   
   // Determine asset type for fallback icon
