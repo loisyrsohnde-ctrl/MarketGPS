@@ -18,8 +18,8 @@ services:
   # ──────────────────────────────────────────────────────────────────────────
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: Dockerfile.backend
     container_name: marketgps-backend
     restart: unless-stopped
     ports:

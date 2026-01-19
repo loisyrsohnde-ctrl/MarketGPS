@@ -1,0 +1,100 @@
+# ============================================================================
+# MarketGPS Backend Dockerfile (PRODUCTION)
+# Build context: Project root (.)
+# ============================================================================
+# 
+# This Dockerfile must be built from the PROJECT ROOT, not from backend/
+# In Dokploy:
+#   - Dockerfile Path: Dockerfile.backend
+#   - Docker Context: . (root)
+#
+# ============================================================================
+
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements from both locations
+COPY backend/requirements.txt ./backend_requirements.txt
+COPY requirements.txt ./requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --user -r requirements.txt && \
+    pip install --no-cache-dir --user -r backend_requirements.txt
+
+# --- Production stage ---
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --shell /bin/bash appuser
+
+# Copy Python packages from builder
+COPY --from=builder /root/.local /home/appuser/.local
+
+# Ensure scripts in .local are usable
+ENV PATH=/home/appuser/.local/bin:$PATH
+
+# ============================================================================
+# Copy ALL necessary modules from project root
+# ============================================================================
+
+# Backend code (main application)
+COPY backend/ ./backend/
+
+# Storage module (SQLite store, Parquet store, migrations)
+COPY storage/ ./storage/
+
+# Core module (config, models, utils, scoring specs)
+COPY core/ ./core/
+
+# Providers module (data providers: yfinance, tiingo, etc.)
+COPY providers/ ./providers/
+
+# Pipeline module (jobs, scheduler) - needed for some imports
+COPY pipeline/ ./pipeline/
+
+# Auth module
+COPY auth/ ./auth/
+
+# Schema file
+COPY schema.sql ./
+
+# ============================================================================
+# Setup working directory and symlinks for imports
+# ============================================================================
+
+# Create data/logs directories (will be mounted as volumes)
+RUN mkdir -p /app/data /app/logs && \
+    chown -R appuser:appuser /app
+
+# Set PYTHONPATH so Python finds all modules
+ENV PYTHONPATH=/app
+
+# Switch to non-root user
+USER appuser
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Start the FastAPI application
+# Note: backend.main:app because main.py is in /app/backend/
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
