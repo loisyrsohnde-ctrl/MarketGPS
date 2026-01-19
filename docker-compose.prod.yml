@@ -1,0 +1,135 @@
+# ============================================================================
+# MarketGPS Production Docker Compose
+# 3 services: frontend, backend, scheduler
+# ============================================================================
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Prerequisites:
+#   - Copy .env.prod.example to .env.prod and fill in values
+#   - Ensure data directory exists with necessary files
+#
+# ============================================================================
+
+services:
+  # ──────────────────────────────────────────────────────────────────────────
+  # BACKEND API (FastAPI)
+  # ──────────────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: marketgps-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist database and data files
+      - marketgps_data:/app/data
+      - ./data/parquet:/app/data/parquet:ro  # Read-only mount for parquet
+      - ./data/marketgps.db:/app/data/marketgps.db  # SQLite database
+      - ./data/logos:/app/data/logos:ro  # Logo images
+      # Logs
+      - backend_logs:/app/logs
+    env_file:
+      - .env.prod
+    environment:
+      - PORT=8000
+      - PYTHONPATH=/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - marketgps-network
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # FRONTEND (Next.js)
+  # ──────────────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # These are baked into the build
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    container_name: marketgps-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    env_file:
+      - .env.prod
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - marketgps-network
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # SCHEDULER (Pipeline jobs)
+  # ──────────────────────────────────────────────────────────────────────────
+  scheduler:
+    build:
+      context: .
+      dockerfile: ./pipeline/Dockerfile
+    container_name: marketgps-scheduler
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      # Share data with backend (must be writable for pipeline)
+      - marketgps_data:/app/data
+      - ./data/parquet:/app/data/parquet  # Read-write for pipeline
+      - ./data/marketgps.db:/app/data/marketgps.db  # SQLite database
+      # Logs
+      - scheduler_logs:/app/logs
+      - scheduler_logs:/app/backend/logs
+    env_file:
+      - .env.prod
+    environment:
+      - PYTHONPATH=/app
+      - MARKET_SCOPE=US_EU
+      - TZ=America/New_York
+      # Set to "true" to run pipeline immediately on startup
+      - RUN_ON_START=false
+    networks:
+      - marketgps-network
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+# ──────────────────────────────────────────────────────────────────────────
+# VOLUMES
+# ──────────────────────────────────────────────────────────────────────────
+volumes:
+  marketgps_data:
+    driver: local
+  backend_logs:
+    driver: local
+  scheduler_logs:
+    driver: local
+
+# ──────────────────────────────────────────────────────────────────────────
+# NETWORKS
+# ──────────────────────────────────────────────────────────────────────────
+networks:
+  marketgps-network:
+    driver: bridge
