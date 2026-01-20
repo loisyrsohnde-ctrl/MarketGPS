@@ -59,9 +59,16 @@ app = FastAPI(
 )
 
 # CORS configuration
-ALLOWED_ORIGINS = [
+# Default allowed origins (includes localhost for development)
+DEFAULT_ORIGINS = [
+    # Production domains - MarketGPS
+    "https://marketgps.online",
+    "https://app.marketgps.online",
+    "https://api.marketgps.online",
+    # Legacy domains - Afristocks
     "https://afristocks.eu",
     "https://app.afristocks.eu",
+    # Local development
     "http://localhost:8501",
     "http://127.0.0.1:8501",
     "http://localhost:3000",
@@ -69,6 +76,11 @@ ALLOWED_ORIGINS = [
     "http://localhost:3001",
     "http://127.0.0.1:3001",
 ]
+
+# Allow additional origins via environment variable (comma-separated)
+env_origins = os.environ.get("CORS_ORIGINS", "")
+extra_origins = [o.strip() for o in env_origins.split(",") if o.strip()]
+ALLOWED_ORIGINS = list(set(DEFAULT_ORIGINS + extra_origins))
 
 app.add_middleware(
     CORSMiddleware,
