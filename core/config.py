@@ -76,7 +76,8 @@ class PipelineConfig:
     gating_coverage_min: float = 0.90
     gating_adv_min_equity: float = 2_000_000  # $2M ADV minimum
     gating_adv_min_etf: float = 5_000_000     # $5M ADV minimum for ETFs
-    gating_lookback_days: int = 252           # 1 year
+    gating_lookback_days: int = 1260          # 5 years (institutional grade)
+    scoring_lookback_days: int = 1260         # 5 years for scoring calculations
     top_n_scores: int = 50
     
     # Scheduler configuration

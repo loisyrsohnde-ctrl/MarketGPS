@@ -86,11 +86,11 @@ class YFinanceProvider(DataProvider):
             # Normalize symbol for yfinance
             yf_symbol = self.normalize_symbol(symbol)
             
-            # Default date range
+            # Default date range (5+ years for institutional-grade scoring)
             if end is None:
                 end = date.today()
             if start is None:
-                start = end - timedelta(days=730)  # 2 years
+                start = end - timedelta(days=1825)  # 5 years
             
             # Create ticker
             ticker = yf.Ticker(yf_symbol)

@@ -519,7 +519,8 @@ class ProductionJobRunner:
         elif last_date:
             start_date = last_date + timedelta(days=1)
         else:
-            start_date = date.today() - timedelta(days=730)
+            # 5+ years of history for institutional-grade scoring
+            start_date = date.today() - timedelta(days=1825)
         
         end_date = date.today()
         
