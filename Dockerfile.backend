@@ -51,8 +51,11 @@ COPY auth/ auth/
 # Schema file
 COPY schema.sql ./
 
+# Data files (universe CSVs for Africa, etc.)
+COPY data/universe/ data/universe/
+
 # Create data/logs directories
-RUN mkdir -p /app/data /app/logs
+RUN mkdir -p /app/data /app/logs /app/data/parquet
 
 # IMPORTANT: on se place dans backend
 WORKDIR /app/backend

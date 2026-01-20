@@ -134,8 +134,8 @@ def run_gating(args) -> int:
         
         if scope == "AFRICA":
             # Use Africa-specific gating with stricter rules
-            from pipeline.africa.gating_africa import AfricaGatingJob
-            job = AfricaGatingJob(store=store, parquet_store=parquet)
+            from pipeline.africa.gating_africa import GatingAfricaJob
+            job = GatingAfricaJob(store=store, parquet_store=parquet)
         else:
             # Standard US_EU gating
             job = GatingJob(store=store, parquet_store=parquet, market_scope=scope)
