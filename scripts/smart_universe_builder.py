@@ -319,7 +319,7 @@ class SmartUniverseBuilder:
         }
         asset_type = type_map.get(type_str, AssetType.EQUITY)
         
-        # Market code
+        # Market code (used as attribute on Asset, not separate parameter)
         market_code = self.MARKET_CODE_MAP.get(exchange, exchange)
         if market_code in ["US", "UK", "FR", "DE", "NL", "CH", "IT", "ES", 
                            "BE", "PT", "AT", "FI", "SE", "DK", "NO", "IE"]:
@@ -339,12 +339,14 @@ class SmartUniverseBuilder:
                 isin=item.get("ISIN"),
                 active=active,
                 tier=tier,
+                market_code=market_code_final,  # Set on asset object
             )
             
-            self._store.upsert_asset(asset, market_scope=self._scope, market_code=market_code_final)
+            # upsert_asset only takes asset and market_scope
+            self._store.upsert_asset(asset, market_scope=self._scope)
             
         except Exception as e:
-            logger.debug(f"Failed to insert {asset_id}: {e}")
+            logger.warning(f"Failed to insert {asset_id}: {e}")
     
     def run(
         self,
