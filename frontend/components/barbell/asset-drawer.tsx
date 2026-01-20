@@ -12,7 +12,7 @@ import { GlassCard } from '@/components/ui/glass-card';
 import { ScoreGauge, PillarBar } from '@/components/charts/score-gauge';
 import Link from 'next/link';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8501';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
 interface AssetDrawerProps {
   assetId: string | null;

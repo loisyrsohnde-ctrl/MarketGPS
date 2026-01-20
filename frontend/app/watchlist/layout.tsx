@@ -20,7 +20,7 @@ export default function WatchlistLayout({ children }: LayoutProps) {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8501';
+        const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
         const usEuRes = await fetch(`${API_BASE}/api/assets?market_scope=US_EU&limit=1`);
         if (usEuRes.ok) {
           const data = await usEuRes.json();

@@ -260,6 +260,32 @@ async def create_portal_session():
             status_code=500, detail="Failed to create portal session")
 
 
+
+# ============================================================================
+# Subscription Status Endpoint
+# ============================================================================
+
+class SubscriptionResponse(BaseModel):
+    plan: str = "FREE"
+    status: str = "active"
+    daily_quota_used: int = 0
+    daily_quota_limit: int = 10
+    features: dict = {}
+
+
+@app.get("/billing/subscription", response_model=SubscriptionResponse)
+@app.get("/api/billing/subscription", response_model=SubscriptionResponse)
+async def get_subscription():
+    """Get current user subscription status."""
+    return SubscriptionResponse(
+        plan="FREE",
+        status="active",
+        daily_quota_used=0,
+        daily_quota_limit=10,
+        features={"markets": ["US", "EU"], "scopes": ["US_EU"]}
+    )
+
+
 # ============================================================================
 # Stripe Webhook (Public but signature-verified)
 # ============================================================================

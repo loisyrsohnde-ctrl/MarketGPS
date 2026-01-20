@@ -69,7 +69,7 @@ interface BuilderAsset {
 // API
 // ═══════════════════════════════════════════════════════════════════════════
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8501';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
 async function fetchBarbellSuggestion(riskProfile: string): Promise<BarbellSuggestion> {
   const res = await fetch(`${API_BASE}/api/barbell/suggest?risk_profile=${riskProfile}`);
