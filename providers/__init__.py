@@ -18,8 +18,8 @@ def get_provider(name: str = "auto") -> DataProvider:
     
     Args:
         name: Provider name:
-            - "auto": Use EODHD if configured, else yfinance
-            - "eodhd": Force EODHD
+            - "auto": Use yfinance (free, reliable, no API limits)
+            - "eodhd": Force EODHD (requires paid API key with fundamentals access)
             - "yfinance": Force yfinance
         
     Returns:
@@ -28,13 +28,10 @@ def get_provider(name: str = "auto") -> DataProvider:
     config = get_config()
     
     if name == "auto":
-        # Check if EODHD is configured
-        if config.eodhd.is_configured:
-            logger.info("Using EODHD provider (API key configured)")
-            return EODHDProvider()
-        else:
-            logger.info("Using yfinance provider (EODHD API key not configured)")
-            return YFinanceProvider()
+        # Default to yfinance (free, reliable, includes fundamentals)
+        # EODHD can be explicitly selected if user has a plan with fundamentals access
+        logger.info("Using yfinance provider (default - free, reliable, no API limits)")
+        return YFinanceProvider()
     
     providers = {
         "eodhd": EODHDProvider,
