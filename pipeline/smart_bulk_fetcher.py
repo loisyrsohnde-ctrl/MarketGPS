@@ -161,7 +161,7 @@ class SmartBulkFetcher:
         
         for asset_id in bulk_data.keys():
             # Check if Parquet file exists
-            parquet_path = self._parquet._get_file_path(asset_id)
+            parquet_path = self._parquet._get_symbol_path(asset_id)
             
             if not parquet_path.exists():
                 new_assets.append(asset_id)
