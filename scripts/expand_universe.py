@@ -1,6 +1,9 @@
 """
-MarketGPS - Expand Universe Script
-Downloads US and EU stock listings from EODHD and adds them to the universe.
+MarketGPS - Expand Universe Script (FULL)
+Downloads ALL available instruments from EODHD:
+- US stocks, ETFs, bonds
+- EU stocks, ETFs, bonds (all exchanges)
+- Africa stocks (JSE, NGX, EGX, BRVM)
 """
 import os
 import sys
@@ -17,8 +20,14 @@ from core.models import Asset, AssetType
 
 logger = get_logger(__name__)
 
-# All supported exchanges (US + Europe)
-US_EXCHANGES = ["US"]  # Main US exchange on EODHD
+# ============================================================================
+# EXCHANGE CONFIGURATION
+# ============================================================================
+
+# US exchanges
+US_EXCHANGES = ["US"]
+
+# European exchanges
 EU_EXCHANGES = [
     "PA",      # Paris (Euronext Paris)
     "XETRA",   # Frankfurt (Deutsche Börse)
@@ -35,14 +44,58 @@ EU_EXCHANGES = [
     "OL",      # Oslo
     "IR",      # Ireland
     "LU",      # Luxembourg
+    "WAR",     # Warsaw
+    "AT",      # Athens
+    "LIS",     # Lisbon
+    "IS",      # Istanbul
 ]
+
+# African exchanges
+AFRICA_EXCHANGES = [
+    "JSE",     # Johannesburg (South Africa)
+    "NGX",     # Nigeria (Nigerian Exchange)
+    # Note: EODHD uses different codes, we'll try alternatives
+]
+
+# Alternative Africa exchange codes (EODHD may use different names)
+AFRICA_EXCHANGE_ALTERNATIVES = {
+    "JSE": ["JSE", "XJSE"],
+    "NGX": ["NGX", "NG", "NGSE"],
+    "EGX": ["EGX", "CA", "CASE"],  # Cairo/Egypt
+    "BRVM": ["BRVM"],  # West Africa
+}
+
+# Asset types to include (map EODHD types to our AssetType)
+ASSET_TYPE_MAP = {
+    "COMMON STOCK": AssetType.EQUITY,
+    "PREFERRED STOCK": AssetType.EQUITY,
+    "ETF": AssetType.ETF,
+    "FUND": AssetType.ETF,
+    "MUTUAL FUND": AssetType.ETF,
+    "BOND": AssetType.BOND,
+    "GOVERNMENT BOND": AssetType.BOND,
+    "CORPORATE BOND": AssetType.BOND,
+    "INDEX": AssetType.INDEX,
+    "REIT": AssetType.EQUITY,  # Treat REITs as equity
+}
+
+# Types to EXCLUDE
+EXCLUDED_TYPES = [
+    "CURRENCY",
+    "CRYPTOCURRENCY",
+    "WARRANT",
+    "RIGHT",
+    "STRUCTURED PRODUCT",
+    "CERTIFICATE",
+]
+
 
 def fetch_exchange_symbols(api_key: str, exchange: str) -> list:
     """Fetch all symbols for an exchange from EODHD."""
     url = f"https://eodhd.com/api/exchange-symbol-list/{exchange}?api_token={api_key}&fmt=json"
     
     try:
-        response = requests.get(url, timeout=60)
+        response = requests.get(url, timeout=120)
         response.raise_for_status()
         data = response.json()
         
@@ -54,47 +107,81 @@ def fetch_exchange_symbols(api_key: str, exchange: str) -> list:
         return []
 
 
-def filter_equities(symbols: list) -> list:
-    """Filter to keep only common stocks and ETFs."""
+def filter_instruments(symbols: list) -> list:
+    """Filter to keep tradeable instruments (stocks, ETFs, bonds)."""
     filtered = []
     
     for s in symbols:
         symbol_type = s.get("Type", "").upper()
         
-        # Keep Common Stock, ETF
-        if symbol_type in ["COMMON STOCK", "ETF"]:
-            filtered.append(s)
+        # Skip excluded types
+        skip = False
+        for excluded in EXCLUDED_TYPES:
+            if excluded in symbol_type:
+                skip = True
+                break
+        
+        if not skip:
+            # Check if it's a type we want
+            for known_type in ASSET_TYPE_MAP.keys():
+                if known_type in symbol_type:
+                    filtered.append(s)
+                    break
     
     return filtered
 
 
-def create_asset_from_symbol(symbol_data: dict, exchange: str, market_scope: str = "US_EU") -> Asset:
+def get_asset_type(symbol_type: str) -> AssetType:
+    """Map EODHD type to our AssetType."""
+    symbol_type = symbol_type.upper()
+    
+    for known_type, asset_type in ASSET_TYPE_MAP.items():
+        if known_type in symbol_type:
+            return asset_type
+    
+    return AssetType.EQUITY  # Default to equity
+
+
+def get_market_code(exchange: str) -> str:
+    """Get market code from exchange."""
+    if exchange in US_EXCHANGES:
+        return "US"
+    elif exchange in EU_EXCHANGES:
+        return "EU"
+    else:
+        return "AFRICA"
+
+
+def get_market_scope(exchange: str) -> str:
+    """Get market scope from exchange."""
+    if exchange in US_EXCHANGES or exchange in EU_EXCHANGES:
+        return "US_EU"
+    else:
+        return "AFRICA"
+
+
+def create_asset_from_symbol(symbol_data: dict, exchange: str) -> Asset:
     """Create an Asset object from EODHD symbol data."""
     symbol = symbol_data.get("Code", "")
     name = symbol_data.get("Name", symbol)
     symbol_type = symbol_data.get("Type", "").upper()
     currency = symbol_data.get("Currency", "USD")
-    country = symbol_data.get("Country", "US")
+    country = symbol_data.get("Country", "")
     
-    # Map type
-    asset_type = AssetType.ETF if "ETF" in symbol_type else AssetType.EQUITY
+    # Get asset type
+    asset_type = get_asset_type(symbol_type)
     
     # Create asset_id
     asset_id = f"{symbol}.{exchange}"
     
-    # Map exchange to market_code
-    market_code_map = {
-        "US": "US",
-        "PA": "EU",
-        "XETRA": "EU",
-        "LSE": "EU",
-    }
-    market_code = market_code_map.get(exchange, "US")
+    # Get market info
+    market_code = get_market_code(exchange)
+    market_scope = get_market_scope(exchange)
     
     return Asset(
         asset_id=asset_id,
         symbol=symbol,
-        name=name[:200] if name else symbol,  # Truncate long names
+        name=name[:200] if name else symbol,
         asset_type=asset_type,
         market_scope=market_scope,
         market_code=market_code,
@@ -102,13 +189,42 @@ def create_asset_from_symbol(symbol_data: dict, exchange: str, market_scope: str
         currency=currency,
         country=country,
         active=True,
-        tier=2,  # Default to tier 2 (extended universe)
+        tier=2,
         priority_level=2,
     )
 
 
+def process_exchange(api_key: str, exchange: str, store: SQLiteStore) -> int:
+    """Process a single exchange and return count of added assets."""
+    print(f"  Fetching {exchange}...")
+    symbols = fetch_exchange_symbols(api_key, exchange)
+    
+    if not symbols:
+        print(f"    No symbols found for {exchange}")
+        return 0
+    
+    print(f"    Found {len(symbols)} total symbols")
+    
+    # Filter instruments
+    instruments = filter_instruments(symbols)
+    print(f"    Filtered to {len(instruments)} tradeable instruments")
+    
+    # Add to universe
+    added = 0
+    for sym in instruments:
+        try:
+            asset = create_asset_from_symbol(sym, exchange)
+            store.upsert_asset(asset)
+            added += 1
+        except Exception as e:
+            logger.warning(f"Failed to add {sym.get('Code')}: {e}")
+    
+    print(f"    Added/updated {added} assets")
+    return added
+
+
 def main():
-    """Main function to expand the universe."""
+    """Main function to expand the universe with ALL available instruments."""
     config = get_config()
     
     api_key = config.eodhd.api_key
@@ -118,97 +234,100 @@ def main():
     
     store = SQLiteStore(config.storage.sqlite_path)
     
-    print("=" * 60)
-    print("MarketGPS - Expand Universe")
-    print("=" * 60)
+    print("=" * 70)
+    print("MarketGPS - FULL Universe Expansion")
+    print("=" * 70)
+    print()
+    print("This will download ALL available instruments from your EODHD plan:")
+    print("  - US: Stocks, ETFs, Bonds")
+    print("  - Europe: All major exchanges (15+)")
+    print("  - Africa: JSE, NGX, EGX, BRVM")
     print()
     
     total_added = 0
-    total_updated = 0
     
-    # Process US exchanges
-    print("Fetching US stocks...")
+    # =========================================================================
+    # US EXCHANGES
+    # =========================================================================
+    print("=" * 70)
+    print("FETCHING US INSTRUMENTS")
+    print("=" * 70)
+    
     for exchange in US_EXCHANGES:
-        print(f"  Fetching {exchange}...")
-        symbols = fetch_exchange_symbols(api_key, exchange)
-        
-        if not symbols:
-            print(f"    No symbols found for {exchange}")
-            continue
-        
-        print(f"    Found {len(symbols)} total symbols")
-        
-        # Filter to equities and ETFs
-        equities = filter_equities(symbols)
-        print(f"    Filtered to {len(equities)} equities/ETFs")
-        
-        # No limit - take ALL available stocks
-        print(f"    Adding ALL {len(equities)} stocks (no limit)")
-        
-        # Add to universe
-        added = 0
-        for sym in equities:
-            try:
-                asset = create_asset_from_symbol(sym, exchange, "US_EU")
-                store.upsert_asset(asset)
-                added += 1
-            except Exception as e:
-                logger.warning(f"Failed to add {sym.get('Code')}: {e}")
-        
-        print(f"    Added/updated {added} assets")
+        added = process_exchange(api_key, exchange, store)
         total_added += added
-        
-        time.sleep(1)  # Be nice to API
+        time.sleep(1)
     
-    # Process EU exchanges
+    # =========================================================================
+    # EU EXCHANGES
+    # =========================================================================
     print()
-    print("Fetching EU stocks...")
+    print("=" * 70)
+    print("FETCHING EU INSTRUMENTS")
+    print("=" * 70)
+    
     for exchange in EU_EXCHANGES:
-        print(f"  Fetching {exchange}...")
-        symbols = fetch_exchange_symbols(api_key, exchange)
-        
-        if not symbols:
-            print(f"    No symbols found for {exchange}")
-            continue
-        
-        print(f"    Found {len(symbols)} total symbols")
-        
-        # Filter to equities and ETFs
-        equities = filter_equities(symbols)
-        print(f"    Filtered to {len(equities)} equities/ETFs")
-        
-        # No limit - take ALL available stocks
-        print(f"    Adding ALL {len(equities)} stocks (no limit)")
-        
-        # Add to universe
-        added = 0
-        for sym in equities:
-            try:
-                asset = create_asset_from_symbol(sym, exchange, "US_EU")
-                store.upsert_asset(asset)
-                added += 1
-            except Exception as e:
-                logger.warning(f"Failed to add {sym.get('Code')}: {e}")
-        
-        print(f"    Added/updated {added} assets")
+        added = process_exchange(api_key, exchange, store)
         total_added += added
-        
-        time.sleep(1)  # Be nice to API
+        time.sleep(1)
     
-    # Get final count
+    # =========================================================================
+    # AFRICA EXCHANGES
+    # =========================================================================
+    print()
+    print("=" * 70)
+    print("FETCHING AFRICA INSTRUMENTS")
+    print("=" * 70)
+    
+    # Try different exchange codes for Africa
+    for base_exchange, alternatives in AFRICA_EXCHANGE_ALTERNATIVES.items():
+        for exchange in alternatives:
+            added = process_exchange(api_key, exchange, store)
+            if added > 0:
+                total_added += added
+                break  # Found working code, move to next exchange
+            time.sleep(0.5)
+    
+    # =========================================================================
+    # SUMMARY
+    # =========================================================================
+    print()
+    print("=" * 70)
+    print("UNIVERSE EXPANSION COMPLETE")
+    print("=" * 70)
+    
+    # Get final counts
     with store._get_conn() as conn:
-        cursor = conn.execute("SELECT COUNT(*) FROM universe WHERE market_scope = 'US_EU'")
-        final_count = cursor.fetchone()[0]
+        cursor = conn.execute("SELECT market_scope, COUNT(*) FROM universe GROUP BY market_scope")
+        counts = dict(cursor.fetchall())
+        
+        cursor = conn.execute("SELECT asset_type, COUNT(*) FROM universe GROUP BY asset_type")
+        type_counts = dict(cursor.fetchall())
+        
+        cursor = conn.execute("SELECT COUNT(*) FROM universe")
+        total = cursor.fetchone()[0]
     
     print()
-    print("=" * 60)
-    print(f"Universe expansion complete!")
-    print(f"  Total US/EU assets: {final_count}")
-    print("=" * 60)
+    print("By Market Scope:")
+    for scope, count in counts.items():
+        print(f"  {scope}: {count:,} assets")
+    
     print()
+    print("By Asset Type:")
+    for atype, count in type_counts.items():
+        print(f"  {atype}: {count:,} assets")
+    
+    print()
+    print(f"TOTAL: {total:,} assets")
+    print()
+    print("=" * 70)
     print("Next steps:")
-    print("  1. Run gating: python -m pipeline.jobs --run-gating --scope US_EU")
-    print("  2. Run rotation: python -m pipeline.jobs --run-rotation --scope US_EU")
+    print("  1. Run US/EU pipeline:")
+    print("     python -m pipeline.jobs --full-pipeline --scope US_EU --production --mode daily_full")
+    print()
+    print("  2. Run Africa pipeline (if applicable):")
+    print("     python -m pipeline.jobs --full-pipeline --scope AFRICA --production --mode daily_full")
+    print("=" * 70)
 
 
 if __name__ == "__main__":
