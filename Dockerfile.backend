@@ -54,6 +54,9 @@ COPY schema.sql ./
 # Data files (universe CSVs for Africa, etc.)
 COPY data/universe/ data/universe/
 
+# Scripts (expand_universe.py, etc.)
+COPY scripts/ scripts/
+
 # Create data/logs directories
 RUN mkdir -p /app/data /app/logs /app/data/parquet
 
