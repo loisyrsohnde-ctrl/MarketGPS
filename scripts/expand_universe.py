@@ -17,9 +17,25 @@ from core.models import Asset, AssetType
 
 logger = get_logger(__name__)
 
-# Top US exchanges to fetch
+# All supported exchanges (US + Europe)
 US_EXCHANGES = ["US"]  # Main US exchange on EODHD
-EU_EXCHANGES = ["PA", "XETRA", "LSE"]  # Paris, Frankfurt, London
+EU_EXCHANGES = [
+    "PA",      # Paris (Euronext Paris)
+    "XETRA",   # Frankfurt (Deutsche Börse)
+    "LSE",     # London Stock Exchange
+    "AS",      # Amsterdam (Euronext)
+    "BR",      # Brussels (Euronext)
+    "MI",      # Milan (Borsa Italiana)
+    "MC",      # Madrid (BME)
+    "SW",      # Swiss Exchange
+    "VI",      # Vienna
+    "CO",      # Copenhagen
+    "HE",      # Helsinki
+    "ST",      # Stockholm
+    "OL",      # Oslo
+    "IR",      # Ireland
+    "LU",      # Luxembourg
+]
 
 def fetch_exchange_symbols(api_key: str, exchange: str) -> list:
     """Fetch all symbols for an exchange from EODHD."""
@@ -126,9 +142,8 @@ def main():
         equities = filter_equities(symbols)
         print(f"    Filtered to {len(equities)} equities/ETFs")
         
-        # Limit to top 2000 US stocks by market cap (we can't filter by market cap, so just take first 2000)
-        equities = equities[:2000]
-        print(f"    Taking top {len(equities)} stocks")
+        # No limit - take ALL available stocks
+        print(f"    Adding ALL {len(equities)} stocks (no limit)")
         
         # Add to universe
         added = 0
@@ -162,9 +177,8 @@ def main():
         equities = filter_equities(symbols)
         print(f"    Filtered to {len(equities)} equities/ETFs")
         
-        # Limit to top 500 per exchange
-        equities = equities[:500]
-        print(f"    Taking top {len(equities)} stocks")
+        # No limit - take ALL available stocks
+        print(f"    Adding ALL {len(equities)} stocks (no limit)")
         
         # Add to universe
         added = 0
