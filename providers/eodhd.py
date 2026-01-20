@@ -123,6 +123,11 @@ class EODHDProvider(DataProvider):
                 logger.warning(f"EODHD server error {response.status_code}")
                 raise EODHDError(f"Server error: {response.status_code}")
             
+            # Handle 403 Forbidden gracefully (plan limitation, not an error)
+            if response.status_code == 403:
+                logger.debug(f"EODHD 403 on {endpoint} - endpoint not available in current plan")
+                return {}
+            
             response.raise_for_status()
             
             data = response.json()
