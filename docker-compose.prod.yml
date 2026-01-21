@@ -28,7 +28,7 @@ services:
       # Persist database and data files
       - marketgps_data:/app/data
       - ./data/parquet:/app/data/parquet:ro  # Read-only mount for parquet
-      - ./data/marketgps.db:/app/data/marketgps.db  # SQLite database
+      - ./data/sqlite:/app/data/sqlite  # SQLite database directory
       - ./data/logos:/app/data/logos:ro  # Logo images
       # Logs
       - backend_logs:/app/logs
@@ -99,7 +99,7 @@ services:
       # Share data with backend (must be writable for pipeline)
       - marketgps_data:/app/data
       - ./data/parquet:/app/data/parquet  # Read-write for pipeline
-      - ./data/marketgps.db:/app/data/marketgps.db  # SQLite database
+      - ./data/sqlite:/app/data/sqlite  # SQLite database directory
       # Logs
       - scheduler_logs:/app/logs
       - scheduler_logs:/app/backend/logs

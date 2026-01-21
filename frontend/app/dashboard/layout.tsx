@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
 import { cn } from '@/lib/utils';
 import { supabase, signOut, getSession } from '@/lib/supabase';
+import { getApiBaseUrl } from '@/lib/config';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DASHBOARD LAYOUT
@@ -22,18 +23,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [user, setUser] = useState<{ email: string; display_name?: string } | null>(null);
   const [scopeCounts, setScopeCounts] = useState({ US_EU: 0, AFRICA: 0 });
 
-  // Fetch scope counts dynamically
+  // Fetch scope counts on mount
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const API_BASE = getApiBaseUrl();
         const res = await fetch(`${API_BASE}/api/metrics/counts`);
         if (res.ok) {
           const data = await res.json();
           setScopeCounts({ US_EU: data.US_EU || 0, AFRICA: data.AFRICA || 0 });
         }
       } catch (error) {
-        console.debug('Failed to fetch scope counts:', error);
+        console.error('Failed to fetch scope counts:', error);
       }
     };
     fetchCounts();

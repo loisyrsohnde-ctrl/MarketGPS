@@ -20,16 +20,11 @@ export default function BarbellLayout({ children }: LayoutProps) {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-        const usEuRes = await fetch(`${API_BASE}/api/assets?market_scope=US_EU&limit=1`);
-        if (usEuRes.ok) {
-          const data = await usEuRes.json();
-          setScopeCounts(prev => ({ ...prev, US_EU: data.total || 0 }));
-        }
-        const africaRes = await fetch(`${API_BASE}/api/assets?market_scope=AFRICA&limit=1`);
-        if (africaRes.ok) {
-          const data = await africaRes.json();
-          setScopeCounts(prev => ({ ...prev, AFRICA: data.total || 0 }));
+        const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8501';
+        const res = await fetch(`${API_BASE}/api/metrics/counts`);
+        if (res.ok) {
+          const data = await res.json();
+          setScopeCounts({ US_EU: data.US_EU || 0, AFRICA: data.AFRICA || 0 });
         }
       } catch (error) {
         console.error('Failed to fetch scope counts:', error);
