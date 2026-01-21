@@ -270,7 +270,7 @@ class SQLiteStore:
         self._ensure_strategy_tables()
 
     def _ensure_strategy_tables(self):
-        """Ensure strategy tables exist (idempotent)."""
+        """Ensure strategy tables exist and have seed data (idempotent)."""
         migration_path = Path(__file__).parent / \
             "migrations" / "add_strategy_tables.sql"
         if not migration_path.exists():
@@ -287,6 +287,14 @@ class SQLiteStore:
                 with open(migration_path, "r") as f:
                     conn.executescript(f.read())
                 logger.info("Strategy tables created successfully")
+            else:
+                # Table exists - check if it has data, if not seed it
+                count = conn.execute("SELECT COUNT(*) FROM strategy_templates").fetchone()[0]
+                if count == 0:
+                    logger.info("Seeding strategy templates...")
+                    with open(migration_path, "r") as f:
+                        conn.executescript(f.read())
+                    logger.info("Strategy templates seeded successfully")
 
     def reset_schema(self):
         """Force reset the database schema."""
