@@ -148,22 +148,34 @@ async def suggest_barbell_portfolio(
             }
 
             # Core: low volatility, defensive
-            vol = asset_dict.get('vol_annual') or 50
+            vol = asset_dict.get('vol_annual')  # Can be None
             lt_score = asset_dict.get('lt_score')
-            score_safety = asset_dict.get('score_safety') or 50
-            score_momentum = asset_dict.get('score_momentum') or 50
+            score_safety = asset_dict.get('score_safety') or 0
+            score_momentum = asset_dict.get('score_momentum') or 0
+            score_total = asset_dict.get('score_total') or 0
 
             # Classify based on characteristics
-            if vol is not None and vol < 25 and score_safety and score_safety > 60:
+            # Core criteria: High safety score (>65) OR (low vol < 25 AND safety > 50)
+            # If vol_annual is missing, rely purely on safety score
+            is_core_candidate = False
+            if score_safety >= 70:
+                # High safety = Core candidate regardless of volatility
+                is_core_candidate = True
+            elif vol is not None and vol < 25 and score_safety > 50:
+                # Low volatility with decent safety
+                is_core_candidate = True
+            elif lt_score and lt_score > 65:
+                # High long-term score
+                is_core_candidate = True
+            
+            if is_core_candidate:
                 core_candidates.append(asset_dict)
-            elif score_momentum and score_momentum > 60:
+            elif score_momentum > 60 or score_total > 75:
+                # High momentum or high total score = Satellite
                 satellite_candidates.append(asset_dict)
             else:
-                # Fallback: use lt_score if available
-                if lt_score and lt_score > 65:
-                    core_candidates.append(asset_dict)
-                else:
-                    satellite_candidates.append(asset_dict)
+                # Default to satellite for remaining assets
+                satellite_candidates.append(asset_dict)
 
         # Sort by appropriate metrics
         core_candidates.sort(key=lambda x: (
