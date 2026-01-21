@@ -636,24 +636,30 @@ async def get_template_compositions(slug: str):
 async def get_eligible_instruments(
     block_type: str = Query(..., description="Block type (ultra_safe, growth, core, satellite, etc.)"),
     strategy_slug: Optional[str] = Query(None, description="Strategy slug for context"),
-    limit: int = Query(100, ge=5, le=500)
+    limit: int = Query(100, ge=5, le=500),
+    include_unscored: bool = Query(False, description="Include unscored assets with estimated fit")
 ):
     """
     Get eligible instruments for a specific strategy block.
     
     Returns instruments with their Strategy Fit Score for this block.
     This score is DIFFERENT from the global score.
+    
+    Relaxed criteria to ensure at least 100 instruments are returned.
     """
     try:
         store = SQLiteStore()
         
-        # Get top scored assets (using existing infrastructure)
+        # Get assets - include unscored if needed
+        scored_filter = None if include_unscored else "scored"
+        
+        # Get more assets to have a good pool
         assets, total = store.list_assets_paginated(
             market_scope="US_EU",
-            scored_filter="scored",
+            scored_filter=scored_filter,
             eligible_only=False,
             page=1,
-            page_size=min(limit * 2, 1000),  # Get more to filter, max 1000
+            page_size=min(limit * 5, 2000),  # Get 5x more to filter
             sort_by="score_total",
             sort_desc=True
         )
@@ -661,53 +667,66 @@ async def get_eligible_instruments(
         eligible = []
         scorer = StrategyFitScorer()
         
-        # Define eligibility criteria per block type
+        # Define eligibility criteria per block type - RELAXED for better coverage
         eligibility_criteria = {
-            'ultra_safe': {'max_vol': 10, 'min_safety': 60, 'max_drawdown': 10},
-            'defensive': {'max_vol': 15, 'min_safety': 50, 'max_drawdown': 15},
-            'core': {'max_vol': 30, 'min_score': 40, 'min_coverage': 0.5},
-            'core_equity': {'max_vol': 35, 'min_score': 40},
-            'core_bond': {'max_vol': 15, 'min_safety': 50},
-            'satellite': {'min_momentum': 40, 'min_score': 30},
-            'growth': {'min_momentum': 50, 'min_score': 40},
-            'crisis_alpha': {'min_coverage': 0.3},
-            'inflation_hedge': {'max_vol': 40, 'min_coverage': 0.4},
+            'ultra_safe': {'max_vol': 25, 'min_safety': 45, 'max_drawdown': 25},  # Relaxed
+            'defensive': {'max_vol': 35, 'min_safety': 35, 'max_drawdown': 30},   # Relaxed
+            'core': {'max_vol': 50, 'min_score': 20, 'min_coverage': 0.3},        # Relaxed
+            'core_equity': {'max_vol': 50, 'min_score': 20},                       # Relaxed
+            'core_bond': {'max_vol': 25, 'min_safety': 30},                        # Relaxed
+            'satellite': {'min_momentum': 20, 'min_score': 15},                    # Relaxed
+            'growth': {'min_momentum': 30, 'min_score': 20},                       # Relaxed
+            'crisis_alpha': {'min_coverage': 0.2},                                 # Relaxed
+            'inflation_hedge': {'max_vol': 60, 'min_coverage': 0.2},               # Relaxed
         }
         
-        criteria = eligibility_criteria.get(block_type.lower(), {'min_score': 30})
+        # If criteria not found, use very permissive defaults
+        criteria = eligibility_criteria.get(block_type.lower(), {})
         
         for asset in assets:
-            # Apply eligibility filters
-            vol = asset.get('vol_annual') or 50
-            safety = asset.get('score_safety') or 0
-            momentum = asset.get('score_momentum') or 0
-            score = asset.get('score_total') or 0
+            # Apply eligibility filters (relaxed)
+            vol = asset.get('vol_annual') or 30  # Default to moderate
+            safety = asset.get('score_safety') or 50  # Default to neutral
+            momentum = asset.get('score_momentum') or 50
+            score = asset.get('score_total') or 40  # Default to neutral
             coverage = asset.get('coverage') or 0.5
-            drawdown = abs(asset.get('max_drawdown') or 50)
+            drawdown = abs(asset.get('max_drawdown') or 20)
             
-            # Check criteria
-            if criteria.get('max_vol') and vol > criteria['max_vol']:
-                continue
-            if criteria.get('min_safety') and safety < criteria['min_safety']:
-                continue
-            if criteria.get('min_momentum') and momentum < criteria['min_momentum']:
-                continue
-            if criteria.get('min_score') and score < criteria['min_score']:
-                continue
-            if criteria.get('min_coverage') and coverage < criteria['min_coverage']:
-                continue
-            if criteria.get('max_drawdown') and drawdown > criteria['max_drawdown']:
+            # Skip only if FAR outside criteria
+            skip = False
+            if criteria.get('max_vol') and vol > criteria['max_vol'] * 1.5:  # 50% tolerance
+                skip = True
+            if criteria.get('min_safety') and safety < criteria['min_safety'] * 0.5:  # 50% tolerance
+                skip = True
+            if criteria.get('min_momentum') and momentum < criteria['min_momentum'] * 0.5:
+                skip = True
+            if criteria.get('min_score') and score < criteria['min_score'] * 0.5:
+                skip = True
+            if criteria.get('max_drawdown') and drawdown > criteria['max_drawdown'] * 2:
+                skip = True
+            
+            if skip:
                 continue
             
             # Calculate fit score for this block
             fit_score, breakdown = scorer.calculate(block_type, asset)
             
+            # Penalize if doesn't meet criteria perfectly
+            if criteria.get('max_vol') and vol > criteria['max_vol']:
+                fit_score *= 0.9
+            if criteria.get('min_safety') and safety < criteria['min_safety']:
+                fit_score *= 0.9
+            if criteria.get('min_momentum') and momentum < criteria['min_momentum']:
+                fit_score *= 0.9
+            if criteria.get('min_score') and score < criteria['min_score']:
+                fit_score *= 0.85
+            
             # Determine badges
             liquidity = asset.get('data_confidence') or asset.get('liquidity') or 0.7
             liquidity_badge = "good" if liquidity > 0.6 else "medium" if liquidity > 0.3 else "low"
             
-            coverage = asset.get('coverage') or 0.8
-            data_badge = "good" if coverage > 0.8 else "medium" if coverage > 0.5 else "low"
+            coverage_val = asset.get('coverage') or 0.8
+            data_badge = "good" if coverage_val > 0.8 else "medium" if coverage_val > 0.5 else "low"
             
             eligible.append(EligibleInstrument(
                 ticker=asset.get('symbol', ''),
