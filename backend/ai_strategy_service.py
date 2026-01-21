@@ -77,9 +77,12 @@ RÈGLES:
 async def get_ai_strategy_suggestion(user_description: str) -> Dict[str, Any]:
     """
     Send user's strategy description to ChatGPT and get structured recommendations.
+    Falls back to rule-based suggestions if OpenAI is not configured.
     """
     if not OPENAI_API_KEY or OPENAI_API_KEY.startswith("sk-proj-xxx"):
-        raise ValueError("OpenAI API key not configured")
+        # Fallback to rule-based strategy generation
+        logger.warning("OpenAI API key not configured - using fallback strategy generation")
+        return _generate_fallback_strategy(user_description)
     
     user_prompt = f"""L'utilisateur décrit sa stratégie d'investissement comme suit:
 
@@ -213,6 +216,77 @@ async def match_assets_to_strategy(
         matched_assets[block_name] = matching[:10]
     
     return matched_assets
+
+
+def _generate_fallback_strategy(description: str) -> Dict[str, Any]:
+    """
+    Generate a rule-based strategy when OpenAI is not available.
+    Analyzes keywords in the description to determine risk profile and allocation.
+    """
+    description_lower = description.lower()
+    
+    # Determine risk profile based on keywords
+    if any(word in description_lower for word in ['prudent', 'conservat', 'sécur', 'stable', 'retraite', 'défensif', 'faible risque']):
+        risk_profile = 'conservative'
+        blocks = [
+            {"name": "Obligations", "description": "Obligations d'État et corporate investment grade", "target_weight": 0.50, "asset_types": ["BOND", "ETF"], "criteria": {"max_volatility": 10}},
+            {"name": "Actions Défensives", "description": "Actions de grande capitalisation à dividendes", "target_weight": 0.30, "asset_types": ["EQUITY", "ETF"], "criteria": {"min_score": 60, "max_volatility": 20}},
+            {"name": "Or & Sécurité", "description": "Métaux précieux et actifs refuges", "target_weight": 0.20, "asset_types": ["COMMODITY", "ETF"], "criteria": {"max_volatility": 15}},
+        ]
+        horizon = 5
+        strategy_name = "Stratégie Prudente"
+        warnings = ["Les rendements attendus sont modérés en contrepartie d'une faible volatilité."]
+    
+    elif any(word in description_lower for word in ['croissance', 'growth', 'dynamique', 'perform', 'maximis', 'rendement']):
+        risk_profile = 'growth'
+        blocks = [
+            {"name": "Actions Croissance", "description": "Actions technologie et secteurs en croissance", "target_weight": 0.60, "asset_types": ["EQUITY", "ETF"], "criteria": {"min_score": 50, "max_volatility": 35}},
+            {"name": "Actions Internationales", "description": "Diversification géographique", "target_weight": 0.25, "asset_types": ["ETF"], "criteria": {"min_score": 45}},
+            {"name": "Obligations", "description": "Stabilisation du portefeuille", "target_weight": 0.15, "asset_types": ["BOND", "ETF"], "criteria": {"max_volatility": 10}},
+        ]
+        horizon = 10
+        strategy_name = "Stratégie Croissance"
+        warnings = ["Cette stratégie peut connaître des baisses significatives à court terme.", "Un horizon long (10+ ans) est recommandé."]
+    
+    elif any(word in description_lower for word in ['agress', 'risqué', 'crypto', 'specul', 'levier', 'option']):
+        risk_profile = 'aggressive'
+        blocks = [
+            {"name": "Actions Tech", "description": "Technologies de pointe et innovation", "target_weight": 0.50, "asset_types": ["EQUITY", "ETF"], "criteria": {"min_score": 40}},
+            {"name": "Crypto & Alternatives", "description": "Actifs à haut potentiel et haute volatilité", "target_weight": 0.30, "asset_types": ["CRYPTO", "COMMODITY"], "criteria": {}},
+            {"name": "Options & Futures", "description": "Dérivés pour amplifier les rendements", "target_weight": 0.20, "asset_types": ["OPTION", "FUTURE"], "criteria": {}},
+        ]
+        horizon = 15
+        strategy_name = "Stratégie Dynamique"
+        warnings = [
+            "Cette stratégie comporte une volatilité élevée, et les rendements peuvent fluctuer considérablement.",
+            "Les investissements en crypto-monnaies et en options peuvent entraîner des pertes significatives et doivent être gérés avec prudence."
+        ]
+    
+    else:  # Default to balanced
+        risk_profile = 'balanced'
+        blocks = [
+            {"name": "Actions Core", "description": "Actions diversifiées de qualité", "target_weight": 0.45, "asset_types": ["EQUITY", "ETF"], "criteria": {"min_score": 55, "max_volatility": 25}},
+            {"name": "Obligations", "description": "Revenu fixe pour stabilité", "target_weight": 0.35, "asset_types": ["BOND", "ETF"], "criteria": {"max_volatility": 10}},
+            {"name": "Alternatives", "description": "Or, immobilier, diversification", "target_weight": 0.20, "asset_types": ["COMMODITY", "ETF"], "criteria": {"max_volatility": 20}},
+        ]
+        horizon = 10
+        strategy_name = "Stratégie Équilibrée"
+        warnings = ["Les performances passées ne garantissent pas les performances futures."]
+    
+    return {
+        "strategy_name": strategy_name,
+        "description": f"Stratégie personnalisée basée sur votre demande: '{description[:100]}...'",
+        "risk_profile": risk_profile,
+        "investment_horizon": horizon,
+        "rationale": f"Cette stratégie a été construite en analysant vos objectifs. Elle vise à offrir un équilibre adapté à votre profil de risque ({risk_profile}) avec un horizon de {horizon} ans.",
+        "blocks": blocks,
+        "key_principles": [
+            "Diversification entre différentes classes d'actifs",
+            "Adaptation au profil de risque indiqué",
+            "Optimisation du rapport rendement/risque"
+        ],
+        "warnings": warnings
+    }
 
 
 def generate_strategy_explanation(strategy_data: Dict[str, Any], matched_assets: Dict[str, List]) -> str:

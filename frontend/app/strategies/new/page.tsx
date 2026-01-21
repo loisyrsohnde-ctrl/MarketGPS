@@ -328,11 +328,15 @@ function NewStrategyPageContent() {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
+  // Save error state
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   // Mutations
   const saveMutation = useMutation({
     mutationFn: saveStrategy,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['user-strategies'] });
+      setSaveError(null);
       // Show success screen instead of redirecting immediately
       setCreatedStrategy({
         id: data.id,
@@ -343,6 +347,10 @@ function NewStrategyPageContent() {
         positions: assets.length,
       });
       setStep(4); // Move to success step
+    },
+    onError: (error: Error) => {
+      console.error('Save strategy error:', error);
+      setSaveError(error.message || 'Erreur lors de la sauvegarde de la stratégie');
     },
   });
 
@@ -504,8 +512,9 @@ function NewStrategyPageContent() {
   const handleNextStep = () => {
     if (!canProceed()) return;
     
-    // If on step 1 and AI has generated a strategy, apply the assets before moving to step 2
-    if (step === 1 && aiGeneratedStrategy && assets.length === 0) {
+    // If on step 1 and AI has generated a strategy, ALWAYS apply the assets
+    // This ensures AI suggestions are used even if user just clicks "Suivant"
+    if (step === 1 && aiGeneratedStrategy) {
       applyAIAssets();
     }
     
@@ -513,13 +522,27 @@ function NewStrategyPageContent() {
   };
 
   const handleSave = () => {
-    if (!strategyName || assets.length === 0 || Math.abs(totalWeight - 1) > 0.01) return;
+    if (!strategyName || assets.length === 0) {
+      console.error('Missing strategy name or assets');
+      return;
+    }
+    
+    // Normalize weights if they don't sum exactly to 1
+    let normalizedAssets = assets;
+    if (Math.abs(totalWeight - 1) > 0.01) {
+      // Auto-normalize weights to sum to 1
+      normalizedAssets = assets.map(a => ({
+        ...a,
+        weight: a.weight / totalWeight
+      }));
+    }
+    
     saveMutation.mutate({
       name: strategyName,
       description: strategyDescription,
       risk_profile: riskProfile || 'balanced',
       horizon_years: horizon,
-      compositions: assets.map((a) => ({
+      compositions: normalizedAssets.map((a) => ({
         ticker: a.ticker,
         weight: a.weight,
         block_name: 'custom',
@@ -534,7 +557,8 @@ function NewStrategyPageContent() {
       case 2:
         return assets.length > 0;
       case 3:
-        return Math.abs(totalWeight - 1) < 0.02;
+        // Allow saving even if weights are slightly off - we'll normalize them
+        return assets.length > 0 && totalWeight > 0;
       default:
         return true;
     }
@@ -1099,11 +1123,21 @@ function NewStrategyPageContent() {
               </div>
 
               {/* Weight Warning */}
-              {Math.abs(totalWeight - 1) > 0.02 && (
+              {Math.abs(totalWeight - 1) > 0.1 && (
                 <div className="mt-4 p-3 rounded-xl bg-score-yellow/10 border border-score-yellow/30">
                   <div className="flex items-center gap-2 text-score-yellow text-sm">
                     <AlertCircle className="w-4 h-4" />
-                    <span>Le total doit être de 100% pour sauvegarder</span>
+                    <span>Le total ({(totalWeight * 100).toFixed(0)}%) sera normalisé à 100%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Save Error */}
+              {saveError && (
+                <div className="mt-4 p-3 rounded-xl bg-score-red/10 border border-score-red/30">
+                  <div className="flex items-center gap-2 text-score-red text-sm">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{saveError}</span>
                   </div>
                 </div>
               )}
