@@ -110,6 +110,7 @@ def startup_seed():
     """
     Seed demo data if database is empty.
     Ensures the dashboard is never empty on first deployment.
+    Also ensures strategy templates are ALWAYS present.
     """
     try:
         # First, ensure all tables exist
@@ -121,6 +122,12 @@ def startup_seed():
         import random
         
         store = SQLiteStore()
+        
+        # ALWAYS ensure strategy templates exist (even if DB has data)
+        # This is called via _ensure_strategy_tables in SQLiteStore.__init__
+        # but we double-check here to guarantee templates are never missing
+        store._ensure_strategy_tables()
+        logger.info("✅ Strategy templates verified/seeded")
         
         # Check if we have any scored assets
         with store._get_connection() as conn:
