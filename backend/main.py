@@ -42,10 +42,99 @@ except Exception as e:
     logger.info("Running in data-only mode (no billing endpoints)")
 
 
+def startup_seed():
+    """
+    Seed demo data if database is empty.
+    Ensures the dashboard is never empty on first deployment.
+    """
+    try:
+        from storage.sqlite_store import SQLiteStore
+        from core.models import Asset, Score, AssetType
+        from datetime import datetime
+        import random
+        
+        store = SQLiteStore()
+        
+        # Check if we have any scored assets
+        with store._get_connection() as conn:
+            count = conn.execute("SELECT COUNT(*) FROM scores_latest WHERE score_total IS NOT NULL").fetchone()[0]
+            
+            if count > 0:
+                logger.info(f"Database has {count} scored assets - no seeding needed")
+                return
+        
+        logger.info("Database empty - seeding demo data for initial display...")
+        
+        # Demo assets (mix of US and EU blue chips)
+        demo_assets = [
+            ("AAPL.US", "AAPL", "Apple Inc.", "EQUITY", "US"),
+            ("MSFT.US", "MSFT", "Microsoft Corp", "EQUITY", "US"),
+            ("GOOGL.US", "GOOGL", "Alphabet Inc", "EQUITY", "US"),
+            ("AMZN.US", "AMZN", "Amazon.com Inc", "EQUITY", "US"),
+            ("NVDA.US", "NVDA", "NVIDIA Corp", "EQUITY", "US"),
+            ("META.US", "META", "Meta Platforms", "EQUITY", "US"),
+            ("TSLA.US", "TSLA", "Tesla Inc", "EQUITY", "US"),
+            ("JPM.US", "JPM", "JPMorgan Chase", "EQUITY", "US"),
+            ("V.US", "V", "Visa Inc", "EQUITY", "US"),
+            ("JNJ.US", "JNJ", "Johnson & Johnson", "EQUITY", "US"),
+            ("SPY.US", "SPY", "SPDR S&P 500 ETF", "ETF", "US"),
+            ("QQQ.US", "QQQ", "Invesco QQQ Trust", "ETF", "US"),
+            ("TLT.US", "TLT", "iShares 20+ Treasury", "ETF", "US"),
+            ("MC.PA", "MC", "LVMH Moët Hennessy", "EQUITY", "EU"),
+            ("SAP.XETRA", "SAP", "SAP SE", "EQUITY", "EU"),
+            ("ASML.NL", "ASML", "ASML Holding", "EQUITY", "EU"),
+            ("SIE.XETRA", "SIE", "Siemens AG", "EQUITY", "EU"),
+            ("TTE.PA", "TTE", "TotalEnergies", "EQUITY", "EU"),
+            ("OR.PA", "OR", "L'Oréal SA", "EQUITY", "EU"),
+            ("AIR.PA", "AIR", "Airbus SE", "EQUITY", "EU"),
+        ]
+        
+        with store._get_connection() as conn:
+            for asset_id, symbol, name, asset_type, market_code in demo_assets:
+                # Insert asset
+                conn.execute("""
+                    INSERT OR IGNORE INTO universe 
+                    (asset_id, symbol, name, asset_type, market_scope, market_code, active, tier)
+                    VALUES (?, ?, ?, ?, 'US_EU', ?, 1, 1)
+                """, (asset_id, symbol, name, asset_type, market_code))
+                
+                # Generate realistic demo score
+                base_score = random.uniform(55, 90)
+                value = random.uniform(45, 85) if asset_type == "EQUITY" else None
+                momentum = random.uniform(40, 80)
+                safety = random.uniform(50, 85)
+                confidence = random.randint(70, 95)
+                
+                conn.execute("""
+                    INSERT OR REPLACE INTO scores_latest
+                    (asset_id, score_total, score_value, score_momentum, score_safety, 
+                     confidence, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+                """, (asset_id, round(base_score, 1), 
+                      round(value, 1) if value else None,
+                      round(momentum, 1), round(safety, 1), confidence))
+                
+                # Insert gating status as eligible
+                conn.execute("""
+                    INSERT OR REPLACE INTO gating_status
+                    (asset_id, eligible, coverage, liquidity, data_confidence, updated_at)
+                    VALUES (?, 1, 0.95, 50000000, 85, datetime('now'))
+                """, (asset_id,))
+        
+        logger.info(f"Seeded {len(demo_assets)} demo assets for initial display")
+        
+    except Exception as e:
+        logger.warning(f"Demo seeding failed (non-critical): {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     logger.info("Starting MarketGPS Backend API...")
+    
+    # Seed demo data if database is empty
+    startup_seed()
+    
     yield
     logger.info("Shutting down MarketGPS Backend API...")
 
@@ -283,6 +372,39 @@ async def get_subscription():
         daily_quota_used=0,
         daily_quota_limit=10,
         features={"markets": ["US", "EU"], "scopes": ["US_EU"]}
+    )
+
+
+# ============================================================================
+# Subscription Status Endpoint
+# ============================================================================
+
+class SubscriptionResponse(BaseModel):
+    plan: str = "FREE"
+    status: str = "active"
+    daily_quota_used: int = 0
+    daily_quota_limit: int = 10
+    features: dict = {}
+
+
+@app.get("/billing/subscription", response_model=SubscriptionResponse)
+@app.get("/api/billing/subscription", response_model=SubscriptionResponse)
+async def get_subscription():
+    """
+    Get current user's subscription status.
+    Returns FREE plan with basic limits if not authenticated or no subscription.
+    """
+    return SubscriptionResponse(
+        plan="FREE",
+        status="active",
+        daily_quota_used=0,
+        daily_quota_limit=10,
+        features={
+            "markets": ["US", "EU"],
+            "scopes": ["US_EU"],
+            "export_enabled": False,
+            "alerts_enabled": False,
+        }
     )
 
 

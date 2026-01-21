@@ -636,7 +636,7 @@ async def get_template_compositions(slug: str):
 async def get_eligible_instruments(
     block_type: str = Query(..., description="Block type (ultra_safe, growth, core, satellite, etc.)"),
     strategy_slug: Optional[str] = Query(None, description="Strategy slug for context"),
-    limit: int = Query(30, ge=5, le=100)
+    limit: int = Query(100, ge=5, le=500)
 ):
     """
     Get eligible instruments for a specific strategy block.
@@ -653,7 +653,7 @@ async def get_eligible_instruments(
             scored_filter="scored",
             eligible_only=False,
             page=1,
-            page_size=limit * 2,  # Get more to filter
+            page_size=min(limit * 2, 1000),  # Get more to filter, max 1000
             sort_by="score_total",
             sort_desc=True
         )
@@ -661,7 +661,44 @@ async def get_eligible_instruments(
         eligible = []
         scorer = StrategyFitScorer()
         
+        # Define eligibility criteria per block type
+        eligibility_criteria = {
+            'ultra_safe': {'max_vol': 10, 'min_safety': 60, 'max_drawdown': 10},
+            'defensive': {'max_vol': 15, 'min_safety': 50, 'max_drawdown': 15},
+            'core': {'max_vol': 30, 'min_score': 40, 'min_coverage': 0.5},
+            'core_equity': {'max_vol': 35, 'min_score': 40},
+            'core_bond': {'max_vol': 15, 'min_safety': 50},
+            'satellite': {'min_momentum': 40, 'min_score': 30},
+            'growth': {'min_momentum': 50, 'min_score': 40},
+            'crisis_alpha': {'min_coverage': 0.3},
+            'inflation_hedge': {'max_vol': 40, 'min_coverage': 0.4},
+        }
+        
+        criteria = eligibility_criteria.get(block_type.lower(), {'min_score': 30})
+        
         for asset in assets:
+            # Apply eligibility filters
+            vol = asset.get('vol_annual') or 50
+            safety = asset.get('score_safety') or 0
+            momentum = asset.get('score_momentum') or 0
+            score = asset.get('score_total') or 0
+            coverage = asset.get('coverage') or 0.5
+            drawdown = abs(asset.get('max_drawdown') or 50)
+            
+            # Check criteria
+            if criteria.get('max_vol') and vol > criteria['max_vol']:
+                continue
+            if criteria.get('min_safety') and safety < criteria['min_safety']:
+                continue
+            if criteria.get('min_momentum') and momentum < criteria['min_momentum']:
+                continue
+            if criteria.get('min_score') and score < criteria['min_score']:
+                continue
+            if criteria.get('min_coverage') and coverage < criteria['min_coverage']:
+                continue
+            if criteria.get('max_drawdown') and drawdown > criteria['max_drawdown']:
+                continue
+            
             # Calculate fit score for this block
             fit_score, breakdown = scorer.calculate(block_type, asset)
             
@@ -764,12 +801,18 @@ async def list_user_strategies(
                 
                 # Get compositions
                 comps = conn.execute("""
-                    SELECT * FROM user_strategy_compositions
+                    SELECT instrument_ticker as ticker, block_name, weight, fit_score
+                    FROM user_strategy_compositions
                     WHERE user_strategy_id = ?
                 """, (strategy['id'],)).fetchall()
                 
                 strategy['compositions'] = [
-                    InstrumentComposition(**dict(c)) 
+                    InstrumentComposition(
+                        ticker=c['ticker'],
+                        block_name=c['block_name'],
+                        weight=c['weight'],
+                        fit_score=c['fit_score']
+                    )
                     for c in comps
                 ]
                 
@@ -859,12 +902,18 @@ async def get_user_strategy(
             
             # Get compositions
             comps = conn.execute("""
-                SELECT * FROM user_strategy_compositions
+                SELECT instrument_ticker as ticker, block_name, weight, fit_score
+                FROM user_strategy_compositions
                 WHERE user_strategy_id = ?
             """, (strategy_id,)).fetchall()
             
             strategy['compositions'] = [
-                InstrumentComposition(**dict(c)) 
+                InstrumentComposition(
+                    ticker=c['ticker'],
+                    block_name=c['block_name'],
+                    weight=c['weight'],
+                    fit_score=c['fit_score']
+                )
                 for c in comps
             ]
             
@@ -874,6 +923,72 @@ async def get_user_strategy(
         raise
     except Exception as e:
         logger.error(f"Error getting user strategy: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/user/{strategy_id}", response_model=UserStrategy)
+async def update_user_strategy(
+    strategy_id: int,
+    request: SaveStrategyRequest,
+    user_id: str = Query("default", description="User ID")
+):
+    """Update an existing user strategy."""
+    try:
+        # Validate weights
+        total_weight = sum(c.weight for c in request.compositions)
+        if abs(total_weight - 1.0) > 0.02:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Weights must sum to 1.0, got {total_weight:.4f}"
+            )
+        
+        store = SQLiteStore()
+        
+        with store._get_connection() as conn:
+            # Check ownership
+            row = conn.execute("""
+                SELECT 1 FROM user_strategies WHERE id = ? AND user_id = ?
+            """, (strategy_id, user_id)).fetchone()
+            
+            if not row:
+                raise HTTPException(status_code=404, detail="Strategy not found")
+            
+            # Update strategy info
+            conn.execute("""
+                UPDATE user_strategies 
+                SET name = ?, description = ?, updated_at = datetime('now')
+                WHERE id = ?
+            """, (request.name, request.description, strategy_id))
+            
+            # Delete old compositions
+            conn.execute("""
+                DELETE FROM user_strategy_compositions WHERE user_strategy_id = ?
+            """, (strategy_id,))
+            
+            # Insert new compositions
+            for comp in request.compositions:
+                conn.execute("""
+                    INSERT INTO user_strategy_compositions 
+                        (user_strategy_id, instrument_ticker, block_name, weight, fit_score)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    strategy_id, comp.ticker, comp.block_name, 
+                    comp.weight, comp.fit_score
+                ))
+            
+            return UserStrategy(
+                id=strategy_id,
+                name=request.name,
+                description=request.description,
+                template_id=request.template_id,
+                compositions=request.compositions,
+                updated_at=datetime.now().isoformat()
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating user strategy: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -905,3 +1020,265 @@ async def delete_user_strategy(
     except Exception as e:
         logger.error(f"Error deleting user strategy: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/user/{strategy_id}/add-instrument")
+async def add_instrument_to_strategy(
+    strategy_id: int,
+    data: Dict[str, Any] = Body(...),
+    user_id: str = Query("default", description="User ID")
+):
+    """Add an instrument to an existing user strategy."""
+    try:
+        ticker = data.get('ticker')
+        weight = data.get('weight', 0.05)
+        block_name = data.get('block_name', 'custom')
+        
+        if not ticker:
+            raise HTTPException(status_code=400, detail="Ticker required")
+        
+        store = SQLiteStore()
+        
+        with store._get_connection() as conn:
+            # Check ownership
+            row = conn.execute("""
+                SELECT 1 FROM user_strategies WHERE id = ? AND user_id = ?
+            """, (strategy_id, user_id)).fetchone()
+            
+            if not row:
+                raise HTTPException(status_code=404, detail="Strategy not found")
+            
+            # Check if ticker already exists
+            existing = conn.execute("""
+                SELECT 1 FROM user_strategy_compositions 
+                WHERE user_strategy_id = ? AND instrument_ticker = ?
+            """, (strategy_id, ticker)).fetchone()
+            
+            if existing:
+                raise HTTPException(status_code=400, detail="Instrument already in strategy")
+            
+            # Insert
+            conn.execute("""
+                INSERT INTO user_strategy_compositions 
+                    (user_strategy_id, instrument_ticker, block_name, weight)
+                VALUES (?, ?, ?, ?)
+            """, (strategy_id, ticker, block_name, weight))
+            
+            # Update timestamp
+            conn.execute("""
+                UPDATE user_strategies SET updated_at = datetime('now')
+                WHERE id = ?
+            """, (strategy_id,))
+            
+            return {"status": "added", "ticker": ticker, "strategy_id": strategy_id}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding instrument to strategy: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class AISuggestRequest(BaseModel):
+    """Request for AI-powered asset suggestions."""
+    risk_profile: str = Field(default="balanced")
+    horizon_years: int = Field(default=10, ge=1, le=30)
+    exclude_tickers: List[str] = []
+    limit: int = Field(default=10, ge=1, le=50)
+
+
+@router.post("/ai-suggest")
+async def get_ai_suggestions(request: AISuggestRequest):
+    """
+    Get AI-powered asset suggestions based on risk profile and horizon.
+    
+    Uses the existing scoring system to find appropriate assets:
+    - Conservative: Low volatility, high safety score
+    - Balanced: Mix of safety and momentum
+    - Growth: High momentum and total score
+    - Aggressive: Highest momentum, accepts higher volatility
+    """
+    try:
+        store = SQLiteStore()
+        
+        # Map risk profile to scoring criteria
+        sort_criteria = {
+            'conservative': ('score_safety', True),
+            'balanced': ('score_total', True),
+            'growth': ('score_momentum', True),
+            'aggressive': ('score_momentum', True),
+        }
+        
+        sort_by, sort_desc = sort_criteria.get(request.risk_profile, ('score_total', True))
+        
+        # Get assets from store
+        assets, _ = store.list_assets_paginated(
+            market_scope="US_EU",
+            scored_filter="scored",
+            eligible_only=True,
+            page=1,
+            page_size=request.limit * 3,  # Get more to filter
+            sort_by=sort_by,
+            sort_desc=sort_desc
+        )
+        
+        # Filter out excluded tickers
+        filtered = [a for a in assets if a.get('symbol') not in request.exclude_tickers]
+        
+        # Apply additional risk-based filters
+        if request.risk_profile == 'conservative':
+            # Low volatility only
+            filtered = [a for a in filtered if (a.get('vol_annual') or 100) < 20]
+        elif request.risk_profile == 'aggressive':
+            # Higher volatility acceptable for momentum plays
+            filtered = [a for a in filtered if (a.get('score_momentum') or 0) > 50]
+        
+        # Limit results
+        filtered = filtered[:request.limit]
+        
+        # Format response
+        suggestions = []
+        for asset in filtered:
+            suggestions.append({
+                'ticker': asset.get('symbol'),
+                'name': asset.get('name', ''),
+                'asset_type': asset.get('asset_type', 'EQUITY'),
+                'score_total': asset.get('score_total'),
+                'score_safety': asset.get('score_safety'),
+                'score_momentum': asset.get('score_momentum'),
+                'vol_annual': asset.get('vol_annual'),
+                'rationale': _get_suggestion_rationale(request.risk_profile, asset),
+            })
+        
+        return suggestions
+        
+    except Exception as e:
+        logger.error(f"Error getting AI suggestions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _get_suggestion_rationale(profile: str, asset: Dict) -> str:
+    """Generate a brief rationale for why an asset is suggested."""
+    score_total = asset.get('score_total') or 0
+    score_safety = asset.get('score_safety') or 0
+    score_momentum = asset.get('score_momentum') or 0
+    vol = asset.get('vol_annual') or 0
+    
+    if profile == 'conservative':
+        if score_safety > 70:
+            return f"Score sécurité élevé ({score_safety:.0f}/100), volatilité maîtrisée ({vol:.1f}%)"
+        return f"Volatilité faible ({vol:.1f}%), bon score global ({score_total:.0f})"
+    
+    elif profile == 'balanced':
+        return f"Équilibre sécurité/performance ({score_safety:.0f}/{score_momentum:.0f})"
+    
+    elif profile == 'growth':
+        if score_momentum > 60:
+            return f"Fort momentum ({score_momentum:.0f}/100), tendance positive"
+        return f"Score global élevé ({score_total:.0f}), potentiel de croissance"
+    
+    else:  # aggressive
+        return f"Momentum exceptionnel ({score_momentum:.0f}), forte dynamique"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# AI-POWERED STRATEGY GENERATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+class AIStrategyRequest(BaseModel):
+    """Request for AI-powered strategy generation."""
+    description: str = Field(..., min_length=10, max_length=2000, description="User's strategy description")
+
+
+class AIStrategyResponse(BaseModel):
+    """Response from AI strategy generation."""
+    success: bool
+    strategy_name: str
+    description: str
+    risk_profile: str
+    investment_horizon: int
+    rationale: str
+    blocks: List[Dict[str, Any]]
+    key_principles: List[str]
+    warnings: List[str]
+    matched_assets: Dict[str, List[Dict[str, Any]]]
+    explanation: str
+
+
+@router.post("/ai-generate", response_model=AIStrategyResponse)
+async def generate_ai_strategy(request: AIStrategyRequest):
+    """
+    Generate a strategy using AI based on user's description.
+    
+    1. Sends description to ChatGPT for analysis
+    2. Gets structured strategy recommendations
+    3. Matches assets from our universe to each block
+    4. Returns complete strategy with explanation
+    """
+    from ai_strategy_service import (
+        get_ai_strategy_suggestion,
+        match_assets_to_strategy,
+        generate_strategy_explanation
+    )
+    
+    try:
+        logger.info(f"AI strategy request: {request.description[:100]}...")
+        
+        # Step 1: Get AI recommendations
+        strategy_data = await get_ai_strategy_suggestion(request.description)
+        
+        # Step 2: Get available assets from our universe
+        store = SQLiteStore()
+        assets, _ = store.list_assets_paginated(
+            market_scope="US_EU",
+            scored_filter="scored",
+            eligible_only=True,
+            page=1,
+            page_size=500,
+            sort_by="score_total",
+            sort_desc=True
+        )
+        
+        # Convert to dict format
+        available_assets = []
+        for asset in assets:
+            available_assets.append({
+                "ticker": asset.get("symbol"),
+                "name": asset.get("name", ""),
+                "asset_type": asset.get("asset_type", "EQUITY"),
+                "score_total": asset.get("score_total"),
+                "score_safety": asset.get("score_safety"),
+                "score_momentum": asset.get("score_momentum"),
+                "vol_annual": asset.get("vol_annual"),
+                "sector": asset.get("sector", ""),
+            })
+        
+        # Step 3: Match assets to strategy blocks
+        matched_assets = await match_assets_to_strategy(
+            strategy_data.get("blocks", []),
+            available_assets
+        )
+        
+        # Step 4: Generate human-readable explanation
+        explanation = generate_strategy_explanation(strategy_data, matched_assets)
+        
+        return AIStrategyResponse(
+            success=True,
+            strategy_name=strategy_data.get("strategy_name", "Ma Stratégie"),
+            description=strategy_data.get("description", ""),
+            risk_profile=strategy_data.get("risk_profile", "balanced"),
+            investment_horizon=strategy_data.get("investment_horizon", 10),
+            rationale=strategy_data.get("rationale", ""),
+            blocks=strategy_data.get("blocks", []),
+            key_principles=strategy_data.get("key_principles", []),
+            warnings=strategy_data.get("warnings", []),
+            matched_assets=matched_assets,
+            explanation=explanation
+        )
+        
+    except Exception as e:
+        logger.error(f"AI strategy generation error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la génération de la stratégie: {str(e)}"
+        )

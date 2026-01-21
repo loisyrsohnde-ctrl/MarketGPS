@@ -243,6 +243,29 @@ export async function getScopeCounts(): Promise<ScopeCounts> {
 }
 
 /**
+ * Asset type count response
+ */
+export interface AssetTypeCount {
+  count: number;
+  avgScore: number;
+}
+
+/**
+ * Get asset counts by type (includes unscored assets)
+ * @endpoint GET /api/metrics/asset-type-counts
+ */
+export async function getAssetTypeCounts(
+  marketScope?: string
+): Promise<Record<string, AssetTypeCount>> {
+  const params = new URLSearchParams();
+  if (marketScope) params.append('market_scope', marketScope);
+  const query = params.toString();
+  return apiFetch<Record<string, AssetTypeCount>>(
+    `/api/metrics/asset-type-counts${query ? `?${query}` : ''}`
+  );
+}
+
+/**
  * Get landing page metrics
  * @endpoint GET /api/metrics/landing
  */
@@ -301,6 +324,7 @@ export const api = {
   checkInWatchlist,
   // Metrics
   getScopeCounts,
+  getAssetTypeCounts,
   getLandingMetrics,
   // Billing
   createCheckoutSession,

@@ -60,16 +60,29 @@ class SmartUniverseBuilder:
     - Tier 2/3 can be processed on-demand or in batches
     """
     
-    # Exchange groupings
+    # Exchange groupings - Complete list including derivatives and bonds
     US_EU_EXCHANGES = [
+        # Main equity markets
         "US", "LSE", "PA", "XETRA", "AS", "SW", "MI", "MC",
-        "BR", "LIS", "VI", "HE", "ST", "CO", "OL", "IR"
+        "BR", "LIS", "VI", "HE", "ST", "CO", "OL", "IR",
+        # US Bonds and Futures
+        "BOND", "MONEY",  # Bond markets
+        # Futures exchanges
+        "CME", "COMEX", "CBOT", "NYMEX",  # US Futures
+        "EUREX",  # European derivatives
+        # ETF specific
+        "ETLX",  # ETF exchange
     ]
     
     AFRICA_EXCHANGES = ["JSE", "NG", "CA", "BRVM"]
     
+    # Derivative/Bond specific exchanges (lower tier by default due to complexity)
+    DERIVATIVE_EXCHANGES = ["CME", "COMEX", "CBOT", "NYMEX", "EUREX"]
+    BOND_EXCHANGES = ["BOND", "MONEY"]
+    
     # Market code mapping
     MARKET_CODE_MAP = {
+        # Equity markets
         "US": "US",
         "LSE": "UK",
         "PA": "FR",
@@ -86,10 +99,22 @@ class SmartUniverseBuilder:
         "CO": "DK",
         "OL": "NO",
         "IR": "IE",
+        # African markets
         "JSE": "ZA",
         "NG": "NG",
         "CA": "EG",
         "BRVM": "CI",
+        # Bond markets
+        "BOND": "US",
+        "MONEY": "US",
+        # Futures exchanges
+        "CME": "US",
+        "COMEX": "US",
+        "CBOT": "US",
+        "NYMEX": "US",
+        "EUREX": "DE",
+        # ETF
+        "ETLX": "US",
     }
     
     def __init__(self, market_scope: str = "US_EU"):
@@ -308,14 +333,37 @@ class SmartUniverseBuilder:
         exchange = item.get("Exchange", "US")
         asset_id = f"{code}.{exchange}"
         
-        # Map type
+        # Map type - Complete mapping for all EODHD asset types
         type_str = item.get("Type", "Common Stock")
         type_map = {
+            # Equity types
             "Common Stock": AssetType.EQUITY,
+            "Preferred Stock": AssetType.EQUITY,
+            "Depositary Receipt": AssetType.EQUITY,
+            "Unit": AssetType.EQUITY,
+            "Trust": AssetType.EQUITY,
+            "REIT": AssetType.EQUITY,
+            # ETF / Funds
             "ETF": AssetType.ETF,
             "FUND": AssetType.FUND,
+            "Mutual Fund": AssetType.FUND,
+            "Closed-End Fund": AssetType.FUND,
+            # Fixed Income
             "Bond": AssetType.BOND,
+            "Corporate Bond": AssetType.BOND,
+            "Government Bond": AssetType.BOND,
+            "Municipal Bond": AssetType.BOND,
+            # Derivatives
+            "Option": AssetType.OPTION,
+            "Warrant": AssetType.OPTION,
+            "Rights": AssetType.OPTION,
+            "Future": AssetType.FUTURE,
+            "Futures": AssetType.FUTURE,
+            # Other
             "INDEX": AssetType.INDEX,
+            "Commodity": AssetType.COMMODITY,
+            "Currency": AssetType.FX,
+            "Cryptocurrency": AssetType.CRYPTO,
         }
         asset_type = type_map.get(type_str, AssetType.EQUITY)
         

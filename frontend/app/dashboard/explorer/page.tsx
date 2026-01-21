@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { GlassCard, GlassCardAccent } from '@/components/ui/glass-card';
@@ -75,11 +76,14 @@ async function fetchExplorerData(params: ExplorerParams): Promise<ExplorerRespon
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// EXPLORER PAGE
+// EXPLORER PAGE CONTENT
 // ═══════════════════════════════════════════════════════════════════════════
 
-export default function ExplorerPage() {
-  const [marketScope, setMarketScope] = useState<'US_EU' | 'AFRICA'>('US_EU');
+function ExplorerPageContent() {
+  const searchParams = useSearchParams();
+  const initialScope = (searchParams.get('scope') as 'US_EU' | 'AFRICA') || 'US_EU';
+  
+  const [marketScope, setMarketScope] = useState<'US_EU' | 'AFRICA'>(initialScope);
   const [typeFilter, setTypeFilter] = useState<AssetType | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -89,6 +93,15 @@ export default function ExplorerPage() {
   const [onlyScored, setOnlyScored] = useState(false); // Show ALL assets by default
   
   const pageSize = 50;
+  
+  // Update scope when URL changes
+  useEffect(() => {
+    const urlScope = searchParams.get('scope') as 'US_EU' | 'AFRICA';
+    if (urlScope && urlScope !== marketScope) {
+      setMarketScope(urlScope);
+      setCurrentPage(1);
+    }
+  }, [searchParams, marketScope]);
 
   // Debounce search
   const handleSearchChange = useCallback((value: string) => {
@@ -429,5 +442,21 @@ export default function ExplorerPage() {
         )}
       </GlassCardAccent>
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPORTED PAGE (with Suspense wrapper)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export default function ExplorerPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
+      </div>
+    }>
+      <ExplorerPageContent />
+    </Suspense>
   );
 }

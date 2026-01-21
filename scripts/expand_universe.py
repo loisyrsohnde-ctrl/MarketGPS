@@ -45,6 +45,21 @@ EU_EXCHANGES = [
     "OL",      # Oslo Stock Exchange
 ]
 
+# Bond exchanges
+BOND_EXCHANGES = [
+    "BOND",    # US Bond market
+    "MONEY",   # Money market instruments
+]
+
+# Futures/Derivatives exchanges
+FUTURES_EXCHANGES = [
+    "CME",     # Chicago Mercantile Exchange
+    "COMEX",   # COMEX (metals)
+    "CBOT",    # Chicago Board of Trade
+    "NYMEX",   # New York Mercantile Exchange
+    "EUREX",   # European derivatives
+]
+
 # African Exchanges (from your existing pipeline/africa/exchanges_catalog.py)
 AFRICA_EXCHANGES = [
     ("JSE", "ZAR", "AFRICA"),     # Johannesburg Stock Exchange (South Africa)
@@ -123,10 +138,34 @@ def map_asset_type(symbol_type: str) -> AssetType:
     """Map EODHD type to our AssetType."""
     symbol_type = symbol_type.upper()
     
+    # ETFs
     if "ETF" in symbol_type:
         return AssetType.ETF
+    # Bonds / Fixed Income
     elif "BOND" in symbol_type:
         return AssetType.BOND
+    # Options and Warrants
+    elif "OPTION" in symbol_type or "WARRANT" in symbol_type or "RIGHT" in symbol_type:
+        return AssetType.OPTION
+    # Futures
+    elif "FUTURE" in symbol_type:
+        return AssetType.FUTURE
+    # Funds
+    elif "FUND" in symbol_type or "MUTUAL" in symbol_type:
+        return AssetType.FUND
+    # Commodities
+    elif "COMMODITY" in symbol_type or "COMMODIT" in symbol_type:
+        return AssetType.COMMODITY
+    # Crypto
+    elif "CRYPTO" in symbol_type:
+        return AssetType.CRYPTO
+    # Currency / Forex
+    elif "CURRENCY" in symbol_type or "FX" in symbol_type or "FOREX" in symbol_type:
+        return AssetType.FX
+    # Index
+    elif "INDEX" in symbol_type:
+        return AssetType.INDEX
+    # Default to equity
     else:
         return AssetType.EQUITY
 
@@ -291,7 +330,58 @@ def main():
         time.sleep(1)
     
     # ========================================================================
-    # 3. AFRICAN EXCHANGES (no limit)
+    # 3. BOND MARKETS
+    # ========================================================================
+    print()
+    print("=" * 50)
+    print("BOND MARKETS")
+    print("=" * 50)
+    
+    for exchange in BOND_EXCHANGES:
+        added = process_exchange(
+            store=store,
+            api_key=api_key,
+            exchange=exchange,
+            market_scope="US_EU",
+            market_code="US",
+            default_currency="USD",
+            limit=None
+        )
+        total_added += added
+        time.sleep(1)
+    
+    # ========================================================================
+    # 4. FUTURES / DERIVATIVES MARKETS
+    # ========================================================================
+    print()
+    print("=" * 50)
+    print("FUTURES / DERIVATIVES MARKETS")
+    print("=" * 50)
+    
+    futures_currency_map = {
+        "CME": "USD",
+        "COMEX": "USD",
+        "CBOT": "USD",
+        "NYMEX": "USD",
+        "EUREX": "EUR",
+    }
+    
+    for exchange in FUTURES_EXCHANGES:
+        currency = futures_currency_map.get(exchange, "USD")
+        added = process_exchange(
+            store=store,
+            api_key=api_key,
+            exchange=exchange,
+            market_scope="US_EU",
+            market_code="US" if exchange != "EUREX" else "EU",
+            default_currency=currency,
+            limit=None
+        )
+        total_added += added
+        time.sleep(1)
+    
+    # ========================================================================
+    # 5. AFRICAN EXCHANGES (no limit)
     # ========================================================================
     print()
     print("=" * 50)

@@ -759,6 +759,48 @@ class SQLiteStore:
                 return Score.from_row(dict(row))
         return None
 
+    def get_latest_score(self, ticker: str, market_scope: str = "US_EU") -> Optional[Dict]:
+        """Get latest score data for a ticker, including price."""
+        with self._get_connection() as conn:
+            # First try exact match with ticker
+            row = conn.execute("""
+                SELECT s.*, u.currency, u.name
+                FROM scores_latest s
+                JOIN universe u ON s.asset_id = u.asset_id
+                WHERE u.symbol = ? AND u.market_scope = ?
+                LIMIT 1
+            """, (ticker.upper(), market_scope)).fetchone()
+            
+            if row:
+                return dict(row)
+            
+            # Try with asset_id pattern
+            row = conn.execute("""
+                SELECT s.*, u.currency, u.name
+                FROM scores_latest s
+                JOIN universe u ON s.asset_id = u.asset_id
+                WHERE s.asset_id LIKE ? AND u.market_scope = ?
+                LIMIT 1
+            """, (f"{ticker.upper()}.%", market_scope)).fetchone()
+            
+            if row:
+                return dict(row)
+            
+        return None
+
+    def get_asset_by_ticker(self, ticker: str) -> Optional[Dict]:
+        """Get asset info by ticker symbol."""
+        with self._get_connection() as conn:
+            row = conn.execute("""
+                SELECT * FROM universe 
+                WHERE symbol = ? OR asset_id LIKE ?
+                LIMIT 1
+            """, (ticker.upper(), f"{ticker.upper()}.%")).fetchone()
+            
+            if row:
+                return dict(row)
+        return None
+
     def get_top_scores(
         self,
         limit: int = 50,

@@ -339,10 +339,10 @@ export default function LandingPage() {
             </div>
 
             <div className="flex gap-8 text-sm text-text-muted">
-              <Link href="/privacy" className="hover:text-text-primary transition-colors">
+              <Link href="/legal/privacy" className="hover:text-text-primary transition-colors">
                 Confidentialité
               </Link>
-              <Link href="/terms" className="hover:text-text-primary transition-colors">
+              <Link href="/legal/terms" className="hover:text-text-primary transition-colors">
                 CGU
               </Link>
               <Link href="/contact" className="hover:text-text-primary transition-colors">

@@ -19,18 +19,18 @@ const config: Config = {
           secondary: "#0A0E10",
           elevated: "#0D1214",
         },
-        // Surface (glass cards)
+        // Surface (glass cards) - Dark elegant style
         surface: {
-          DEFAULT: "rgba(255, 255, 255, 0.04)",
-          hover: "rgba(255, 255, 255, 0.06)",
-          active: "rgba(255, 255, 255, 0.08)",
-          dark: "rgba(0, 0, 0, 0.35)",
+          DEFAULT: "rgba(255, 255, 255, 0.03)",  // Subtle, dark cards
+          hover: "rgba(255, 255, 255, 0.05)",   // Subtle hover
+          active: "rgba(255, 255, 255, 0.07)",  // Subtle active
+          dark: "rgba(0, 0, 0, 0.50)",
         },
-        // Glass borders
+        // Glass borders - Subtle elegant style
         glass: {
-          border: "rgba(255, 255, 255, 0.08)",
-          "border-hover": "rgba(255, 255, 255, 0.12)",
-          "border-active": "rgba(25, 211, 140, 0.4)",
+          border: "rgba(255, 255, 255, 0.08)",         // Subtle borders
+          "border-hover": "rgba(255, 255, 255, 0.12)", // Subtle hover
+          "border-active": "rgba(25, 211, 140, 0.5)",  // Accent active
         },
         // Accent Green
         accent: {
@@ -40,12 +40,12 @@ const config: Config = {
           dim: "rgba(25, 211, 140, 0.15)",
           glow: "rgba(25, 211, 140, 0.25)",
         },
-        // Text
+        // Text - High contrast for excellent readability
         text: {
           primary: "#EAF2EE",
-          secondary: "rgba(234, 242, 238, 0.70)",
-          muted: "rgba(234, 242, 238, 0.50)",
-          dim: "rgba(234, 242, 238, 0.35)",
+          secondary: "rgba(234, 242, 238, 0.85)",  // Much higher for readability
+          muted: "rgba(234, 242, 238, 0.70)",      // Visible grey text
+          dim: "rgba(234, 242, 238, 0.55)",        // Subtle but readable
         },
         // Score colors
         score: {

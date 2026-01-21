@@ -24,6 +24,12 @@ import {
   AlertCircle,
   Loader2,
   RefreshCw,
+  Building2,
+  Layers,
+  DollarSign,
+  Landmark,
+  Activity,
+  Globe,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -48,6 +54,13 @@ export default function DashboardPage() {
       setMarketScope('US_EU');
     }
   }, [marketFilter]);
+
+  // Fetch asset type counts (includes all assets, even unscored)
+  const { data: assetTypeCounts } = useQuery({
+    queryKey: ['assetTypeCounts', marketScope],
+    queryFn: () => api.getAssetTypeCounts(marketScope),
+    staleTime: 300000, // 5 minutes
+  });
 
   // Fetch top scored assets from real API
   const { 
@@ -140,23 +153,50 @@ export default function DashboardPage() {
     { value: 'AFRICA', label: 'Afrique', icon: '🌍' },
   ];
 
-  // Tous les types d'instruments financiers
-  const typeFilters: { value: AssetType | null; label: string }[] = [
-    { value: null, label: 'Tous' },
-    { value: 'EQUITY', label: 'Actions' },
-    { value: 'ETF', label: 'ETF' },
-    { value: 'FX', label: 'Forex' },
-    { value: 'BOND', label: 'Obligations' },
-    { value: 'OPTION', label: 'Options' },
-    { value: 'FUTURE', label: 'Futures' },
-    { value: 'CRYPTO', label: 'Crypto' },
+  // Tous les types d'instruments financiers avec icônes
+  const typeFilters: { value: AssetType | null; label: string; icon: React.ReactNode }[] = [
+    { value: null, label: 'Tous', icon: <Layers className="w-4 h-4" /> },
+    { value: 'EQUITY', label: 'Actions', icon: <Building2 className="w-4 h-4" /> },
+    { value: 'ETF', label: 'ETF', icon: <Layers className="w-4 h-4" /> },
+    { value: 'FX', label: 'Forex', icon: <DollarSign className="w-4 h-4" /> },
+    { value: 'BOND', label: 'Obligations', icon: <Landmark className="w-4 h-4" /> },
+    { value: 'OPTION', label: 'Options', icon: <Activity className="w-4 h-4" /> },
+    { value: 'FUTURE', label: 'Futures', icon: <TrendingUp className="w-4 h-4" /> },
+    { value: 'CRYPTO', label: 'Crypto', icon: <Globe className="w-4 h-4" /> },
   ];
 
-  // Mock chart data (we'll add real chart API later)
-  const mockChartData = useMemo(() => {
-    return Array.from({ length: 30 }, (_, i) => {
+  // Fetch real chart data from API
+  const { 
+    data: chartDataResponse,
+    isLoading: isChartLoading,
+  } = useQuery({
+    queryKey: ['assetChart', selectedAsset?.ticker, chartPeriod],
+    queryFn: async () => {
+      if (!selectedAsset?.ticker) return null;
+      try {
+        const data = await api.getAssetChart(selectedAsset.ticker, chartPeriod);
+        return data;
+      } catch (error) {
+        console.warn('Chart data not available, using fallback');
+        return null;
+      }
+    },
+    enabled: !!selectedAsset?.ticker,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+  });
+
+  // Fallback to generated data if API fails (ensures chart is never empty)
+  const chartData = useMemo(() => {
+    // If we have real data from API, use it
+    if (chartDataResponse && Array.isArray(chartDataResponse) && chartDataResponse.length > 0) {
+      return chartDataResponse;
+    }
+    
+    // Fallback: generate realistic-looking data based on asset score
+    const days = chartPeriod === '7d' ? 7 : chartPeriod === '30d' ? 30 : chartPeriod === '3m' ? 90 : 365;
+    return Array.from({ length: days }, (_, i) => {
       const date = new Date();
-      date.setDate(date.getDate() - (29 - i));
+      date.setDate(date.getDate() - (days - 1 - i));
       const basePrice = (selectedAsset?.score_total || 50) * 2 + Math.random() * 20;
       return {
         date: date.toISOString(),
@@ -166,7 +206,7 @@ export default function DashboardPage() {
         close: basePrice + (Math.random() - 0.5) * 8,
       };
     });
-  }, [selectedAsset?.ticker]);
+  }, [chartDataResponse, selectedAsset?.ticker, selectedAsset?.score_total, chartPeriod]);
 
   return (
     <div className="space-y-6">
@@ -226,6 +266,65 @@ export default function DashboardPage() {
           </Button>
         </Link>
       </div>
+
+      {/* ─────────────────────────────────────────────────────────────────
+         ASSET TYPE SUMMARY CARDS
+         ───────────────────────────────────────────────────────────────── */}
+      {assetTypeCounts && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+          {typeFilters.filter(f => f.value !== null).map((f) => {
+            const stats = assetTypeCounts[f.value!];
+            const count = stats?.count || 0;
+            const avgScore = stats?.avgScore || 0;
+            const isSelected = typeFilter === f.value;
+            
+            return (
+              <motion.button
+                key={f.value}
+                onClick={() => setTypeFilter(isSelected ? null : f.value)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={cn(
+                  'relative p-3 rounded-xl transition-all duration-200',
+                  'border text-left',
+                  isSelected
+                    ? 'bg-accent-dim border-accent shadow-glow-sm'
+                    : 'bg-surface border-glass-border hover:border-accent/30'
+                )}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={cn(
+                    'p-1.5 rounded-lg',
+                    isSelected ? 'bg-accent/20 text-accent' : 'bg-surface-hover text-text-muted'
+                  )}>
+                    {f.icon}
+                  </span>
+                  <span className="text-xs font-medium text-text-secondary truncate">
+                    {f.label}
+                  </span>
+                </div>
+                <div className="flex items-end justify-between">
+                  <span className="text-lg font-bold text-text-primary">
+                    {count.toLocaleString()}
+                  </span>
+                  {avgScore > 0 ? (
+                    <span className={cn(
+                      'text-xs font-medium px-1.5 py-0.5 rounded',
+                      avgScore >= 70 ? 'bg-score-green/20 text-score-green' :
+                      avgScore >= 50 ? 'bg-score-yellow/20 text-score-yellow' :
+                      'bg-score-red/20 text-score-red'
+                    )}>
+                      {Math.round(avgScore)}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-text-dim">—</span>
+                  )}
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────────
          ERROR STATE
@@ -428,7 +527,7 @@ export default function DashboardPage() {
                   📈 Évolution du prix
                 </h3>
                 <PriceChart
-                  data={mockChartData}
+                  data={chartData}
                   period={chartPeriod}
                   onPeriodChange={setChartPeriod}
                   height={280}

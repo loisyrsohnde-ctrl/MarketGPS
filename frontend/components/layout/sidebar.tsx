@@ -58,13 +58,13 @@ export function Sidebar({ scopeCounts, onLogout }: SidebarProps) {
         section: 'Marchés',
         items: [
           {
-            href: '/dashboard?scope=US_EU',
+            href: '/dashboard/explorer?scope=US_EU',
             icon: 'flag-us-eu',
             label: `US / Europe`,
             badge: formatNumberSafe(scopeCounts?.US_EU),
           },
           {
-            href: '/dashboard?scope=AFRICA',
+            href: '/dashboard/explorer?scope=AFRICA',
             icon: Globe,
             label: 'Afrique',
             badge: formatNumberSafe(scopeCounts?.AFRICA),

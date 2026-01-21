@@ -99,30 +99,10 @@ export default function MarketsPage() {
 
   const topAssets = topAssetsData || [];
 
-  // Calculate stats per asset type for selected market
+  // Fetch stats per asset type for selected market (includes unscored assets)
   const { data: assetTypeStats } = useQuery({
     queryKey: ['assetTypeStats', selectedMarket],
-    queryFn: async () => {
-      const stats: Record<string, { count: number; avgScore: number }> = {};
-      for (const { type } of ASSET_TYPES) {
-        if (type) {
-          const response = await api.getTopScored({
-            market_scope: selectedMarket,
-            asset_type: type,
-            limit: 100,
-          });
-          const assets = response.data || [];
-          const validScores = assets.filter(a => a.score_total != null).map(a => a.score_total!);
-          stats[type] = {
-            count: response.total || assets.length,
-            avgScore: validScores.length > 0
-              ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length)
-              : 0,
-          };
-        }
-      }
-      return stats;
-    },
+    queryFn: () => api.getAssetTypeCounts(selectedMarket),
     staleTime: 300000,
   });
 
@@ -194,7 +174,7 @@ export default function MarketsPage() {
           <div className="p-4 border-b border-glass-border">
             <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
               <Layers className="w-5 h-5 text-accent" />
-              Types d'actifs
+              Types d&apos;actifs
             </h2>
           </div>
           <div className="p-4 space-y-4">

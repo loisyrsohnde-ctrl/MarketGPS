@@ -20,6 +20,24 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [user, setUser] = useState<{ email: string; display_name?: string } | null>(null);
+  const [scopeCounts, setScopeCounts] = useState({ US_EU: 0, AFRICA: 0 });
+
+  // Fetch scope counts dynamically
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const res = await fetch(`${API_BASE}/api/metrics/counts`);
+        if (res.ok) {
+          const data = await res.json();
+          setScopeCounts({ US_EU: data.US_EU || 0, AFRICA: data.AFRICA || 0 });
+        }
+      } catch (error) {
+        console.debug('Failed to fetch scope counts:', error);
+      }
+    };
+    fetchCounts();
+  }, []);
 
   // Check auth on mount
   useEffect(() => {
@@ -74,12 +92,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     if (query) {
       router.push(`/dashboard/explorer?q=${encodeURIComponent(query)}`);
     }
-  };
-
-  // Mock scope counts (replace with real data)
-  const scopeCounts = {
-    US_EU: 3552,
-    AFRICA: 50,
   };
 
   return (

@@ -417,14 +417,14 @@ async def explore_assets(
     market_scope: str = Query("US_EU"),
     asset_type: Optional[str] = Query(None),
     query: Optional[str] = Query(None),
-    only_scored: bool = Query(True),
+    only_scored: bool = Query(False),  # Changed to False to show all assets including BOND/OPTION/FUTURE
     sort_by: str = Query("score_total"),
     sort_desc: bool = Query(True),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
 ):
     """
-    Paginated explorer for all assets.
+    Paginated explorer for all assets (including unscored).
     """
     try:
         offset = (page - 1) * page_size
@@ -681,6 +681,45 @@ async def get_scope_counts():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/metrics/asset-type-counts")
+async def get_asset_type_counts(market_scope: Optional[str] = Query(None)):
+    """
+    Get asset counts by asset type, including assets without scores.
+    Returns count and average score for each type.
+    """
+    try:
+        with db._get_connection() as conn:
+            # Build query with optional market scope filter
+            scope_filter = ""
+            params = []
+            if market_scope:
+                scope_filter = "AND u.market_scope = ?"
+                params.append(market_scope)
+            
+            cursor = conn.execute(f"""
+                SELECT 
+                    u.asset_type,
+                    COUNT(*) as count,
+                    ROUND(AVG(s.score_total), 1) as avg_score
+                FROM universe u
+                LEFT JOIN scores_latest s ON u.asset_id = s.asset_id
+                WHERE u.active = 1 {scope_filter}
+                GROUP BY u.asset_type
+                ORDER BY count DESC
+            """, params)
+            
+            result = {}
+            for row in cursor.fetchall():
+                result[row[0]] = {
+                    "count": row[1],
+                    "avgScore": row[2] if row[2] else 0
+                }
+            
+            return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/metrics/stats")
 async def get_stats(market_scope: Optional[str] = Query(None)):
     """
@@ -894,3 +933,99 @@ async def get_logo(ticker: str):
         media_type="image/png",
         headers={"Cache-Control": "public, max-age=3600"}  # Cache 1h for placeholders
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Prices Endpoints (Delayed Data)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.get("/prices/batch")
+async def get_batch_prices(
+    tickers: str = Query(..., description="Comma-separated list of tickers"),
+    market_scope: str = Query("US_EU")
+):
+    """
+    Get latest prices for multiple tickers.
+    Prices are from the last available data (typically 15min delayed or EOD).
+    Returns from scores_latest table which contains last_price.
+    """
+    try:
+        ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+        
+        if len(ticker_list) > 100:
+            raise HTTPException(status_code=400, detail="Maximum 100 tickers per request")
+        
+        prices = {}
+        for ticker in ticker_list:
+            # Try to get from scores_latest
+            score = db.get_latest_score(ticker, market_scope=market_scope)
+            if score and score.get("last_price"):
+                prices[ticker] = {
+                    "price": score.get("last_price"),
+                    "updated_at": score.get("updated_at"),
+                    "currency": score.get("currency", "USD"),
+                }
+            else:
+                # Fallback: try to get from universe table
+                asset = db.get_asset_by_ticker(ticker)
+                if asset:
+                    prices[ticker] = {
+                        "price": None,
+                        "updated_at": None,
+                        "currency": asset.get("currency", "USD"),
+                    }
+        
+        return {
+            "prices": prices,
+            "count": len(prices),
+            "delay": "15min",  # Indicate data is delayed
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/prices/{ticker}")
+async def get_single_price(
+    ticker: str,
+    market_scope: str = Query("US_EU")
+):
+    """
+    Get latest price for a single ticker.
+    """
+    try:
+        ticker = ticker.upper()
+        
+        # Get from scores_latest
+        score = db.get_latest_score(ticker, market_scope=market_scope)
+        
+        if score and score.get("last_price"):
+            return {
+                "ticker": ticker,
+                "price": score.get("last_price"),
+                "sma200": score.get("sma200"),
+                "vol_annual": score.get("vol_annual"),
+                "rsi": score.get("rsi"),
+                "state_label": score.get("state_label"),
+                "updated_at": score.get("updated_at"),
+                "currency": score.get("currency", "USD"),
+                "delay": "15min",
+            }
+        
+        # Fallback to asset info
+        asset = db.get_asset_by_ticker(ticker)
+        if asset:
+            return {
+                "ticker": ticker,
+                "price": None,
+                "currency": asset.get("currency", "USD"),
+                "message": "Price data not available",
+            }
+        
+        raise HTTPException(status_code=404, detail=f"Ticker {ticker} not found")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
