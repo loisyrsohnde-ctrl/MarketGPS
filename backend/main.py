@@ -42,12 +42,79 @@ except Exception as e:
     logger.info("Running in data-only mode (no billing endpoints)")
 
 
+def ensure_tables_exist():
+    """
+    Ensure all required tables exist in the database.
+    Creates user_strategies and user_strategy_compositions if missing.
+    """
+    try:
+        from storage.sqlite_store import SQLiteStore
+        store = SQLiteStore()
+        
+        with store._get_connection() as conn:
+            # Create user_strategies table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_strategies (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL DEFAULT 'default',
+                    template_id INTEGER,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    updated_at TEXT DEFAULT (datetime('now')),
+                    FOREIGN KEY (template_id) REFERENCES strategy_templates(id)
+                )
+            """)
+            
+            # Create user_strategy_compositions table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_strategy_compositions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_strategy_id INTEGER NOT NULL,
+                    instrument_ticker TEXT NOT NULL,
+                    block_name TEXT NOT NULL DEFAULT 'custom',
+                    weight REAL NOT NULL DEFAULT 0.0,
+                    fit_score REAL,
+                    FOREIGN KEY (user_strategy_id) REFERENCES user_strategies(id) ON DELETE CASCADE
+                )
+            """)
+            
+            # Create indexes
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_strategies_user ON user_strategies(user_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_compositions_strategy ON user_strategy_compositions(user_strategy_id)")
+            
+            # Also ensure strategy_templates exists
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS strategy_templates (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    slug TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    category TEXT DEFAULT 'balanced',
+                    risk_level TEXT DEFAULT 'moderate',
+                    horizon_years INTEGER DEFAULT 10,
+                    rebalance_frequency TEXT DEFAULT 'annual',
+                    structure_json TEXT,
+                    scope TEXT DEFAULT 'US_EU',
+                    created_at TEXT DEFAULT (datetime('now'))
+                )
+            """)
+        
+        logger.info("✅ All required tables verified/created")
+        
+    except Exception as e:
+        logger.error(f"Error ensuring tables exist: {e}")
+
+
 def startup_seed():
     """
     Seed demo data if database is empty.
     Ensures the dashboard is never empty on first deployment.
     """
     try:
+        # First, ensure all tables exist
+        ensure_tables_exist()
+        
         from storage.sqlite_store import SQLiteStore
         from core.models import Asset, Score, AssetType
         from datetime import datetime
@@ -347,32 +414,6 @@ async def create_portal_session():
         logger.error(f"Portal session error: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to create portal session")
-
-
-
-# ============================================================================
-# Subscription Status Endpoint
-# ============================================================================
-
-class SubscriptionResponse(BaseModel):
-    plan: str = "FREE"
-    status: str = "active"
-    daily_quota_used: int = 0
-    daily_quota_limit: int = 10
-    features: dict = {}
-
-
-@app.get("/billing/subscription", response_model=SubscriptionResponse)
-@app.get("/api/billing/subscription", response_model=SubscriptionResponse)
-async def get_subscription():
-    """Get current user subscription status."""
-    return SubscriptionResponse(
-        plan="FREE",
-        status="active",
-        daily_quota_used=0,
-        daily_quota_limit=10,
-        features={"markets": ["US", "EU"], "scopes": ["US_EU"]}
-    )
 
 
 # ============================================================================
