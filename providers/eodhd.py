@@ -422,6 +422,32 @@ class EODHDProvider(DataProvider):
             logger.error(f"Search failed for '{query}': {e}")
             return []
     
+    def get_exchange_symbols(self, exchange_code: str) -> List[Dict[str, Any]]:
+        """
+        Get all symbols listed on an exchange.
+        
+        API: GET /exchange-symbol-list/{EXCHANGE_CODE}
+        
+        Args:
+            exchange_code: Exchange code (e.g., "US", "PA", "XETRA", "LSE")
+            
+        Returns:
+            List of symbol dicts with Code, Name, Type, Exchange, Currency, etc.
+        """
+        try:
+            data = self._request(f"exchange-symbol-list/{exchange_code}")
+            
+            if not data or not isinstance(data, list):
+                logger.warning(f"No symbols returned for exchange {exchange_code}")
+                return []
+            
+            logger.info(f"Exchange {exchange_code}: {len(data)} symbols")
+            return data
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch symbols for exchange {exchange_code}: {e}")
+            return []
+    
     def healthcheck(self) -> ProviderHealth:
         """
         Check EODHD API health.
