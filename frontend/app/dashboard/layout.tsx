@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
+import { AssetInspector } from '@/components/AssetInspector';
 import { cn } from '@/lib/utils';
 import { supabase, signOut, getSession } from '@/lib/supabase';
 import { getApiBaseUrl } from '@/lib/config';
@@ -121,6 +122,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {children}
         </div>
       </main>
+
+      {/* Global Asset Inspector Slide-Over */}
+      <AssetInspector />
     </div>
   );
 }

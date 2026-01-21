@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useEffect, Suspense } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -10,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Pill, ScoreGaugeBadge } from '@/components/ui/badge';
 import { AssetLogo } from '@/components/cards/asset-card';
+import { useAssetInspector } from '@/store/useAssetInspector';
 import { cn, formatNumberSafe } from '@/lib/utils';
 import type { Asset, MarketFilter, AssetType } from '@/types';
 import {
@@ -82,6 +82,9 @@ async function fetchExplorerData(params: ExplorerParams): Promise<ExplorerRespon
 function ExplorerPageContent() {
   const searchParams = useSearchParams();
   const initialScope = (searchParams.get('scope') as 'US_EU' | 'AFRICA') || 'US_EU';
+  
+  // Global inspector
+  const { openInspector } = useAssetInspector();
   
   const [marketScope, setMarketScope] = useState<'US_EU' | 'AFRICA'>(initialScope);
   const [typeFilter, setTypeFilter] = useState<AssetType | null>(null);
@@ -349,9 +352,14 @@ function ExplorerPageContent() {
                 <div className="col-span-1 text-sm text-text-muted">
                   {(currentPage - 1) * pageSize + index + 1}
                 </div>
-                <div className="col-span-2 flex items-center gap-2">
+                <div 
+                  className="col-span-2 flex items-center gap-2 cursor-pointer group"
+                  onClick={() => openInspector(asset.ticker, asset.asset_id)}
+                >
                   <AssetLogo ticker={asset.ticker} assetType={asset.asset_type} size="xs" />
-                  <span className="font-semibold text-text-primary">{asset.ticker}</span>
+                  <span className="font-semibold text-text-primary group-hover:text-accent transition-colors">
+                    {asset.ticker}
+                  </span>
                 </div>
                 <div className="col-span-4 text-sm text-text-secondary truncate">
                   {asset.name}
@@ -369,11 +377,13 @@ function ExplorerPageContent() {
                   )}
                 </div>
                 <div className="col-span-2 text-right">
-                  <Link href={`/asset/${asset.ticker}`}>
-                    <Button variant="ghost" size="sm">
-                      Détails
-                    </Button>
-                  </Link>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => openInspector(asset.ticker, asset.asset_id)}
+                  >
+                    Inspecter
+                  </Button>
                 </div>
               </motion.div>
             ))

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
+import { AssetInspector } from '@/components/AssetInspector';
 import { cn } from '@/lib/utils';
 import { supabase, signOut, getSession } from '@/lib/supabase';
 
@@ -74,6 +75,7 @@ export default function WatchlistLayout({ children }: LayoutProps) {
       <main className={cn('pt-16 min-h-screen transition-all duration-300', sidebarCollapsed ? 'ml-[72px]' : 'ml-[240px]')}>
         <div className="p-6">{children}</div>
       </main>
+      <AssetInspector />
     </div>
   );
 }
