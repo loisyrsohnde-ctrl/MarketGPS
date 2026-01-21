@@ -332,3 +332,95 @@ export const api = {
 };
 
 export default api;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// On-Demand Scoring API (NEW - Hybrid Architecture)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface OnDemandScoreResult {
+  asset_id: string;
+  symbol: string;
+  name: string;
+  asset_type: string;
+  market_scope: string;
+  score_total: number | null;
+  score_value: number | null;
+  score_momentum: number | null;
+  score_safety: number | null;
+  confidence: number | null;
+  rsi: number | null;
+  zscore: number | null;
+  vol_annual: number | null;
+  max_drawdown: number | null;
+  last_price: number | null;
+  state_label: string | null;
+  updated_at: string;
+  from_cache: boolean;
+  quota_used: boolean;
+  quota_remaining?: number;
+}
+
+export interface QuotaStatus {
+  plan: string;
+  daily_used: number;
+  daily_limit: number;
+  remaining: number;
+  is_pro: boolean;
+  is_annual: boolean;
+  can_score: boolean;
+}
+
+export interface UniverseMetrics {
+  total_assets: number;
+  scored_assets: number;
+  tier1_assets: number;
+  markets_covered: number;
+  exchanges_covered: number;
+  by_scope: Record<string, number>;
+  by_type: Record<string, number>;
+  scoring_coverage: number;
+}
+
+/**
+ * Calculate score for an asset on-demand
+ * @endpoint POST /api/assets/{ticker}/score
+ */
+export async function calculateScoreOnDemand(
+  ticker: string,
+  force: boolean = false,
+  token?: string
+): Promise<OnDemandScoreResult> {
+  const params = new URLSearchParams();
+  if (force) params.append('force', 'true');
+  
+  const query = params.toString();
+  const endpoint = `/api/assets/${ticker}/score${query ? `?${query}` : ''}`;
+  
+  return apiFetch<OnDemandScoreResult>(endpoint, {
+    method: 'POST',
+    token,
+  });
+}
+
+/**
+ * Get current user quota status
+ * @endpoint GET /api/user/quota
+ */
+export async function getUserQuota(token?: string): Promise<QuotaStatus> {
+  return apiFetch<QuotaStatus>('/api/user/quota', { token });
+}
+
+/**
+ * Get comprehensive universe metrics
+ * @endpoint GET /api/metrics/universe
+ */
+export async function getUniverseMetrics(): Promise<UniverseMetrics> {
+  return apiFetch<UniverseMetrics>('/api/metrics/universe');
+}
+
+// Update the api object with new functions
+Object.assign(api, {
+  calculateScoreOnDemand,
+  getUserQuota,
+  getUniverseMetrics,
+});
