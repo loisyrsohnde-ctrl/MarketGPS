@@ -249,6 +249,9 @@ class EODHDProvider(DataProvider):
             logger.info(f"Fetched {len(df)} bars for {symbol}")
             return df
             
+        except EODHDQuotaExhaustedError:
+            # Re-raise quota errors so SmartProvider can fallback to yfinance
+            raise
         except Exception as e:
             logger.error(f"Failed to fetch bars for {symbol}: {e}")
             return pd.DataFrame()
