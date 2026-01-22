@@ -31,6 +31,11 @@ class EODHDRateLimitError(EODHDError):
     pass
 
 
+class EODHDQuotaExhaustedError(EODHDError):
+    """API quota exhausted (402 Payment Required)."""
+    pass
+
+
 class EODHDProvider(DataProvider):
     """
     EODHD.com data provider implementation.
@@ -114,6 +119,11 @@ class EODHDProvider(DataProvider):
             if response.status_code == 429:
                 logger.warning(f"EODHD rate limited on {endpoint}")
                 raise EODHDRateLimitError("Rate limit exceeded")
+            
+            # Handle 402 Payment Required - quota exhausted (DON'T RETRY)
+            if response.status_code == 402:
+                logger.warning(f"EODHD quota exhausted (402) on {endpoint} - falling back to yfinance")
+                raise EODHDQuotaExhaustedError("API quota exhausted")
             
             if response.status_code == 401:
                 logger.error("EODHD: Invalid API key")
