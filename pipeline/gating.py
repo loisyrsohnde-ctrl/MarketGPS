@@ -121,16 +121,33 @@ class GatingJob:
         end_date = date.today()
         start_date = end_date - timedelta(days=lookback_days)
         
-        # Fetch historical data
-        df = self._provider.fetch_daily_bars(
-            asset.asset_id,
-            start=start_date,
-            end=end_date
-        )
+        # First, check if we have cached data in Parquet
+        df = None
+        use_cached = False
         
-        # Store the data for later use
-        if not df.empty:
-            self._parquet.upsert_bars(asset.asset_id, df)
+        try:
+            cached_df = self._parquet.load_bars(asset.asset_id)
+            if cached_df is not None and len(cached_df) > 50:
+                # Check if data is fresh (within last 5 trading days)
+                last_date = self._parquet.get_last_date(asset.asset_id)
+                if last_date and (end_date - last_date).days <= 7:
+                    logger.debug(f"Using cached data for {asset.asset_id} (last: {last_date})")
+                    df = cached_df
+                    use_cached = True
+        except Exception:
+            pass  # No cached data available
+        
+        # If no valid cache, fetch from provider
+        if df is None or df.empty:
+            df = self._provider.fetch_daily_bars(
+                asset.asset_id,
+                start=start_date,
+                end=end_date
+            )
+            
+            # Store the data for later use
+            if not df.empty:
+                self._parquet.upsert_bars(asset.asset_id, df)
         
         # For US_EU: use enhanced investability metrics
         if self._market_scope == "US_EU" and not df.empty:
