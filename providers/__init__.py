@@ -112,6 +112,33 @@ class SmartProvider(DataProvider):
         """Reset the fallback state (e.g., when quota resets)."""
         self._eodhd_quota_exhausted = False
         logger.info("Smart provider fallback state reset")
+    
+    def healthcheck(self):
+        """Check provider health - delegates to active provider."""
+        from core.models import ProviderHealth
+        from datetime import datetime
+        
+        if self._eodhd_quota_exhausted:
+            # If EODHD quota exhausted, return yfinance health
+            return ProviderHealth(
+                provider="smart (yfinance fallback)",
+                status="degraded",
+                message="Using yfinance fallback (EODHD quota exhausted)",
+                latency_ms=0,
+                last_check=datetime.now()
+            )
+        
+        # Try EODHD healthcheck
+        try:
+            return self._eodhd.healthcheck()
+        except Exception:
+            return ProviderHealth(
+                provider="smart",
+                status="degraded",
+                message="EODHD healthcheck failed",
+                latency_ms=0,
+                last_check=datetime.now()
+            )
 
 
 def get_provider(name: str = "auto") -> DataProvider:
