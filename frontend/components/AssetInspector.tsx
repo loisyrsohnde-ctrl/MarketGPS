@@ -478,7 +478,7 @@ export function AssetInspector() {
                     <div className="flex items-center justify-center py-4">
                       <ScoreGauge 
                         score={asset.score_total || 0} 
-                        size={160}
+                        size="xl"
                         showLabel
                       />
                     </div>
