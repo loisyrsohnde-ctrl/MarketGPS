@@ -75,7 +75,7 @@ export function CandidatesTable({
   addedAssetIds = [],
 }: CandidatesTableProps) {
   const [page, setPage] = useState(0);
-  const [pageSize] = useState(15);
+  const [pageSize] = useState(25); // Increased from 15 for better UX
   const [sortBy, setSortBy] = useState(type === 'core' ? 'core_score' : 'satellite_score');
   const [sortOrder, setSortOrder] = useState('desc');
   const [showFilters, setShowFilters] = useState(false);

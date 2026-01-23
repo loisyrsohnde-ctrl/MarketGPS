@@ -149,6 +149,44 @@ export function BarbellBuilder({
     onUpdateComposition(normalized);
   };
 
+  // Distribute weights evenly within each block based on target ratios
+  const handleDistributeEvenly = () => {
+    if (compositions.length === 0) return;
+    
+    const coreAssets = compositions.filter(c => c.block === 'core');
+    const satelliteAssets = compositions.filter(c => c.block === 'satellite');
+    
+    const coreWeightEach = coreAssets.length > 0 ? coreRatio / coreAssets.length : 0;
+    const satelliteWeightEach = satelliteAssets.length > 0 ? satelliteRatio / satelliteAssets.length : 0;
+    
+    const distributed = compositions.map(c => ({
+      ...c,
+      weight: c.block === 'core' ? coreWeightEach : satelliteWeightEach,
+    }));
+    onUpdateComposition(distributed);
+  };
+
+  // Auto-adjust to match target ratios (keep relative weights within blocks)
+  const handleAutoAdjust = () => {
+    if (compositions.length === 0) return;
+    
+    const coreAssets = compositions.filter(c => c.block === 'core');
+    const satelliteAssets = compositions.filter(c => c.block === 'satellite');
+    
+    const currentCoreTotal = coreAssets.reduce((sum, c) => sum + c.weight, 0);
+    const currentSatelliteTotal = satelliteAssets.reduce((sum, c) => sum + c.weight, 0);
+    
+    const adjusted = compositions.map(c => {
+      if (c.block === 'core' && currentCoreTotal > 0) {
+        return { ...c, weight: (c.weight / currentCoreTotal) * coreRatio };
+      } else if (c.block === 'satellite' && currentSatelliteTotal > 0) {
+        return { ...c, weight: (c.weight / currentSatelliteTotal) * satelliteRatio };
+      }
+      return c;
+    });
+    onUpdateComposition(adjusted);
+  };
+
   return (
     <div className="space-y-6">
       {/* Builder Header */}
@@ -200,6 +238,21 @@ export function BarbellBuilder({
               />
             </div>
           </div>
+
+          {/* Quick Action Buttons */}
+          {compositions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <Button size="sm" variant="ghost" onClick={handleDistributeEvenly} title="Répartir équitablement dans chaque bloc">
+                ⚖️ Répartir
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleAutoAdjust} title="Ajuster automatiquement aux ratios cibles">
+                🎯 Auto-ajuster
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleNormalizeWeights} title="Normaliser à 100%">
+                📊 Normaliser
+              </Button>
+            </div>
+          )}
 
           {/* Weight Warning */}
           {!isWeightValid && compositions.length > 0 && (
@@ -267,7 +320,15 @@ export function BarbellBuilder({
                       </span>
                     </td>
                     <td className="px-4 py-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        {/* Quick decrease button */}
+                        <button
+                          onClick={() => onUpdateWeight(asset.asset_id, Math.max(0, asset.weight - 0.01))}
+                          className="p-1 hover:bg-surface rounded text-text-muted hover:text-text-primary transition-colors"
+                          title="-1%"
+                        >
+                          −
+                        </button>
                         <input
                           type="number"
                           min="0"
@@ -275,9 +336,17 @@ export function BarbellBuilder({
                           step="1"
                           value={Math.round(asset.weight * 100)}
                           onChange={(e) => onUpdateWeight(asset.asset_id, parseInt(e.target.value) / 100)}
-                          className="w-16 px-2 py-1 text-sm text-center bg-bg-primary border border-glass-border rounded focus:outline-none focus:border-accent"
+                          className="w-14 px-1 py-1 text-sm text-center bg-bg-primary border border-glass-border rounded focus:outline-none focus:border-accent"
                         />
-                        <span className="text-text-muted">%</span>
+                        {/* Quick increase button */}
+                        <button
+                          onClick={() => onUpdateWeight(asset.asset_id, Math.min(1, asset.weight + 0.01))}
+                          className="p-1 hover:bg-surface rounded text-text-muted hover:text-text-primary transition-colors"
+                          title="+1%"
+                        >
+                          +
+                        </button>
+                        <span className="text-text-muted text-xs">%</span>
                       </div>
                     </td>
                     <td className="px-4 py-2 hidden lg:table-cell">
@@ -292,12 +361,35 @@ export function BarbellBuilder({
                       </span>
                     </td>
                     <td className="px-4 py-2 text-right">
-                      <button
-                        onClick={() => onRemoveAsset(asset.asset_id)}
-                        className="p-1.5 rounded-lg hover:bg-score-red/10 text-text-muted hover:text-score-red transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Switch block button */}
+                        <button
+                          onClick={() => {
+                            const newBlock = asset.block === 'core' ? 'satellite' : 'core';
+                            const updated = compositions.map(c => 
+                              c.asset_id === asset.asset_id ? { ...c, block: newBlock } : c
+                            );
+                            onUpdateComposition(updated);
+                          }}
+                          className={cn(
+                            "p-1.5 rounded-lg transition-colors text-xs",
+                            asset.block === 'core' 
+                              ? "hover:bg-score-red/10 text-text-muted hover:text-score-red" 
+                              : "hover:bg-score-green/10 text-text-muted hover:text-score-green"
+                          )}
+                          title={asset.block === 'core' ? 'Déplacer vers Satellite' : 'Déplacer vers Core'}
+                        >
+                          ↔
+                        </button>
+                        {/* Remove button */}
+                        <button
+                          onClick={() => onRemoveAsset(asset.asset_id)}
+                          className="p-1.5 rounded-lg hover:bg-score-red/10 text-text-muted hover:text-score-red transition-colors"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </motion.tr>
                 ))}

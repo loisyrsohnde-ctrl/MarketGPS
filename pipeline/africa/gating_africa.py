@@ -46,13 +46,13 @@ MarketScope = Literal["AFRICA"]
 # ═══════════════════════════════════════════════════════════════════════════
 
 AFRICA_GATING_CONFIG = {
-    "coverage_min": 0.70,           # 70% minimum coverage
-    "stale_ratio_max": 0.35,        # 35% stale days allowed
-    "min_bars_standard": 260,       # 1 year for standard scoring
-    "min_bars_low_confidence": 60,  # 3 months for low confidence
-    "min_price": 0.01,              # Very low threshold for emerging markets
-    "fx_risk_threshold": 0.50,      # High FX volatility threshold
-    "liquidity_risk_threshold": 0.40,  # Low liquidity threshold
+    "coverage_min": 0.50,           # Relaxed to 50% for MVP
+    "stale_ratio_max": 0.50,        # Relaxed to 50% for MVP
+    "min_bars_standard": 200,       # Relaxed from 260
+    "min_bars_low_confidence": 50,  # Relaxed from 60
+    "min_price": 0.001,             # Very low threshold for emerging markets
+    "fx_risk_threshold": 0.60,      # Relaxed from 0.50
+    "liquidity_risk_threshold": 0.50,  # Relaxed from 0.40
 }
 
 

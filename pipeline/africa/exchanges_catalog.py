@@ -61,8 +61,8 @@ AFRICA_EXCHANGES: Dict[str, ExchangeInfo] = {
         trading_days=["mon", "tue", "wed", "thu", "fri"],
         tier=1,
         active=True,
-        min_liquidity_usd=100_000,
-        stale_days_threshold=5,
+        min_liquidity_usd=10_000,  # Relaxed from 100_000 for MVP
+        stale_days_threshold=10,   # Relaxed from 5
         data_source_priority=["EODHD", "yfinance"]
     ),
     
@@ -80,8 +80,8 @@ AFRICA_EXCHANGES: Dict[str, ExchangeInfo] = {
         trading_days=["mon", "tue", "wed", "thu", "fri"],
         tier=2,
         active=True,
-        min_liquidity_usd=50_000,
-        stale_days_threshold=7,
+        min_liquidity_usd=5_000,  # Relaxed from 50_000
+        stale_days_threshold=10,  # Relaxed from 7
         data_source_priority=["EODHD"]
     ),
     "EGX": ExchangeInfo(
@@ -95,8 +95,8 @@ AFRICA_EXCHANGES: Dict[str, ExchangeInfo] = {
         trading_days=["sun", "mon", "tue", "wed", "thu"],
         tier=2,
         active=True,
-        min_liquidity_usd=50_000,
-        stale_days_threshold=7,
+        min_liquidity_usd=5_000,  # Relaxed from 50_000
+        stale_days_threshold=10,  # Relaxed from 7
         data_source_priority=["EODHD"]
     ),
     "NSE": ExchangeInfo(
@@ -125,8 +125,8 @@ AFRICA_EXCHANGES: Dict[str, ExchangeInfo] = {
         trading_days=["mon", "tue", "wed", "thu", "fri"],
         tier=2,
         active=True,
-        min_liquidity_usd=40_000,
-        stale_days_threshold=7,
+        min_liquidity_usd=5_000,  # Relaxed from 40_000
+        stale_days_threshold=10,  # Relaxed from 7
         data_source_priority=["EODHD"]
     ),
     
@@ -377,9 +377,26 @@ CURRENCY_INFO: Dict[str, CurrencyInfo] = {
 # HELPER FUNCTIONS
 # ═══════════════════════════════════════════════════════════════════════════
 
+# Mapping from EODHD codes to our internal codes
+EODHD_CODE_MAP = {
+    "BC": "CSE",    # Casablanca
+    "CA": "EGX",    # Cairo  
+    "NG": "NGX",    # Nigeria
+    "JO": "JSE",    # Johannesburg (yfinance)
+}
+
+
 def get_exchange_info(code: str) -> Optional[ExchangeInfo]:
-    """Get exchange info by code."""
-    return AFRICA_EXCHANGES.get(code.upper())
+    """Get exchange info by code (supports both our codes and EODHD codes)."""
+    code_upper = code.upper()
+    # Direct lookup
+    if code_upper in AFRICA_EXCHANGES:
+        return AFRICA_EXCHANGES[code_upper]
+    # Try EODHD code mapping
+    mapped = EODHD_CODE_MAP.get(code_upper)
+    if mapped:
+        return AFRICA_EXCHANGES.get(mapped)
+    return None
 
 
 def get_supported_exchanges(active_only: bool = True) -> List[str]:
@@ -425,14 +442,14 @@ def get_exchange_by_eodhd_code(eodhd_code: str) -> Optional[ExchangeInfo]:
 
 def get_min_liquidity_for_exchange(code: str) -> float:
     """Get minimum liquidity requirement for an exchange."""
-    info = AFRICA_EXCHANGES.get(code.upper())
-    return info.min_liquidity_usd if info else 50_000
+    info = get_exchange_info(code)  # Use the mapping-aware function
+    return info.min_liquidity_usd if info else 5_000  # Relaxed default from 50_000
 
 
 def get_stale_threshold_for_exchange(code: str) -> int:
     """Get stale data threshold in days for an exchange."""
-    info = AFRICA_EXCHANGES.get(code.upper())
-    return info.stale_days_threshold if info else 7
+    info = get_exchange_info(code)  # Use the mapping-aware function
+    return info.stale_days_threshold if info else 10  # Relaxed default from 7
 
 
 # ═══════════════════════════════════════════════════════════════════════════

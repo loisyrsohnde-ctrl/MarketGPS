@@ -154,24 +154,29 @@ async def suggest_barbell_portfolio(
             score_momentum = asset_dict.get('score_momentum') or 0
             score_total = asset_dict.get('score_total') or 0
 
-            # Classify based on characteristics
-            # Core criteria: High safety score (>65) OR (low vol < 25 AND safety > 50)
-            # If vol_annual is missing, rely purely on safety score
+            # Classify based on characteristics - RELAXED CRITERIA
+            # Core: Assets with good safety or low volatility
+            # Satellite: Assets with good momentum or high total score
             is_core_candidate = False
-            if score_safety >= 70:
-                # High safety = Core candidate regardless of volatility
+            
+            # Core criteria (relaxed):
+            # - High safety (>55) OR
+            # - Low volatility (<35) with decent safety (>40) OR
+            # - High lt_score (>55)
+            if score_safety >= 55:
                 is_core_candidate = True
-            elif vol is not None and vol < 25 and score_safety > 50:
-                # Low volatility with decent safety
+            elif vol is not None and vol < 35 and score_safety > 40:
                 is_core_candidate = True
-            elif lt_score and lt_score > 65:
-                # High long-term score
+            elif lt_score and lt_score > 55:
+                is_core_candidate = True
+            elif score_total > 60 and score_safety > 45:
+                # Good overall score with acceptable safety
                 is_core_candidate = True
             
             if is_core_candidate:
                 core_candidates.append(asset_dict)
-            elif score_momentum > 60 or score_total > 75:
-                # High momentum or high total score = Satellite
+            elif score_momentum > 50 or score_total > 60:
+                # Moderate momentum or good total score = Satellite
                 satellite_candidates.append(asset_dict)
             else:
                 # Default to satellite for remaining assets
@@ -274,8 +279,9 @@ async def get_core_candidates(
             safety = score_obj.score_safety or 0
             lt_score = getattr(score_obj, 'lt_score', None) or 0
 
-            # Core criteria: low vol OR high safety OR high lt_score
-            if (vol and vol < 30) or (safety and safety > 55) or (lt_score and lt_score > 60):
+            # Core criteria: low vol OR decent safety - RELAXED for more candidates
+            # Accept assets with: low vol (<40) OR safety > 40 OR lt_score > 50
+            if (vol and vol < 40) or (safety and safety > 40) or (lt_score and lt_score > 50) or score_obj.score_total > 50:
                 candidates.append({
                     "asset_id": asset_obj.asset_id,
                     "symbol": asset_obj.symbol,
@@ -333,8 +339,9 @@ async def get_satellite_candidates(
             score_total = score_obj.score_total or 0
             lt_confidence = getattr(score_obj, 'lt_confidence', None) or 50
 
-            # Satellite criteria: high momentum
-            if momentum and momentum > 50:
+            # Satellite criteria: high momentum - RELAXED for more candidates
+            # Accept assets with momentum > 40 OR high score total
+            if (momentum and momentum > 40) or score_obj.score_total > 55:
                 candidates.append({
                     "asset_id": asset_obj.asset_id,
                     "symbol": asset_obj.symbol,
@@ -401,7 +408,7 @@ async def get_allocation_ratios():
 @router.get("/candidates/core")
 async def get_core_candidates_v2(
     market_scope: str = Query("US_EU", description="Market scope"),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     q: Optional[str] = Query(None, description="Search ticker/name"),
     min_score_total: Optional[float] = Query(None, ge=0, le=100),
@@ -421,19 +428,20 @@ async def get_core_candidates_v2(
         from storage.sqlite_store import SQLiteStore
 
         store = SQLiteStore()
-        assets = store.get_top_scores(market_scope=market_scope, limit=500)
+        # Get more assets (up to 1000) to have enough candidates
+        assets = store.get_top_scores(market_scope=market_scope, limit=1000)
 
         candidates = []
         for asset_tuple in assets:
             asset_obj, score_obj = asset_tuple
 
-            vol = score_obj.vol_annual or 100
-            safety = score_obj.score_safety or 0
-            lt_score = getattr(score_obj, 'lt_score', None) or 0
+            vol = score_obj.vol_annual or 50  # Default to 50% if missing
+            safety = score_obj.score_safety or 50  # Default to 50 if missing
+            lt_score = getattr(score_obj, 'lt_score', None) or 50
             coverage = score_obj.confidence or 50
             score_total = score_obj.score_total or 0
 
-            # Apply filters
+            # Apply filters (if specified by user)
             if min_score_total and score_total < min_score_total:
                 continue
             if min_score_safety and safety < min_score_safety:
@@ -455,16 +463,16 @@ async def get_core_candidates_v2(
                 if search not in ticker.lower() and search not in name.lower():
                     continue
 
-            # Core score calculation
+            # Core score calculation - weighted composite
             core_score = (100 - min(vol, 100)) * 0.3 + safety * 0.4 + lt_score * 0.3
 
-            # Determine warnings
+            # Determine warnings (relaxed thresholds)
             warnings = []
-            if vol > 40:
+            if vol > 50:  # Relaxed from 40
                 warnings.append("high_volatility")
-            if coverage < 70:
+            if coverage < 60:  # Relaxed from 70
                 warnings.append("low_coverage")
-            if safety < 50:
+            if safety < 40:  # Relaxed from 50
                 warnings.append("low_safety")
 
             candidates.append({
@@ -514,7 +522,7 @@ async def get_core_candidates_v2(
 @router.get("/candidates/satellite")
 async def get_satellite_candidates_v2(
     market_scope: str = Query("US_EU", description="Market scope"),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     q: Optional[str] = Query(None, description="Search ticker/name"),
     min_score_total: Optional[float] = Query(None, ge=0, le=100),
@@ -533,19 +541,20 @@ async def get_satellite_candidates_v2(
         from storage.sqlite_store import SQLiteStore
 
         store = SQLiteStore()
-        assets = store.get_top_scores(market_scope=market_scope, limit=500)
+        # Get more assets (up to 1000) to have enough candidates
+        assets = store.get_top_scores(market_scope=market_scope, limit=1000)
 
         candidates = []
         for asset_tuple in assets:
             asset_obj, score_obj = asset_tuple
 
-            momentum = score_obj.score_momentum or 0
+            momentum = score_obj.score_momentum or 50  # Default to 50 if missing
             score_total = score_obj.score_total or 0
             coverage = score_obj.confidence or 50
             lt_confidence = getattr(score_obj, 'lt_confidence', None) or 50
             vol = score_obj.vol_annual or 50
 
-            # Apply filters
+            # Apply filters (if specified by user)
             if min_score_total and score_total < min_score_total:
                 continue
             if min_score_momentum and momentum < min_score_momentum:
@@ -565,14 +574,14 @@ async def get_satellite_candidates_v2(
                 if search not in ticker.lower() and search not in name.lower():
                     continue
 
-            # Satellite score
+            # Satellite score - momentum weighted
             satellite_score = momentum * 0.5 + score_total * 0.3 + min(lt_confidence, 100) * 0.2
 
-            # Warnings
+            # Warnings (relaxed thresholds)
             warnings = []
-            if coverage < 70:
+            if coverage < 60:  # Relaxed from 70
                 warnings.append("low_coverage")
-            if momentum < 50:
+            if momentum < 40:  # Relaxed from 50
                 warnings.append("low_momentum")
 
             candidates.append({
