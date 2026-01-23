@@ -416,6 +416,8 @@ async def search_assets(
 async def explore_assets(
     market_scope: str = Query("US_EU"),
     asset_type: Optional[str] = Query(None),
+    country: Optional[str] = Query(None, description="Country code for Africa filtering (e.g., ZA, NG)"),
+    region: Optional[str] = Query(None, description="Region for Africa filtering (e.g., SOUTHERN, WEST)"),
     query: Optional[str] = Query(None),
     only_scored: bool = Query(True),
     sort_by: str = Query("score_total"),
@@ -425,6 +427,7 @@ async def explore_assets(
 ):
     """
     Paginated explorer for all assets.
+    Supports Africa filtering by country or region.
     """
     try:
         offset = (page - 1) * page_size
@@ -432,6 +435,8 @@ async def explore_assets(
         results, total = db.search_universe(
             market_scope=market_scope,
             asset_type=asset_type,
+            country=country,
+            region=region,
             query=query,
             only_scored=only_scored,
             sort_by=sort_by,

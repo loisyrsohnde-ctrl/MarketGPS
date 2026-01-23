@@ -1917,11 +1917,36 @@ class SQLiteStore:
     # UNIVERSE SEARCH (ENHANCED for Explorer v12)
     # ═══════════════════════════════════════════════════════════════════════════
 
+    # Africa region to country mapping
+    AFRICA_REGIONS = {
+        "SOUTHERN": ["ZA", "BW", "ZW", "ZM", "MW", "MZ", "NA", "LS", "SZ"],
+        "WEST": ["NG", "GH", "CI", "SN", "ML", "BF", "NE", "BJ", "TG"],
+        "NORTH": ["MA", "DZ", "TN", "EG", "LY"],
+        "EAST": ["KE", "TZ", "UG", "RW", "ET", "MU"],
+        "CENTRAL": ["CM", "CD", "CG", "GA", "CF", "TD"],
+    }
+    
+    # Country to exchange mapping for Africa
+    AFRICA_COUNTRY_EXCHANGES = {
+        "ZA": ["JSE", "JO"],
+        "NG": ["NGX", "NG"],
+        "EG": ["EGX", "CA"],
+        "MA": ["CSE", "BC"],
+        "KE": ["NSE"],
+        "CI": ["BRVM"],
+        "GH": ["GSE"],
+        "TN": ["BVMT"],
+        "MU": ["SEM"],
+        "BW": ["BSE"],
+    }
+
     def search_universe(
         self,
         market_scope: str = "US_EU",
         market_code: str = None,
         asset_type: str = None,
+        country: str = None,
+        region: str = None,
         query: str = None,
         only_scored: bool = True,
         sort_by: str = "score_total",
@@ -1932,6 +1957,7 @@ class SQLiteStore:
         """
         Search universe with filters for Explorer page.
         Returns (results, total_count).
+        Supports Africa filtering by country or region.
         """
         conditions = ["u.active = 1"]
         params = []
@@ -1945,6 +1971,27 @@ class SQLiteStore:
         if market_code and market_code not in ("ALL", "Tous"):
             conditions.append("u.market_code = ?")
             params.append(market_code)
+
+        # Country filter (for Africa) - filter by exchange codes
+        if country and country in self.AFRICA_COUNTRY_EXCHANGES:
+            exchanges = self.AFRICA_COUNTRY_EXCHANGES[country]
+            placeholders = ", ".join(["?" for _ in exchanges])
+            # Match asset_id ending with any of the exchange codes
+            exchange_conditions = " OR ".join([f"u.asset_id LIKE ?" for _ in exchanges])
+            conditions.append(f"({exchange_conditions})")
+            params.extend([f"%.{ex}" for ex in exchanges])
+        
+        # Region filter (for Africa) - filter by countries in region
+        if region and region in self.AFRICA_REGIONS:
+            region_countries = self.AFRICA_REGIONS[region]
+            all_exchanges = []
+            for c in region_countries:
+                if c in self.AFRICA_COUNTRY_EXCHANGES:
+                    all_exchanges.extend(self.AFRICA_COUNTRY_EXCHANGES[c])
+            if all_exchanges:
+                exchange_conditions = " OR ".join([f"u.asset_id LIKE ?" for _ in all_exchanges])
+                conditions.append(f"({exchange_conditions})")
+                params.extend([f"%.{ex}" for ex in all_exchanges])
 
         # Asset type
         if asset_type and asset_type not in ("ALL", "Tous"):

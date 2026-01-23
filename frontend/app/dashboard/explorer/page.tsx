@@ -35,6 +35,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8
 interface ExplorerParams {
   market_scope: string;
   asset_type?: string;
+  country?: string;  // Country code for filtering (e.g., 'ZA', 'NG')
+  region?: string;   // Region for filtering (e.g., 'SOUTHERN', 'WEST')
   query?: string;
   only_scored: boolean;
   sort_by: string;
@@ -63,6 +65,12 @@ async function fetchExplorerData(params: ExplorerParams): Promise<ExplorerRespon
   if (params.asset_type) {
     searchParams.append('asset_type', params.asset_type);
   }
+  if (params.country) {
+    searchParams.append('country', params.country);
+  }
+  if (params.region) {
+    searchParams.append('region', params.region);
+  }
   if (params.query) {
     searchParams.append('query', params.query);
   }
@@ -89,12 +97,42 @@ function ExplorerPageContent() {
   
   const [marketScope, setMarketScope] = useState<'US_EU' | 'AFRICA'>(initialScope);
   const [typeFilter, setTypeFilter] = useState<AssetType | null>(null);
+  const [africaRegion, setAfricaRegion] = useState<string | null>(null); // Africa subdivision
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<'score_total' | 'symbol' | 'name'>('symbol');
   const [sortDesc, setSortDesc] = useState(false);
   const [onlyScored, setOnlyScored] = useState(false); // Show ALL assets by default
+
+  // Africa regions/countries configuration
+  const africaRegions = [
+    { value: null, label: 'Toute l\'Afrique', icon: '🌍', countries: [] },
+    // Southern Africa
+    { value: 'SOUTHERN', label: 'Afrique Australe', icon: '🇿🇦', countries: ['ZA', 'BW', 'ZW', 'ZM', 'MW', 'MZ', 'NA', 'LS', 'SZ'] },
+    // West Africa  
+    { value: 'WEST', label: 'Afrique de l\'Ouest', icon: '🇳🇬', countries: ['NG', 'GH', 'CI', 'SN', 'ML', 'BF', 'NE', 'BJ', 'TG'] },
+    // North Africa
+    { value: 'NORTH', label: 'Afrique du Nord', icon: '🇲🇦', countries: ['MA', 'DZ', 'TN', 'EG', 'LY'] },
+    // East Africa
+    { value: 'EAST', label: 'Afrique de l\'Est', icon: '🇰🇪', countries: ['KE', 'TZ', 'UG', 'RW', 'ET', 'MU'] },
+    // Central Africa
+    { value: 'CENTRAL', label: 'Afrique Centrale', icon: '🇨🇲', countries: ['CM', 'CD', 'CG', 'GA', 'CF', 'TD'] },
+  ];
+
+  // Individual countries for detailed filtering
+  const africaCountries = [
+    { value: 'ZA', label: 'Afrique du Sud', icon: '🇿🇦', exchange: 'JSE' },
+    { value: 'NG', label: 'Nigeria', icon: '🇳🇬', exchange: 'NGX' },
+    { value: 'EG', label: 'Égypte', icon: '🇪🇬', exchange: 'EGX' },
+    { value: 'MA', label: 'Maroc', icon: '🇲🇦', exchange: 'CSE' },
+    { value: 'KE', label: 'Kenya', icon: '🇰🇪', exchange: 'NSE' },
+    { value: 'CI', label: 'Côte d\'Ivoire (BRVM)', icon: '🇨🇮', exchange: 'BRVM' },
+    { value: 'GH', label: 'Ghana', icon: '🇬🇭', exchange: 'GSE' },
+    { value: 'TN', label: 'Tunisie', icon: '🇹🇳', exchange: 'BVMT' },
+    { value: 'MU', label: 'Maurice', icon: '🇲🇺', exchange: 'SEM' },
+    { value: 'BW', label: 'Botswana', icon: '🇧🇼', exchange: 'BSE' },
+  ];
   
   const pageSize = 50;
   
@@ -117,12 +155,19 @@ function ExplorerPageContent() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Determine if africaRegion is a country code or a region
+  const isAfricaCountryCode = africaRegion && africaRegion.length === 2;
+  const africaCountryFilter = isAfricaCountryCode ? africaRegion : undefined;
+  const africaRegionFilter = africaRegion && !isAfricaCountryCode ? africaRegion : undefined;
+
   // Fetch data
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['explorer', marketScope, typeFilter, debouncedQuery, currentPage, sortBy, sortDesc, onlyScored],
+    queryKey: ['explorer', marketScope, typeFilter, africaRegion, debouncedQuery, currentPage, sortBy, sortDesc, onlyScored],
     queryFn: () => fetchExplorerData({
       market_scope: marketScope,
       asset_type: typeFilter || undefined,
+      country: africaCountryFilter,
+      region: africaRegionFilter,
       query: debouncedQuery || undefined,
       only_scored: onlyScored,
       sort_by: sortBy,
@@ -222,6 +267,7 @@ function ExplorerPageContent() {
                   active={marketScope === f.value}
                   onClick={() => {
                     setMarketScope(f.value);
+                    setAfricaRegion(null); // Reset Africa region when switching scope
                     setCurrentPage(1);
                   }}
                   icon={<span>{f.icon}</span>}
@@ -231,6 +277,56 @@ function ExplorerPageContent() {
               ))}
             </div>
           </div>
+
+          {/* Africa region filter - only shown when Africa is selected */}
+          {marketScope === 'AFRICA' && (
+            <>
+              <div className="h-6 w-px bg-glass-border" />
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-text-muted font-medium">Région:</span>
+                <div className="flex flex-wrap gap-1">
+                  {africaRegions.map((region) => (
+                    <Pill
+                      key={region.value || 'all'}
+                      active={africaRegion === region.value}
+                      onClick={() => {
+                        setAfricaRegion(region.value);
+                        setCurrentPage(1);
+                      }}
+                      icon={<span className="text-xs">{region.icon}</span>}
+                    >
+                      <span className="text-xs">{region.label}</span>
+                    </Pill>
+                  ))}
+                </div>
+              </div>
+              {/* Individual country shortcuts */}
+              <div className="w-full flex flex-wrap items-center gap-2 mt-2">
+                <span className="text-xs text-text-muted font-medium">Pays:</span>
+                <div className="flex flex-wrap gap-1">
+                  {africaCountries.map((country) => (
+                    <button
+                      key={country.value}
+                      onClick={() => {
+                        setAfricaRegion(country.value);
+                        setCurrentPage(1);
+                      }}
+                      className={cn(
+                        "px-2 py-0.5 rounded text-xs transition-all",
+                        africaRegion === country.value
+                          ? "bg-accent text-white"
+                          : "bg-glass-subtle text-text-secondary hover:bg-glass-border hover:text-text-primary"
+                      )}
+                      title={country.label}
+                    >
+                      <span className="mr-1">{country.icon}</span>
+                      {country.exchange}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="h-6 w-px bg-glass-border" />
 
