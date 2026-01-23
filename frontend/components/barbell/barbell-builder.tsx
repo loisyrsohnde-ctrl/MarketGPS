@@ -365,7 +365,7 @@ export function BarbellBuilder({
                         {/* Switch block button */}
                         <button
                           onClick={() => {
-                            const newBlock = asset.block === 'core' ? 'satellite' : 'core';
+                            const newBlock: 'core' | 'satellite' = asset.block === 'core' ? 'satellite' : 'core';
                             const updated = compositions.map(c => 
                               c.asset_id === asset.asset_id ? { ...c, block: newBlock } : c
                             );
