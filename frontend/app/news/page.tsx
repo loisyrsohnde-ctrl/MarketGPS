@@ -513,6 +513,43 @@ export default function NewsPage() {
           </Link>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="bg-slate-900 text-white py-12 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-8">
+            {/* Logo */}
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
+                <span className="text-white font-bold text-xs">◉</span>
+              </div>
+              <span className="font-semibold">Market<span className="text-slate-400">GPS</span></span>
+            </div>
+
+            {/* Links */}
+            <div className="flex gap-8 text-sm text-slate-400">
+              <Link href="/legal/privacy" className="hover:text-white transition-colors">
+                Confidentialité
+              </Link>
+              <Link href="/legal/terms" className="hover:text-white transition-colors">
+                CGU
+              </Link>
+              <Link href="/contact" className="hover:text-white transition-colors">
+                Contact
+              </Link>
+            </div>
+
+            {/* Copyright */}
+            <p className="text-xs text-slate-500">
+              © 2024 MarketGPS. Plateforme d&apos;analyse quantitative.
+            </p>
+          </div>
+
+          <p className="mt-8 text-center text-xs text-slate-500">
+            ⚠️ Capital à risque. Les performances passées ne garantissent pas le futur.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
