@@ -1,7 +1,7 @@
 """
 MarketGPS News Pipeline - Image Fetcher
 
-Fetches relevant images for articles using free image APIs.
+Fetches relevant images for articles using Pexels API.
 """
 
 import os
@@ -9,136 +9,130 @@ import re
 import hashlib
 import requests
 from typing import Optional, List
-from pathlib import Path
+from urllib.parse import quote
 
 from core.config import get_logger
 
 logger = get_logger(__name__)
 
-# Free image sources (no API key needed for basic usage)
-UNSPLASH_SOURCE_URL = "https://source.unsplash.com/800x450/"
-
 
 class ImageFetcher:
-    """Fetches relevant images for news articles."""
+    """Fetches relevant images for news articles using Pexels API."""
     
-    # Keywords mapping for better image search
-    CATEGORY_KEYWORDS = {
-        "fintech": ["fintech", "mobile payment", "digital banking", "smartphone finance"],
-        "finance": ["finance", "stock market", "business meeting", "african economy"],
-        "startup": ["startup", "entrepreneur", "innovation", "tech office"],
-        "tech": ["technology", "computer", "coding", "digital"],
-        "banking": ["bank", "banking", "atm", "financial"],
-        "crypto": ["cryptocurrency", "bitcoin", "blockchain", "digital currency"],
-        "regulation": ["government", "policy", "law", "regulation"],
-        "économie": ["economy", "business", "trade", "market"],
+    # Pexels API (free, reliable)
+    PEXELS_API_URL = "https://api.pexels.com/v1/search"
+    
+    # Category to search query mapping
+    CATEGORY_QUERIES = {
+        "fintech": "mobile payment technology africa",
+        "finance": "african business finance",
+        "startup": "african entrepreneur startup",
+        "tech": "technology africa digital",
+        "banking": "bank finance africa",
+        "crypto": "cryptocurrency blockchain",
+        "régulation": "government policy africa",
+        "économie": "african economy market",
+        "business": "african business meeting",
+        "actualité": "africa city business",
     }
     
-    # Africa-specific image keywords to add context
-    AFRICA_KEYWORDS = ["africa", "african", "lagos", "nairobi", "johannesburg"]
+    # Fallback images (curated high-quality Pexels images - direct links)
+    FALLBACK_IMAGES = {
+        "fintech": "https://images.pexels.com/photos/6963944/pexels-photo-6963944.jpeg?auto=compress&cs=tinysrgb&w=800",
+        "finance": "https://images.pexels.com/photos/7567443/pexels-photo-7567443.jpeg?auto=compress&cs=tinysrgb&w=800",
+        "startup": "https://images.pexels.com/photos/3184360/pexels-photo-3184360.jpeg?auto=compress&cs=tinysrgb&w=800",
+        "tech": "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg?auto=compress&cs=tinysrgb&w=800",
+        "banking": "https://images.pexels.com/photos/4386158/pexels-photo-4386158.jpeg?auto=compress&cs=tinysrgb&w=800",
+        "crypto": "https://images.pexels.com/photos/6771900/pexels-photo-6771900.jpeg?auto=compress&cs=tinysrgb&w=800",
+        "business": "https://images.pexels.com/photos/3184292/pexels-photo-3184292.jpeg?auto=compress&cs=tinysrgb&w=800",
+        "économie": "https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=800",
+        "default": "https://images.pexels.com/photos/3184287/pexels-photo-3184287.jpeg?auto=compress&cs=tinysrgb&w=800",
+    }
     
     def __init__(self):
         """Initialize the image fetcher."""
+        self.pexels_key = os.environ.get("PEXELS_API_KEY")
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": "MarketGPS/1.0 (+https://marketgps.online)"
         })
+        if self.pexels_key:
+            self.session.headers["Authorization"] = self.pexels_key
     
-    def _generate_search_query(self, title: str, category: Optional[str], country: Optional[str]) -> str:
-        """Generate a search query based on article metadata."""
-        keywords = []
+    def _get_search_query(self, title: str, category: Optional[str], keywords: Optional[str]) -> str:
+        """Generate search query for Pexels."""
+        # Use provided keywords if available
+        if keywords:
+            return keywords
         
-        # Add category-based keywords
+        # Use category mapping
         if category:
             cat_lower = category.lower()
-            if cat_lower in self.CATEGORY_KEYWORDS:
-                keywords.extend(self.CATEGORY_KEYWORDS[cat_lower][:2])
-            else:
-                keywords.append(cat_lower)
+            if cat_lower in self.CATEGORY_QUERIES:
+                return self.CATEGORY_QUERIES[cat_lower]
         
-        # Add Africa context
-        if country:
-            country_names = {
-                "NG": "nigeria lagos",
-                "ZA": "south africa johannesburg",
-                "KE": "kenya nairobi",
-                "EG": "egypt cairo",
-                "GH": "ghana accra",
-                "CI": "ivory coast abidjan",
-                "SN": "senegal dakar",
-                "MA": "morocco casablanca",
-                "CM": "cameroon douala",
-            }
-            if country in country_names:
-                keywords.append(country_names[country])
-        else:
-            keywords.append("africa business")
-        
-        # Extract key terms from title (simple approach)
-        title_words = re.findall(r'\b[A-Za-z]{4,}\b', title.lower())
-        important_words = [w for w in title_words if w not in 
-                         ['avec', 'pour', 'dans', 'vers', 'une', 'les', 'des', 'the', 'and', 'for']]
-        keywords.extend(important_words[:2])
-        
-        # Build query
-        query = " ".join(keywords[:4])
-        return query
+        # Extract keywords from title
+        return "africa business finance"
     
     def fetch_image_url(
         self, 
         title: str, 
         category: Optional[str] = None,
         country: Optional[str] = None,
+        keywords: Optional[str] = None,
         fallback_url: Optional[str] = None
     ) -> Optional[str]:
         """
         Fetch a relevant image URL for an article.
         
-        Uses Unsplash Source API for free, high-quality images.
-        
-        Args:
-            title: Article title
-            category: Article category
-            country: Country code
-            fallback_url: URL to return if fetch fails
-            
-        Returns:
-            Image URL or fallback
+        Uses Pexels API if key available, otherwise returns curated fallback.
         """
-        try:
-            query = self._generate_search_query(title, category, country)
-            
-            # Use Unsplash Source API (redirects to a random matching image)
-            # Format: https://source.unsplash.com/800x450/?keyword1,keyword2
-            keywords = query.replace(" ", ",")
-            image_url = f"https://source.unsplash.com/800x450/?{keywords}"
-            
-            # Verify the URL works by making a HEAD request
-            response = self.session.head(image_url, allow_redirects=True, timeout=5)
-            
-            if response.status_code == 200:
-                # Return the final redirected URL (actual image)
-                return response.url
-            
-        except Exception as e:
-            logger.warning(f"Image fetch failed: {e}")
+        # If we have a Pexels API key, try to fetch a relevant image
+        if self.pexels_key:
+            try:
+                query = self._get_search_query(title, category, keywords)
+                
+                response = self.session.get(
+                    self.PEXELS_API_URL,
+                    params={
+                        "query": query,
+                        "per_page": 5,
+                        "orientation": "landscape"
+                    },
+                    timeout=5
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    photos = data.get("photos", [])
+                    if photos:
+                        # Get a random-ish photo based on title hash
+                        idx = hash(title) % len(photos)
+                        photo = photos[idx]
+                        # Return medium size (good balance of quality/speed)
+                        return photo.get("src", {}).get("large", photo.get("src", {}).get("medium"))
+                        
+            except Exception as e:
+                logger.warning(f"Pexels API failed: {e}")
         
-        return fallback_url
+        # Return category-based fallback
+        return self.get_fallback_image(category)
     
     def get_fallback_image(self, category: Optional[str] = None) -> str:
         """Get a fallback image URL based on category."""
-        # Use category-based Unsplash images as fallback
         if category:
             cat_lower = category.lower()
-            return f"https://source.unsplash.com/800x450/?{cat_lower},africa,business"
+            if cat_lower in self.FALLBACK_IMAGES:
+                return self.FALLBACK_IMAGES[cat_lower]
         
-        return "https://source.unsplash.com/800x450/?africa,business,finance"
+        return self.FALLBACK_IMAGES["default"]
 
 
 def fetch_article_image(
     title: str,
     category: Optional[str] = None,
     country: Optional[str] = None,
+    keywords: Optional[str] = None,
     existing_url: Optional[str] = None
 ) -> Optional[str]:
     """
@@ -148,20 +142,28 @@ def fetch_article_image(
         title: Article title
         category: Article category  
         country: Country code
+        keywords: Image search keywords from LLM
         existing_url: Existing image URL (returned if valid)
         
     Returns:
         Image URL
     """
-    # If there's already a valid image URL, use it
+    # If there's already a valid image URL, verify it works
     if existing_url and existing_url.startswith("http"):
-        return existing_url
+        try:
+            # Quick HEAD check to verify image exists
+            resp = requests.head(existing_url, timeout=3, allow_redirects=True)
+            if resp.status_code == 200:
+                return existing_url
+        except:
+            pass
     
     fetcher = ImageFetcher()
     return fetcher.fetch_image_url(
         title=title,
         category=category,
         country=country,
+        keywords=keywords,
         fallback_url=fetcher.get_fallback_image(category)
     )
 

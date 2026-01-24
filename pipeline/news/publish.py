@@ -173,36 +173,49 @@ class NewsPublisher:
         title = raw_payload.get("title", "")
         content = raw_payload.get("content") or raw_payload.get("summary", "")
         
-        prompt = f"""Tu es un ÉDITEUR FINANCIER FRANCOPHONE SENIOR travaillant pour un magazine financier premium de type Financial Times ou Les Échos.
+        prompt = f"""Tu es un JOURNALISTE ÉCONOMIQUE SENIOR pour un magazine financier africain premium.
 
-Ta mission est de transformer cet article brut en contenu éditorial de haute qualité.
+Ta mission: Transformer cet article en un ARTICLE COMPLET en français de 400 à 800 mots.
 
 Article original ({source_language}):
 Titre: {title}
-Contenu: {content[:2500]}
+Contenu: {content[:4000]}
 
-INSTRUCTIONS STRICTES:
+INSTRUCTIONS CRITIQUES:
 
-1. **TITRE** (title_fr): Réécris un titre percutant, style "Une" de journal financier. Maximum 100 caractères. Doit être accrocheur et informatif.
+1. **TITRE** (title_fr): Titre accrocheur style Financial Times/Jeune Afrique. Max 100 caractères.
 
-2. **RÉSUMÉ** (excerpt_fr): Exactement 2 phrases concises résumant l'essentiel. Style journalistique professionnel.
+2. **RÉSUMÉ** (excerpt_fr): 2-3 phrases résumant l'essentiel. Style journalistique pro.
 
-3. **CONTENU** (content_md): Reformule le contenu en français soutenu, style éditorial. 3-4 paragraphes. Ne copie jamais mot pour mot.
+3. **CONTENU** (content_md): ARTICLE COMPLET de 400-800 MOTS MINIMUM en français. Structure:
+   - Introduction captivante (contexte, enjeux)
+   - Développement détaillé avec chiffres, citations si disponibles
+   - Analyse des implications pour le marché/secteur africain
+   - Conclusion avec perspectives
+   Utilise le format Markdown: **gras** pour termes importants, sous-titres ## si pertinent.
 
-4. **POINTS CLÉS** (tldr): Exactement 3 bullet points percutants résumant les informations essentielles.
+4. **POINTS CLÉS** (tldr): 3-4 bullet points percutants.
 
-5. **CATÉGORIE** (category): UNE seule parmi: "Fintech", "Finance", "Startup", "Tech", "Régulation", "Banking", "Crypto", "Économie"
+5. **CATÉGORIE** (category): UNE parmi: "Fintech", "Finance", "Startup", "Tech", "Régulation", "Banking", "Économie", "Business"
 
-6. **SENTIMENT** (sentiment): "positive", "negative", ou "neutral" selon le ton de l'article.
+6. **SENTIMENT** (sentiment): "positive", "negative", ou "neutral"
 
-Réponds UNIQUEMENT en JSON valide avec ce format exact:
+7. **MOTS-CLÉS IMAGE** (image_keywords): 3 mots-clés en anglais pour trouver une image pertinente (ex: "africa fintech mobile")
+
+8. **EST AFRICAIN** (is_african): true si l'article concerne l'Afrique, une entreprise africaine, ou un sujet impactant l'Afrique. false sinon.
+
+IMPORTANT: Le contenu doit être SUBSTANTIEL (400-800 mots minimum), pas juste 2-3 paragraphes courts!
+
+Réponds UNIQUEMENT en JSON valide:
 {{
   "title_fr": "...",
   "excerpt_fr": "...",
-  "content_md": "...",
+  "content_md": "...(article complet 400-800 mots)...",
   "tldr": ["point1", "point2", "point3"],
   "category": "...",
-  "sentiment": "..."
+  "sentiment": "...",
+  "image_keywords": "africa business finance",
+  "is_african": true
 }}
 """
         
@@ -211,7 +224,7 @@ Réponds UNIQUEMENT en JSON valide avec ce format exact:
                 response = self.openai_client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt}],
-                    max_tokens=1500,
+                    max_tokens=4000,
                     temperature=0.7
                 )
                 text = response.choices[0].message.content
@@ -268,6 +281,12 @@ Réponds UNIQUEMENT en JSON valide avec ce format exact:
             if not rewritten:
                 rewritten = self._fallback_process(raw_payload)
             
+            # Skip non-African articles if AI determined it's not relevant
+            if is_ai_processed and rewritten.get("is_african") is False:
+                logger.debug(f"Skipping non-African article: {raw_payload.get('title', '')[:50]}")
+                self.store.mark_raw_item_processed(raw_item["id"])
+                return None
+            
             # Detect country and tags
             full_content = f"{rewritten.get('title_fr', '')} {rewritten.get('content_md', '')}"
             country = self._detect_country(full_content, raw_item.get("source_country"))
@@ -277,12 +296,14 @@ Réponds UNIQUEMENT en JSON valide avec ce format exact:
             category = rewritten.get("category") or (tags[0].capitalize() if tags else "Actualité")
             sentiment = rewritten.get("sentiment", "neutral")
             
-            # Fetch image if not present
+            # Fetch image using keywords from LLM or category fallback
             existing_image = raw_payload.get("image")
+            image_keywords = rewritten.get("image_keywords")
             image_url = fetch_article_image(
                 title=rewritten.get("title_fr", raw_payload.get("title", "")),
                 category=category,
                 country=country,
+                keywords=image_keywords,
                 existing_url=existing_image
             )
             
