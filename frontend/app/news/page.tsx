@@ -460,15 +460,16 @@ export default function NewsPage() {
                 <div className="bg-white rounded-sm shadow-sm border border-slate-200 p-6">
                   <nav className="space-y-3">
                     {[
-                      { name: 'CEMAC', desc: 'Afrique Centrale' },
-                      { name: 'UEMOA', desc: 'Afrique de l\'Ouest' },
-                      { name: 'Afrique du Nord', desc: 'Maghreb & Égypte' },
-                      { name: 'Afrique de l\'Est', desc: 'Kenya, Rwanda...' },
-                      { name: 'Afrique Australe', desc: 'Afrique du Sud...' },
-                      { name: 'Nigeria', desc: 'La puissance économique' },
+                      { name: 'CEMAC', desc: 'Afrique Centrale', href: '/news/cemac' },
+                      { name: 'UEMOA', desc: 'Afrique de l\'Ouest', href: '/news/uemoa' },
+                      { name: 'Afrique du Nord', desc: 'Maghreb & Égypte', href: '/news/north-africa' },
+                      { name: 'Afrique de l\'Est', desc: 'Kenya, Rwanda...', href: '/news/east-africa' },
+                      { name: 'Afrique Australe', desc: 'Afrique du Sud...', href: '/news/southern-africa' },
+                      { name: 'Nigeria', desc: 'La puissance économique', href: '/news/nigeria' },
                     ].map((region) => (
-                      <button
+                      <Link
                         key={region.name}
+                        href={region.href}
                         className="w-full flex items-center justify-between p-3 rounded hover:bg-slate-50 transition-colors text-left group"
                       >
                         <div>
@@ -478,7 +479,7 @@ export default function NewsPage() {
                           <p className="text-xs text-slate-500">{region.desc}</p>
                         </div>
                         <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-700" />
-                      </button>
+                      </Link>
                     ))}
                   </nav>
                 </div>
