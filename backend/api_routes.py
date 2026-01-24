@@ -585,23 +585,39 @@ async def get_asset_chart(
 async def get_asset_details(ticker: str):
     """
     Get detailed information for a specific asset.
+    Supports both symbol (BTC) and asset_id (BTC.CRYPTO) formats.
     """
     try:
-        # Search for asset by symbol
-        results = db.search_assets(query=ticker, limit=10)
-        
-        # Find exact match
         asset = None
-        for a in results:
-            if a.get("symbol", "").upper() == ticker.upper():
-                asset = a
-                break
         
+        # If ticker contains a dot, it might be a full asset_id - try it directly first
+        if "." in ticker:
+            asset = db.get_asset_detail(ticker.upper())
+            if not asset:
+                # Maybe the format is wrong, extract symbol and try search
+                symbol_part = ticker.split(".")[0]
+                results = db.search_assets(query=symbol_part, limit=10)
+                for a in results:
+                    if a.get("symbol", "").upper() == symbol_part.upper():
+                        asset = a
+                        break
+        
+        # If no asset yet, search by symbol
         if not asset:
-            # Try with asset_id format
+            results = db.search_assets(query=ticker, limit=10)
+            
+            # Find exact match
+            for a in results:
+                if a.get("symbol", "").upper() == ticker.upper():
+                    asset = a
+                    break
+        
+        # If still no asset, try with asset_id format for various exchanges
+        if not asset:
             suffixes = [
                 "US", "EU", "CRYPTO", "FX", "CMDTY", "FUTURE", "OPTION", "INDEX",  # Global
-                "JSE", "NGX", "BRVM", "EGX", "NSE", "CSE", "GSE", "BVMT"           # Africa
+                "JSE", "NGX", "BRVM", "EGX", "NSE", "CSE", "GSE", "BVMT",           # Africa
+                "CME", "COMEX", "CBOT", "NYMEX", "CBOE"                              # Derivatives
             ]
             
             for suffix in suffixes:
