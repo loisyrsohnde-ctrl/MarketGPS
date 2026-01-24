@@ -20,7 +20,7 @@ import time
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from core.models import AssetType, Score
+from core.models import AssetType, Score, StateLabel
 from core.config import get_logger, get_config
 from storage.sqlite_store import SQLiteStore
 from storage.parquet_store import ParquetStore
@@ -248,7 +248,7 @@ class AlternativeAssetScorer:
             max_drawdown=metrics["max_drawdown"],
             sma200=metrics["sma200"],
             last_price=metrics["last_price"],
-            state_label="Équilibre",
+            state_label=StateLabel.EQUILIBRE,
             fundamentals_available=False,
         )
         
