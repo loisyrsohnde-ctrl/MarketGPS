@@ -209,7 +209,7 @@ Titre: {title}
 Contenu: {content[:4000]}
 
 Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown ```json ... ```) :
-{
+{{
   "skip": false,
   "title_fr": "Titre percutant ici",
   "excerpt_fr": "Résumé ici",
@@ -218,7 +218,7 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
   "sentiment": "neutral",
   "image_search_query": "requête image",
   "tldr": ["point 1", "point 2"]
-}
+}}
 """
         
         try:
