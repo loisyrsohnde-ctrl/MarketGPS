@@ -599,13 +599,17 @@ async def get_asset_details(ticker: str):
         
         if not asset:
             # Try with asset_id format
-            asset_id = f"{ticker.upper()}.US"
-            detail = db.get_asset_detail(asset_id)
-            if not detail:
-                asset_id = f"{ticker.upper()}.EU"
+            suffixes = [
+                "US", "EU", "CRYPTO", "FX", "CMDTY", "FUTURE", "OPTION", "INDEX",  # Global
+                "JSE", "NGX", "BRVM", "EGX", "NSE", "CSE", "GSE", "BVMT"           # Africa
+            ]
+            
+            for suffix in suffixes:
+                asset_id = f"{ticker.upper()}.{suffix}"
                 detail = db.get_asset_detail(asset_id)
-            if detail:
-                asset = detail
+                if detail:
+                    asset = detail
+                    break
         
         if not asset:
             raise HTTPException(status_code=404, detail=f"Asset {ticker} not found")
