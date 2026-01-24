@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Pill, ScoreGaugeBadge } from '@/components/ui/badge';
 import { AssetLogo } from '@/components/cards/asset-card';
+import { AssetListItem, AssetListSkeleton } from '@/components/cards/AssetListItem';
 import { useAssetInspector } from '@/store/useAssetInspector';
 import { cn, formatNumberSafe } from '@/lib/utils';
 import type { Asset, MarketFilter, AssetType } from '@/types';
@@ -213,19 +214,19 @@ function ExplorerPageContent() {
   return (
     <div className="space-y-6">
       {/* ─────────────────────────────────────────────────────────────────
-         HEADER
+         HEADER (responsive)
          ───────────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <Link href="/dashboard" className="hidden sm:block">
             <Button variant="ghost" size="sm" leftIcon={<ArrowLeft className="w-4 h-4" />}>
               Retour
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">Explorer les actifs</h1>
-            <p className="text-sm text-text-muted">
-              {formatNumberSafe(totalAssets)} actifs disponibles
+            <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Explorer</h1>
+            <p className="text-xs sm:text-sm text-text-muted">
+              {formatNumberSafe(totalAssets)} actifs
             </p>
           </div>
         </div>
@@ -235,103 +236,54 @@ function ExplorerPageContent() {
           size="sm" 
           onClick={() => refetch()}
           leftIcon={<RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />}
+          className="self-end sm:self-auto"
         >
-          Actualiser
+          <span className="hidden sm:inline">Actualiser</span>
+          <span className="sm:hidden">Sync</span>
         </Button>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────
-         FILTERS
+         FILTERS (responsive)
          ───────────────────────────────────────────────────────────────── */}
-      <GlassCard>
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Search */}
-          <div className="flex-1 min-w-[200px] max-w-md">
-            <Input
-              placeholder="Rechercher un actif..."
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              leftIcon={<Search className="w-4 h-4" />}
-            />
-          </div>
+      <GlassCard className="overflow-hidden">
+        <div className="space-y-3">
+          {/* Row 1: Search + Market scope */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Search */}
+            <div className="flex-1 min-w-0">
+              <Input
+                placeholder="Rechercher..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                leftIcon={<Search className="w-4 h-4" />}
+              />
+            </div>
 
-          <div className="h-6 w-px bg-glass-border" />
-
-          {/* Market scope */}
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-text-muted" />
-            <div className="flex gap-2">
-              {marketFilters.map((f) => (
-                <Pill
-                  key={f.value}
-                  active={marketScope === f.value}
-                  onClick={() => {
-                    setMarketScope(f.value);
-                    setAfricaRegion(null); // Reset Africa region when switching scope
-                    setCurrentPage(1);
-                  }}
-                  icon={<span>{f.icon}</span>}
-                >
-                  {f.label}
-                </Pill>
-              ))}
+            {/* Market scope pills */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Filter className="w-4 h-4 text-text-muted hidden sm:block" />
+              <div className="flex gap-1 sm:gap-2">
+                {marketFilters.map((f) => (
+                  <Pill
+                    key={f.value}
+                    active={marketScope === f.value}
+                    onClick={() => {
+                      setMarketScope(f.value);
+                      setAfricaRegion(null);
+                      setCurrentPage(1);
+                    }}
+                    icon={<span className="text-sm">{f.icon}</span>}
+                  >
+                    <span className="hidden sm:inline">{f.label}</span>
+                  </Pill>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Africa region filter - only shown when Africa is selected */}
-          {marketScope === 'AFRICA' && (
-            <>
-              <div className="h-6 w-px bg-glass-border" />
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-text-muted font-medium">Région:</span>
-                <div className="flex flex-wrap gap-1">
-                  {africaRegions.map((region) => (
-                    <Pill
-                      key={region.value || 'all'}
-                      active={africaRegion === region.value}
-                      onClick={() => {
-                        setAfricaRegion(region.value);
-                        setCurrentPage(1);
-                      }}
-                      icon={<span className="text-xs">{region.icon}</span>}
-                    >
-                      <span className="text-xs">{region.label}</span>
-                    </Pill>
-                  ))}
-                </div>
-              </div>
-              {/* Individual country shortcuts */}
-              <div className="w-full flex flex-wrap items-center gap-2 mt-2">
-                <span className="text-xs text-text-muted font-medium">Pays:</span>
-                <div className="flex flex-wrap gap-1">
-                  {africaCountries.map((country) => (
-                    <button
-                      key={country.value}
-                      onClick={() => {
-                        setAfricaRegion(country.value);
-                        setCurrentPage(1);
-                      }}
-                      className={cn(
-                        "px-2 py-0.5 rounded text-xs transition-all",
-                        africaRegion === country.value
-                          ? "bg-accent text-white"
-                          : "bg-glass-subtle text-text-secondary hover:bg-glass-border hover:text-text-primary"
-                      )}
-                      title={country.label}
-                    >
-                      <span className="mr-1">{country.icon}</span>
-                      {country.exchange}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
-          <div className="h-6 w-px bg-glass-border" />
-
-          {/* Type filter */}
-          <div className="flex flex-wrap gap-2">
+          {/* Row 2: Type filters (horizontal scroll on mobile) */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
             {typeFilters.map((f) => (
               <Pill
                 key={f.value || 'all'}
@@ -340,25 +292,69 @@ function ExplorerPageContent() {
                   setTypeFilter(f.value);
                   setCurrentPage(1);
                 }}
+                className="flex-shrink-0"
               >
                 {f.label}
               </Pill>
             ))}
+            <div className="w-px h-6 bg-glass-border hidden sm:block flex-shrink-0" />
+            <Pill
+              active={onlyScored}
+              onClick={() => {
+                setOnlyScored(!onlyScored);
+                setCurrentPage(1);
+              }}
+              icon={<TrendingUp className="w-3 h-3" />}
+              className="flex-shrink-0"
+            >
+              <span className="hidden sm:inline">Scorés uniquement</span>
+              <span className="sm:hidden">Scorés</span>
+            </Pill>
           </div>
 
-          <div className="h-6 w-px bg-glass-border" />
-
-          {/* Only scored toggle */}
-          <Pill
-            active={onlyScored}
-            onClick={() => {
-              setOnlyScored(!onlyScored);
-              setCurrentPage(1);
-            }}
-            icon={<TrendingUp className="w-3 h-3" />}
-          >
-            Scorés uniquement
-          </Pill>
+          {/* Africa region filter - only shown when Africa is selected */}
+          {marketScope === 'AFRICA' && (
+            <div className="pt-2 border-t border-glass-border space-y-2">
+              {/* Regions */}
+              <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
+                {africaRegions.map((region) => (
+                  <Pill
+                    key={region.value || 'all'}
+                    active={africaRegion === region.value}
+                    onClick={() => {
+                      setAfricaRegion(region.value);
+                      setCurrentPage(1);
+                    }}
+                    icon={<span className="text-xs">{region.icon}</span>}
+                    className="flex-shrink-0"
+                  >
+                    <span className="text-xs">{region.label}</span>
+                  </Pill>
+                ))}
+              </div>
+              {/* Countries */}
+              <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
+                {africaCountries.map((country) => (
+                  <button
+                    key={country.value}
+                    onClick={() => {
+                      setAfricaRegion(country.value);
+                      setCurrentPage(1);
+                    }}
+                    className={cn(
+                      "px-2 py-1 rounded text-xs transition-all flex-shrink-0 min-h-[32px]",
+                      africaRegion === country.value
+                        ? "bg-accent text-white"
+                        : "bg-glass-subtle text-text-secondary active:bg-glass-border"
+                    )}
+                  >
+                    <span className="mr-1">{country.icon}</span>
+                    {country.exchange}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </GlassCard>
 
@@ -383,11 +379,11 @@ function ExplorerPageContent() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────────
-         TABLE
+         ASSET LIST (responsive: cards on mobile, table on desktop)
          ───────────────────────────────────────────────────────────────── */}
       <GlassCardAccent padding="none">
-        {/* Table Header */}
-        <div className="grid grid-cols-12 gap-4 p-4 border-b border-glass-border bg-bg-elevated/50">
+        {/* Desktop Table Header - hidden on mobile */}
+        <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b border-glass-border bg-bg-elevated/50">
           <div className="col-span-1 text-xs font-semibold text-text-muted uppercase">#</div>
           <button 
             onClick={() => toggleSort('symbol')}
@@ -414,106 +410,130 @@ function ExplorerPageContent() {
           <div className="col-span-2 text-xs font-semibold text-text-muted uppercase text-right">Action</div>
         </div>
 
-        {/* Table Body */}
-        <div className="divide-y divide-glass-border">
-          {isLoading ? (
-            // Skeleton
-            Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="grid grid-cols-12 gap-4 p-4">
-                <div className="col-span-1"><div className="h-4 w-8 skeleton rounded" /></div>
-                <div className="col-span-2"><div className="h-4 w-16 skeleton rounded" /></div>
-                <div className="col-span-4"><div className="h-4 w-48 skeleton rounded" /></div>
-                <div className="col-span-1"><div className="h-4 w-12 skeleton rounded" /></div>
-                <div className="col-span-2"><div className="h-6 w-12 skeleton rounded" /></div>
-                <div className="col-span-2"><div className="h-8 w-20 skeleton rounded ml-auto" /></div>
-              </div>
-            ))
-          ) : assets.length === 0 ? (
-            // Empty state
-            <div className="p-12 text-center">
-              <Search className="w-12 h-12 text-text-muted mx-auto mb-4" />
-              <p className="text-text-secondary text-lg">Aucun actif trouvé</p>
-              <p className="text-sm text-text-muted mt-1">
-                Essayez de modifier vos filtres
-              </p>
-            </div>
-          ) : (
-            assets.map((asset, index) => (
-              <motion.div
-                key={asset.asset_id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.02 }}
-                className="grid grid-cols-12 gap-4 p-4 hover:bg-surface/50 transition-colors"
-              >
-                <div className="col-span-1 text-sm text-text-muted">
-                  {(currentPage - 1) * pageSize + index + 1}
-                </div>
-                <div 
-                  className="col-span-2 flex items-center gap-2 cursor-pointer group"
-                  onClick={() => openInspector(asset.ticker, asset.asset_id)}
-                >
-                  <AssetLogo ticker={asset.ticker} assetType={asset.asset_type} size="xs" />
-                  <span className="font-semibold text-text-primary group-hover:text-accent transition-colors">
-                    {asset.ticker}
-                  </span>
-                </div>
-                <div className="col-span-4 text-sm text-text-secondary truncate">
-                  {asset.name}
-                </div>
-                <div className="col-span-1">
-                  <span className="px-2 py-0.5 rounded text-xs bg-surface text-text-muted">
-                    {asset.asset_type}
-                  </span>
-                </div>
-                <div className="col-span-2">
-                  {asset.score_total ? (
-                    <ScoreGaugeBadge score={asset.score_total} size="sm" />
-                  ) : (
-                    <span className="text-xs text-text-dim">—</span>
-                  )}
-                </div>
-                <div className="col-span-2 text-right">
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => openInspector(asset.ticker, asset.asset_id)}
-                  >
-                    Inspecter
-                  </Button>
-                </div>
-              </motion.div>
-            ))
-          )}
+        {/* Mobile Sort Bar - visible only on mobile */}
+        <div className="md:hidden flex items-center justify-between p-3 border-b border-glass-border bg-bg-elevated/50">
+          <span className="text-xs text-text-muted">
+            {formatNumberSafe(totalAssets)} résultats
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => toggleSort('score_total')}
+              className={cn(
+                "flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors",
+                sortBy === 'score_total' ? "bg-accent/20 text-accent" : "bg-surface text-text-muted"
+              )}
+            >
+              <ArrowUpDown className="w-3 h-3" />
+              Score
+            </button>
+            <button
+              onClick={() => toggleSort('symbol')}
+              className={cn(
+                "flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors",
+                sortBy === 'symbol' ? "bg-accent/20 text-accent" : "bg-surface text-text-muted"
+              )}
+            >
+              <ArrowUpDown className="w-3 h-3" />
+              A-Z
+            </button>
+          </div>
         </div>
 
-        {/* Pagination */}
+        {/* List Body - responsive */}
+        <div className="divide-y divide-glass-border md:divide-y-0">
+          {/* Mobile: card grid with gaps */}
+          <div className="md:hidden p-3 space-y-2">
+            {isLoading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <AssetListSkeleton key={i} />
+              ))
+            ) : assets.length === 0 ? (
+              <div className="py-12 text-center">
+                <Search className="w-10 h-10 text-text-muted mx-auto mb-3" />
+                <p className="text-text-secondary">Aucun actif trouvé</p>
+                <p className="text-xs text-text-muted mt-1">Modifiez vos filtres</p>
+              </div>
+            ) : (
+              assets.map((asset, index) => (
+                <motion.div
+                  key={asset.asset_id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(index * 0.02, 0.2) }}
+                >
+                  <AssetListItem
+                    asset={asset}
+                    index={(currentPage - 1) * pageSize + index + 1}
+                    onInspect={openInspector}
+                  />
+                </motion.div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop: table rows */}
+          <div className="hidden md:block divide-y divide-glass-border">
+            {isLoading ? (
+              Array.from({ length: 10 }).map((_, i) => (
+                <AssetListSkeleton key={i} />
+              ))
+            ) : assets.length === 0 ? (
+              <div className="p-12 text-center">
+                <Search className="w-12 h-12 text-text-muted mx-auto mb-4" />
+                <p className="text-text-secondary text-lg">Aucun actif trouvé</p>
+                <p className="text-sm text-text-muted mt-1">
+                  Essayez de modifier vos filtres
+                </p>
+              </div>
+            ) : (
+              assets.map((asset, index) => (
+                <motion.div
+                  key={asset.asset_id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.02 }}
+                >
+                  <AssetListItem
+                    asset={asset}
+                    index={(currentPage - 1) * pageSize + index + 1}
+                    onInspect={openInspector}
+                  />
+                </motion.div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Pagination (responsive) */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between p-4 border-t border-glass-border bg-bg-elevated/30">
-            <p className="text-sm text-text-muted">
-              Page {currentPage} sur {totalPages} ({formatNumberSafe(totalAssets)} actifs)
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 border-t border-glass-border bg-bg-elevated/30">
+            <p className="text-xs sm:text-sm text-text-muted text-center sm:text-left">
+              Page {currentPage}/{totalPages}
+              <span className="hidden sm:inline"> ({formatNumberSafe(totalAssets)} actifs)</span>
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center gap-1 sm:gap-2">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                leftIcon={<ChevronLeft className="w-4 h-4" />}
+                className="px-2 sm:px-3"
               >
-                Précédent
+                <ChevronLeft className="w-4 h-4" />
+                <span className="hidden sm:inline ml-1">Préc</span>
               </Button>
               
-              {/* Page numbers */}
+              {/* Page numbers - fewer on mobile */}
               <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                {Array.from({ length: Math.min(typeof window !== 'undefined' && window.innerWidth < 640 ? 3 : 5, totalPages) }, (_, i) => {
+                  const maxPages = 5;
                   let pageNum: number;
-                  if (totalPages <= 5) {
+                  if (totalPages <= maxPages) {
                     pageNum = i + 1;
                   } else if (currentPage <= 3) {
                     pageNum = i + 1;
                   } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
+                    pageNum = totalPages - maxPages + 1 + i;
                   } else {
                     pageNum = currentPage - 2 + i;
                   }
@@ -523,10 +543,10 @@ function ExplorerPageContent() {
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
                       className={cn(
-                        'w-8 h-8 rounded-lg text-sm font-medium transition-colors',
+                        'w-8 h-8 sm:w-9 sm:h-9 rounded-lg text-sm font-medium transition-colors',
                         pageNum === currentPage
                           ? 'bg-accent text-bg-primary'
-                          : 'text-text-secondary hover:bg-surface'
+                          : 'text-text-secondary active:bg-surface'
                       )}
                     >
                       {pageNum}
@@ -540,9 +560,10 @@ function ExplorerPageContent() {
                 size="sm"
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                rightIcon={<ChevronRight className="w-4 h-4" />}
+                className="px-2 sm:px-3"
               >
-                Suivant
+                <span className="hidden sm:inline mr-1">Suiv</span>
+                <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
           </div>

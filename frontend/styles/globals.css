@@ -537,4 +537,56 @@
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────
+     MOBILE UTILITIES
+     ───────────────────────────────────────────────────────────────────── */
+
+  /* Touch manipulation - improves touch performance */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  /* Prevent text selection on touch */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Prevent horizontal overflow on mobile */
+  .overflow-x-clip {
+    overflow-x: clip;
+  }
+
+  /* Min touch target size (44x44px per Apple HIG) */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* iOS input zoom fix - prevents zoom on focus */
+  @media screen and (max-width: 640px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="search"],
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Smooth momentum scrolling on iOS */
+  .scroll-smooth-ios {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent overscroll bounce on mobile */
+  .overscroll-none {
+    overscroll-behavior: none;
+  }
 }

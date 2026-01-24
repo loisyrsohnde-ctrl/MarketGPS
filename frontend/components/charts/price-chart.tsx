@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   AreaChart,
   Area,
@@ -20,6 +20,7 @@ import type { ChartDataPoint, ChartPeriod } from '@/types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PRICE CHART COMPONENT
+// Mobile-optimized with simplified axes and touch-friendly tooltip
 // ═══════════════════════════════════════════════════════════════════════════
 
 type ChartStyle = 'line' | 'area' | 'candlestick';
@@ -32,6 +33,20 @@ interface PriceChartProps {
   showPeriodSelector?: boolean;
   className?: string;
   chartStyle?: ChartStyle;
+}
+
+// Hook to detect mobile
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
+  return isMobile;
 }
 
 const periods: { value: ChartPeriod; label: string }[] = [
@@ -50,6 +65,11 @@ export function PriceChart({
   className,
   chartStyle = 'line',
 }: PriceChartProps) {
+  const isMobile = useIsMobile();
+  
+  // Responsive height
+  const chartHeight = isMobile ? Math.min(height, 180) : height;
+  
   // Calculate if price is up or down
   const priceChange = useMemo(() => {
     if (!data || data.length < 2) return 0;
@@ -62,6 +82,11 @@ export function PriceChart({
   const chartColor = isPositive ? '#22C55E' : '#EF4444';
   // Use unique ID to avoid SVG gradient conflicts
   const gradientId = useMemo(() => `priceGradient-${Date.now()}-${Math.random().toString(36).slice(2)}`, []);
+  
+  // Mobile: use smaller Y-axis width and fewer ticks
+  const yAxisWidth = isMobile ? 40 : 55;
+  const xAxisTickFontSize = isMobile ? 9 : 10;
+  const yAxisTickFontSize = isMobile ? 9 : 10;
 
   // Format data for chart - ensure numbers are valid
   const chartData = useMemo(() => {
@@ -107,19 +132,20 @@ export function PriceChart({
   }
 
   return (
-    <div className={cn('space-y-4', className)}>
-      {/* Period selector */}
+    <div className={cn('space-y-3 sm:space-y-4', className)}>
+      {/* Period selector - horizontal scroll on mobile */}
       {showPeriodSelector && onPeriodChange && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0">
           {periods.map((p) => (
             <button
               key={p.value}
               onClick={() => onPeriodChange(p.value)}
               className={cn(
-                'px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200',
+                'px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 flex-shrink-0',
+                'min-h-[32px] sm:min-h-0', // Touch target
                 period === p.value
                   ? 'bg-accent text-bg-primary'
-                  : 'bg-surface text-text-secondary hover:bg-surface-hover hover:text-text-primary'
+                  : 'bg-surface text-text-secondary active:bg-surface-hover'
               )}
             >
               {p.label}
@@ -130,14 +156,14 @@ export function PriceChart({
 
       {/* Chart */}
       <div
-        className="bg-surface/50 rounded-xl border border-glass-border p-4"
-        style={{ height, minHeight: height }}
+        className="bg-surface/50 rounded-xl border border-glass-border p-2 sm:p-4"
+        style={{ height: chartHeight, minHeight: chartHeight }}
       >
         <ResponsiveContainer width="100%" height="100%">
           {chartStyle === 'area' ? (
             <AreaChart
               data={chartData}
-              margin={{ top: 10, right: 15, left: 0, bottom: 0 }}
+              margin={{ top: 10, right: isMobile ? 5 : 15, left: isMobile ? -10 : 0, bottom: 0 }}
             >
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -154,35 +180,36 @@ export function PriceChart({
                 dataKey="dateFormatted"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 10 }}
+                tick={{ fill: '#94a3b8', fontSize: xAxisTickFontSize }}
                 dy={10}
                 interval="preserveStartEnd"
               />
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 10 }}
+                tick={{ fill: '#94a3b8', fontSize: yAxisTickFontSize }}
                 domain={[minMax.min, minMax.max]}
                 dx={-5}
                 tickFormatter={(value) => typeof value === 'number' ? value.toFixed(0) : '0'}
-                width={55}
+                width={yAxisWidth}
+                hide={isMobile}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip isMobile={isMobile} />} />
               <Area
                 type="monotone"
                 dataKey="close"
                 stroke={chartColor}
-                strokeWidth={2}
+                strokeWidth={isMobile ? 1.5 : 2}
                 fill={`url(#${gradientId})`}
                 dot={false}
-                activeDot={{ r: 6, fill: chartColor, stroke: '#fff', strokeWidth: 2 }}
+                activeDot={{ r: isMobile ? 4 : 6, fill: chartColor, stroke: '#fff', strokeWidth: 2 }}
                 animationDuration={500}
               />
             </AreaChart>
           ) : chartStyle === 'candlestick' ? (
             <ComposedChart
               data={chartData}
-              margin={{ top: 10, right: 15, left: 0, bottom: 0 }}
+              margin={{ top: 10, right: isMobile ? 5 : 15, left: isMobile ? -10 : 0, bottom: 0 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -193,33 +220,34 @@ export function PriceChart({
                 dataKey="dateFormatted"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 10 }}
+                tick={{ fill: '#94a3b8', fontSize: xAxisTickFontSize }}
                 dy={10}
                 interval="preserveStartEnd"
               />
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 10 }}
+                tick={{ fill: '#94a3b8', fontSize: yAxisTickFontSize }}
                 domain={[minMax.min, minMax.max]}
                 dx={-5}
                 tickFormatter={(value) => typeof value === 'number' ? value.toFixed(0) : '0'}
-                width={55}
+                width={yAxisWidth}
+                hide={isMobile}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip isMobile={isMobile} />} />
               <Line
                 type="linear"
                 dataKey="close"
                 stroke={chartColor}
-                strokeWidth={2}
+                strokeWidth={isMobile ? 1.5 : 2}
                 dot={false}
-                activeDot={{ r: 6, fill: chartColor, stroke: '#fff', strokeWidth: 2 }}
+                activeDot={{ r: isMobile ? 4 : 6, fill: chartColor, stroke: '#fff', strokeWidth: 2 }}
               />
             </ComposedChart>
           ) : (
             <LineChart
               data={chartData}
-              margin={{ top: 10, right: 15, left: 0, bottom: 0 }}
+              margin={{ top: 10, right: isMobile ? 5 : 15, left: isMobile ? -10 : 0, bottom: 0 }}
             >
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -236,27 +264,28 @@ export function PriceChart({
                 dataKey="dateFormatted"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 10 }}
+                tick={{ fill: '#94a3b8', fontSize: xAxisTickFontSize }}
                 dy={10}
                 interval="preserveStartEnd"
               />
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 10 }}
+                tick={{ fill: '#94a3b8', fontSize: yAxisTickFontSize }}
                 domain={[minMax.min, minMax.max]}
                 dx={-5}
                 tickFormatter={(value) => typeof value === 'number' ? value.toFixed(0) : '0'}
-                width={55}
+                width={yAxisWidth}
+                hide={isMobile}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip isMobile={isMobile} />} />
               <Line
                 type="linear"
                 dataKey="close"
                 stroke={chartColor}
-                strokeWidth={2.5}
+                strokeWidth={isMobile ? 2 : 2.5}
                 dot={false}
-                activeDot={{ r: 6, fill: chartColor, stroke: '#fff', strokeWidth: 2 }}
+                activeDot={{ r: isMobile ? 4 : 6, fill: chartColor, stroke: '#fff', strokeWidth: 2 }}
                 animationDuration={500}
                 connectNulls={true}
                 isAnimationActive={false}
@@ -283,13 +312,27 @@ interface CustomTooltipProps {
   active?: boolean;
   payload?: TooltipPayload[];
   label?: string;
+  isMobile?: boolean;
 }
 
-function CustomTooltip({ active, payload }: CustomTooltipProps) {
+function CustomTooltip({ active, payload, isMobile }: CustomTooltipProps) {
   if (!active || !payload || !payload[0]) return null;
 
   const data = payload[0].payload;
 
+  // Mobile: simplified tooltip with just date and close price
+  if (isMobile) {
+    return (
+      <div className="bg-bg-elevated border border-glass-border rounded-lg px-2.5 py-1.5 shadow-glass-lg">
+        <p className="text-[10px] text-text-muted">{data.dateFormatted}</p>
+        <p className="text-sm font-semibold text-text-primary">
+          {data.close?.toFixed(2)}
+        </p>
+      </div>
+    );
+  }
+
+  // Desktop: full tooltip with OHLC
   return (
     <div className="bg-bg-elevated border border-glass-border rounded-lg p-3 shadow-glass-lg">
       <p className="text-xs text-text-muted mb-2">{data.dateFormatted}</p>
