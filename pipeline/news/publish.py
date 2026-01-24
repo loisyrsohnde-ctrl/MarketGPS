@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 
 from core.config import get_logger
 from storage.sqlite_store import SQLiteStore
+from pipeline.news.image_fetcher import fetch_article_image
 
 logger = get_logger(__name__)
 
@@ -275,6 +276,15 @@ Réponds UNIQUEMENT en JSON valide avec ce format exact:
             category = rewritten.get("category") or (tags[0].capitalize() if tags else "Actualité")
             sentiment = rewritten.get("sentiment", "neutral")
             
+            # Fetch image if not present
+            existing_image = raw_payload.get("image")
+            image_url = fetch_article_image(
+                title=rewritten.get("title_fr", raw_payload.get("title", "")),
+                category=category,
+                country=country,
+                existing_url=existing_image
+            )
+            
             # Generate slug
             slug = self._generate_slug(rewritten.get("title_fr", "article"))
             
@@ -289,7 +299,7 @@ Réponds UNIQUEMENT en JSON valide avec ce format exact:
                 "tags_json": json.dumps(tags) if tags else None,
                 "country": country,
                 "language": "fr",
-                "image_url": raw_payload.get("image"),
+                "image_url": image_url,
                 "source_name": raw_item.get("source_name", "Unknown"),
                 "source_url": raw_item.get("url"),
                 "canonical_url": raw_item.get("url"),
