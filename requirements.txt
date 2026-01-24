@@ -38,3 +38,4 @@ tenacity>=8.2.0
 # News Pipeline
 feedparser>=6.0.0
 google-generativeai>=0.3.0
+openai>=1.0.0
