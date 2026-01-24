@@ -331,7 +331,7 @@ export default function ArticlePage() {
           )}
         </p>
         <p className="mt-2 text-xs">
-          Contenu reformulé par MarketGPS. Pour l'article original, consultez la source.
+          Contenu reformulé par MarketGPS. Pour l&apos;article original, consultez la source.
         </p>
       </GlassCard>
     </div>
