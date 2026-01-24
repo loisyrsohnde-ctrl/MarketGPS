@@ -237,7 +237,16 @@ Réponds UNIQUEMENT en JSON valide:
             # Extract JSON from response
             json_match = re.search(r'\{[\s\S]*\}', text)
             if json_match:
-                return json.loads(json_match.group())
+                result = json.loads(json_match.group())
+                # Validate that we got French content
+                if result.get("title_fr") and result.get("content_md"):
+                    content_length = len(result.get("content_md", ""))
+                    logger.debug(f"LLM response OK: {content_length} chars")
+                    return result
+                else:
+                    logger.warning("LLM response missing required fields")
+            else:
+                logger.warning(f"LLM response not valid JSON: {text[:200]}...")
             
         except Exception as e:
             logger.warning(f"LLM rewrite failed: {e}")
@@ -278,7 +287,10 @@ Réponds UNIQUEMENT en JSON valide:
             rewritten = self._rewrite_with_llm(raw_payload, source_language)
             is_ai_processed = rewritten is not None
             
-            if not rewritten:
+            if rewritten:
+                logger.info(f"✓ AI processed: {rewritten.get('title_fr', '')[:50]}...")
+            else:
+                logger.warning(f"✗ AI failed, using fallback for: {raw_payload.get('title', '')[:50]}...")
                 rewritten = self._fallback_process(raw_payload)
             
             # Skip non-African articles if AI determined it's not relevant
