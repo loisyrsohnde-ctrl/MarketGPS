@@ -50,28 +50,29 @@ class NewsPublisher:
     def _init_llm(self):
         """Initialize LLM for translation/rewriting."""
         self.llm_provider = None
+        self.openai_client = None
         
-        # Try Gemini first
-        gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        if GEMINI_AVAILABLE and gemini_key:
+        # Try OpenAI first (more reliable)
+        openai_key = os.environ.get("OPENAI_API_KEY")
+        if OPENAI_AVAILABLE and openai_key:
             try:
-                genai.configure(api_key=gemini_key)
-                self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
-                self.llm_provider = "gemini"
-                logger.info("Using Gemini for news rewriting")
+                self.openai_client = openai.OpenAI(api_key=openai_key)
+                self.llm_provider = "openai"
+                logger.info("Using OpenAI for news rewriting")
             except Exception as e:
-                logger.warning(f"Gemini init failed: {e}")
+                logger.warning(f"OpenAI init failed: {e}")
         
-        # Try OpenAI as fallback
+        # Try Gemini as fallback
         if not self.llm_provider:
-            openai_key = os.environ.get("OPENAI_API_KEY")
-            if OPENAI_AVAILABLE and openai_key:
+            gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+            if GEMINI_AVAILABLE and gemini_key:
                 try:
-                    openai.api_key = openai_key
-                    self.llm_provider = "openai"
-                    logger.info("Using OpenAI for news rewriting")
+                    genai.configure(api_key=gemini_key)
+                    self.gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+                    self.llm_provider = "gemini"
+                    logger.info("Using Gemini for news rewriting")
                 except Exception as e:
-                    logger.warning(f"OpenAI init failed: {e}")
+                    logger.warning(f"Gemini init failed: {e}")
         
         if not self.llm_provider:
             logger.warning("No LLM available - running in fallback mode (no translation)")
@@ -206,17 +207,17 @@ Réponds UNIQUEMENT en JSON valide avec ce format exact:
 """
         
         try:
-            if self.llm_provider == "gemini":
-                response = self.gemini_model.generate_content(prompt)
-                text = response.text
-            elif self.llm_provider == "openai":
-                response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
+            if self.llm_provider == "openai" and self.openai_client:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=1500,
                     temperature=0.7
                 )
                 text = response.choices[0].message.content
+            elif self.llm_provider == "gemini":
+                response = self.gemini_model.generate_content(prompt)
+                text = response.text
             else:
                 return None
             
