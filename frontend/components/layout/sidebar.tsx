@@ -18,6 +18,7 @@ import {
   Globe,
   Dumbbell,
   Briefcase,
+  Newspaper,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -51,7 +52,7 @@ export function Sidebar({ scopeCounts, onLogout }: SidebarProps) {
           { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
           { href: '/dashboard/explorer', icon: Search, label: 'Explorer' },
           { href: '/watchlist', icon: Star, label: 'Liste de suivi' },
-          { href: '/dashboard/markets', icon: TrendingUp, label: 'Marchés' },
+          { href: '/news', icon: Newspaper, label: 'Actualités' },
         ],
       },
       {
