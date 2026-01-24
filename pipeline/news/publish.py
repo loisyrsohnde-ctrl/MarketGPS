@@ -173,49 +173,51 @@ class NewsPublisher:
         title = raw_payload.get("title", "")
         content = raw_payload.get("content") or raw_payload.get("summary", "")
         
-        prompt = f"""Tu es un JOURNALISTE ÉCONOMIQUE SENIOR pour un magazine financier africain premium.
+        prompt = f"""Rôle : Tu es un Rédacteur en Chef pour "MarketGPS Afrique", un média économique de référence (type Jeune Afrique / Les Échos).
 
-Ta mission: Transformer cet article en un ARTICLE COMPLET en français de 400 à 800 mots.
+TÂCHE 1 : FILTRAGE STRICT
+Le sujet de l'article est-il CLAIREMENT lié à l'un de ces thèmes ?
+- Économie / Finance / Bourse
+- Tech / Startups / Innovation / Fintech
+- Entreprises / Business / Entrepreneuriat
+- Régulation économique
+
+SI NON (ex: Sport pur, Faits divers, Politique sans angle éco, People, Religion) :
+Réponds UNIQUEMENT : {{"skip": true}}
+
+SI OUI :
+Réécris l'article en suivant ces règles IMPÉRATIVES :
+
+1. STYLE :
+- Journalistique, fluide, professionnel.
+- PAS DE STRUCTURE SCOLAIRE : Interdiction formelle d'écrire "Introduction", "Conclusion", "Développement".
+- Commence directement par l'information clé (Lead).
+- Ton factuel et analytique.
+
+2. CONTENU (400-600 mots) :
+- Synthétise les faits, les chiffres et les enjeux.
+- Explique l'impact pour le marché ou l'écosystème africain.
+- Utilise le **gras** pour les noms d'entreprises et chiffres clés.
+
+3. IMAGE SEARCH (IMPORTANT) :
+- Génère une requête de recherche d'image précise en ANGLAIS pour illustrer cet article spécifiquement.
+- Ex: Pour un article sur Dangote -> "Aliko Dangote cement factory nigeria"
+- Ex: Pour une levée de fonds -> "Flutterwave office lagos tech"
 
 Article original ({source_language}):
 Titre: {title}
 Contenu: {content[:4000]}
 
-INSTRUCTIONS CRITIQUES:
-
-1. **TITRE** (title_fr): Titre accrocheur style Financial Times/Jeune Afrique. Max 100 caractères.
-
-2. **RÉSUMÉ** (excerpt_fr): 2-3 phrases résumant l'essentiel. Style journalistique pro.
-
-3. **CONTENU** (content_md): ARTICLE COMPLET de 400-800 MOTS MINIMUM en français. Structure:
-   - Introduction captivante (contexte, enjeux)
-   - Développement détaillé avec chiffres, citations si disponibles
-   - Analyse des implications pour le marché/secteur africain
-   - Conclusion avec perspectives
-   Utilise le format Markdown: **gras** pour termes importants, sous-titres ## si pertinent.
-
-4. **POINTS CLÉS** (tldr): 3-4 bullet points percutants.
-
-5. **CATÉGORIE** (category): UNE parmi: "Fintech", "Finance", "Startup", "Tech", "Régulation", "Banking", "Économie", "Business"
-
-6. **SENTIMENT** (sentiment): "positive", "negative", ou "neutral"
-
-7. **MOTS-CLÉS IMAGE** (image_keywords): 3 mots-clés en anglais pour trouver une image pertinente (ex: "africa fintech mobile")
-
-8. **EST AFRICAIN** (is_african): true si l'article concerne l'Afrique, une entreprise africaine, ou un sujet impactant l'Afrique. false sinon.
-
-IMPORTANT: Le contenu doit être SUBSTANTIEL (400-800 mots minimum), pas juste 2-3 paragraphes courts!
-
-Réponds UNIQUEMENT en JSON valide:
+Réponds UNIQUEMENT en JSON valide :
 {{
-  "title_fr": "...",
-  "excerpt_fr": "...",
-  "content_md": "...(article complet 400-800 mots)...",
-  "tldr": ["point1", "point2", "point3"],
-  "category": "...",
-  "sentiment": "...",
-  "image_keywords": "africa business finance",
-  "is_african": true
+  "skip": false,
+  "title_fr": "Titre percutant (max 100 car)",
+  "excerpt_fr": "Chapeau de l'article (2 phrases accrocheuses)",
+  "content_md": "Corps de l'article en markdown (sans titres de sections scolaires)",
+  "category": "Une catégorie parmi: Fintech, Finance, Startup, Tech, Économie, Business",
+  "sentiment": "positive/neutral/negative",
+  "image_search_query": "requête précise en anglais pour l'image",
+  "tldr": ["Point clé 1", "Point clé 2", "Point clé 3"]
 }}
 """
         
@@ -293,9 +295,9 @@ Réponds UNIQUEMENT en JSON valide:
                 logger.warning(f"✗ AI failed, using fallback for: {raw_payload.get('title', '')[:50]}...")
                 rewritten = self._fallback_process(raw_payload)
             
-            # Skip non-African articles if AI determined it's not relevant
-            if is_ai_processed and rewritten.get("is_african") is False:
-                logger.debug(f"Skipping non-African article: {raw_payload.get('title', '')[:50]}")
+            # Skip based on AI decision (off-topic)
+            if rewritten.get("skip") is True:
+                logger.info(f"⏭️  Skipped (off-topic): {raw_payload.get('title', '')[:50]}...")
                 self.store.mark_raw_item_processed(raw_item["id"])
                 return None
             
@@ -308,14 +310,15 @@ Réponds UNIQUEMENT en JSON valide:
             category = rewritten.get("category") or (tags[0].capitalize() if tags else "Actualité")
             sentiment = rewritten.get("sentiment", "neutral")
             
-            # Fetch image using keywords from LLM or category fallback
+            # Fetch image using SPECIFIC SEARCH QUERY from LLM
             existing_image = raw_payload.get("image")
-            image_keywords = rewritten.get("image_keywords")
+            search_query = rewritten.get("image_search_query")
+            
             image_url = fetch_article_image(
                 title=rewritten.get("title_fr", raw_payload.get("title", "")),
                 category=category,
                 country=country,
-                keywords=image_keywords,
+                keywords=search_query,
                 existing_url=existing_image
             )
             
