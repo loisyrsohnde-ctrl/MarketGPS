@@ -103,13 +103,57 @@ const TAGS = [
   { id: 'banking', label: 'Banque' },
 ];
 
-const COUNTRIES = [
-  { code: 'NG', name: 'Nigeria' },
-  { code: 'ZA', name: 'Afrique du Sud' },
-  { code: 'KE', name: 'Kenya' },
-  { code: 'EG', name: 'Égypte' },
-  { code: 'GH', name: 'Ghana' },
-  { code: 'CI', name: "Côte d'Ivoire" },
+// Régions africaines
+const REGIONS = [
+  { 
+    id: 'CEMAC', 
+    name: 'CEMAC', 
+    emoji: '🌍',
+    countries: ['CM', 'CF', 'TD', 'CG', 'GQ', 'GA'],
+    description: 'Cameroun, RCA, Tchad, Congo, Guinée Éq., Gabon'
+  },
+  { 
+    id: 'UEMOA', 
+    name: 'UEMOA', 
+    emoji: '🌍',
+    countries: ['BJ', 'BF', 'CI', 'GW', 'ML', 'NE', 'SN', 'TG'],
+    description: 'Bénin, Burkina, Côte d\'Ivoire, Mali, Niger, Sénégal, Togo'
+  },
+  { 
+    id: 'NORTH', 
+    name: 'Afrique du Nord', 
+    emoji: '🏜️',
+    countries: ['MA', 'DZ', 'TN', 'LY', 'EG'],
+    description: 'Maroc, Algérie, Tunisie, Libye, Égypte'
+  },
+  { 
+    id: 'EAST', 
+    name: 'Afrique de l\'Est', 
+    emoji: '🦁',
+    countries: ['KE', 'TZ', 'UG', 'RW', 'ET'],
+    description: 'Kenya, Tanzanie, Ouganda, Rwanda, Éthiopie'
+  },
+  { 
+    id: 'SOUTH', 
+    name: 'Afrique Australe', 
+    emoji: '🌴',
+    countries: ['ZA', 'ZW', 'BW', 'NA', 'MZ'],
+    description: 'Afrique du Sud, Zimbabwe, Botswana, Namibie'
+  },
+  { 
+    id: 'NG', 
+    name: 'Nigeria', 
+    emoji: '🇳🇬',
+    countries: ['NG'],
+    description: 'Nigeria'
+  },
+  { 
+    id: 'GH', 
+    name: 'Ghana', 
+    emoji: '🇬🇭',
+    countries: ['GH'],
+    description: 'Ghana'
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -237,15 +281,20 @@ export default function NewsPage() {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+  
+  // Get countries for selected region
+  const selectedCountries = selectedRegion 
+    ? REGIONS.find(r => r.id === selectedRegion)?.countries.join(',') 
+    : undefined;
   
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['news', page, searchQuery, selectedTag, selectedCountry],
+    queryKey: ['news', page, searchQuery, selectedTag, selectedRegion],
     queryFn: () => fetchNewsFeed({
       page,
       q: searchQuery || undefined,
       tag: selectedTag || undefined,
-      country: selectedCountry || undefined,
+      country: selectedCountries || undefined,
     }),
     staleTime: 60000,
   });
@@ -263,8 +312,8 @@ export default function NewsPage() {
     setPage(1);
   };
   
-  const handleCountryClick = (country: string) => {
-    setSelectedCountry(selectedCountry === country ? null : country);
+  const handleRegionClick = (regionId: string) => {
+    setSelectedRegion(selectedRegion === regionId ? null : regionId);
     setPage(1);
   };
   
@@ -317,23 +366,24 @@ export default function NewsPage() {
           ))}
         </div>
         
-        {/* Countries */}
+        {/* Regions */}
         <div className="flex flex-wrap gap-2">
-          <span className="text-xs text-text-muted self-center mr-2">Pays:</span>
-          {COUNTRIES.map((country) => (
+          <span className="text-xs text-text-muted self-center mr-2">Régions:</span>
+          {REGIONS.map((region) => (
             <button
-              key={country.code}
-              onClick={() => handleCountryClick(country.code)}
+              key={region.id}
+              onClick={() => handleRegionClick(region.id)}
+              title={region.description}
               className={cn(
                 'px-3 py-1.5 rounded-lg text-sm transition-colors',
                 'flex items-center gap-1.5',
-                selectedCountry === country.code
+                selectedRegion === region.id
                   ? 'bg-accent text-bg-primary'
                   : 'bg-surface text-text-secondary hover:bg-surface-hover'
               )}
             >
-              <span>{COUNTRY_FLAGS[country.code]}</span>
-              <span className="hidden sm:inline">{country.name}</span>
+              <span>{region.emoji}</span>
+              <span>{region.name}</span>
             </button>
           ))}
         </div>

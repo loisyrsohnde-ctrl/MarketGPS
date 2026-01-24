@@ -2305,8 +2305,15 @@ class SQLiteStore:
             params.extend([pattern, pattern, pattern])
         
         if country:
-            conditions.append("country = ?")
-            params.append(country)
+            # Support comma-separated countries for region filtering
+            countries = [c.strip() for c in country.split(',') if c.strip()]
+            if len(countries) == 1:
+                conditions.append("country = ?")
+                params.append(countries[0])
+            elif len(countries) > 1:
+                placeholders = ','.join(['?' for _ in countries])
+                conditions.append(f"country IN ({placeholders})")
+                params.extend(countries)
         
         if tag:
             conditions.append("tags_json LIKE ?")
