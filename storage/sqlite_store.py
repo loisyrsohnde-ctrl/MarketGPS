@@ -315,6 +315,22 @@ class SQLiteStore:
                 with open(migration_path, "r") as f:
                     conn.executescript(f.read())
                 logger.info("News tables created successfully")
+            else:
+                # Table exists - ensure new columns exist (safe migration)
+                columns = conn.execute("PRAGMA table_info(news_articles)").fetchall()
+                column_names = [c[1] for c in columns]
+                
+                if "category" not in column_names:
+                    logger.info("Adding category column to news_articles...")
+                    conn.execute("ALTER TABLE news_articles ADD COLUMN category TEXT")
+                
+                if "sentiment" not in column_names:
+                    logger.info("Adding sentiment column to news_articles...")
+                    conn.execute("ALTER TABLE news_articles ADD COLUMN sentiment TEXT DEFAULT 'neutral'")
+                
+                if "is_ai_processed" not in column_names:
+                    logger.info("Adding is_ai_processed column to news_articles...")
+                    conn.execute("ALTER TABLE news_articles ADD COLUMN is_ai_processed INTEGER DEFAULT 0")
 
     def reset_schema(self):
         """Force reset the database schema."""
