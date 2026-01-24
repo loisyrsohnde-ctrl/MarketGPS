@@ -164,31 +164,43 @@ class NewsPublisher:
         return list(tags)[:8]  # Limit to 8 tags
     
     def _rewrite_with_llm(self, raw_payload: Dict, source_language: str) -> Optional[Dict]:
-        """Use LLM to translate and rewrite content to French."""
+        """Use LLM to translate and rewrite content to French with premium editorial style."""
         if not self.llm_provider:
             return None
         
         title = raw_payload.get("title", "")
         content = raw_payload.get("content") or raw_payload.get("summary", "")
         
-        prompt = f"""Tu es un journaliste tech/finance qui réécrit des articles pour un public francophone intéressé par les startups et la fintech en Afrique.
+        prompt = f"""Tu es un ÉDITEUR FINANCIER FRANCOPHONE SENIOR travaillant pour un magazine financier premium de type Financial Times ou Les Échos.
+
+Ta mission est de transformer cet article brut en contenu éditorial de haute qualité.
 
 Article original ({source_language}):
 Titre: {title}
-Contenu: {content[:2000]}
+Contenu: {content[:2500]}
 
-Réécris cet article en français avec:
-1. Un nouveau titre accrocheur (max 80 caractères)
-2. Un résumé court (2-3 phrases, max 200 caractères)
-3. Le contenu principal reformulé (pas de copie directe, cite la source)
-4. Un TL;DR en 3 points clés maximum
+INSTRUCTIONS STRICTES:
 
-Réponds UNIQUEMENT en JSON valide avec ce format:
+1. **TITRE** (title_fr): Réécris un titre percutant, style "Une" de journal financier. Maximum 100 caractères. Doit être accrocheur et informatif.
+
+2. **RÉSUMÉ** (excerpt_fr): Exactement 2 phrases concises résumant l'essentiel. Style journalistique professionnel.
+
+3. **CONTENU** (content_md): Reformule le contenu en français soutenu, style éditorial. 3-4 paragraphes. Ne copie jamais mot pour mot.
+
+4. **POINTS CLÉS** (tldr): Exactement 3 bullet points percutants résumant les informations essentielles.
+
+5. **CATÉGORIE** (category): UNE seule parmi: "Fintech", "Finance", "Startup", "Tech", "Régulation", "Banking", "Crypto", "Économie"
+
+6. **SENTIMENT** (sentiment): "positive", "negative", ou "neutral" selon le ton de l'article.
+
+Réponds UNIQUEMENT en JSON valide avec ce format exact:
 {{
   "title_fr": "...",
   "excerpt_fr": "...",
   "content_md": "...",
-  "tldr": ["point1", "point2", "point3"]
+  "tldr": ["point1", "point2", "point3"],
+  "category": "...",
+  "sentiment": "..."
 }}
 """
         
@@ -249,6 +261,7 @@ Réponds UNIQUEMENT en JSON valide avec ce format:
             
             # Try LLM rewrite first, fallback to basic processing
             rewritten = self._rewrite_with_llm(raw_payload, source_language)
+            is_ai_processed = rewritten is not None
             
             if not rewritten:
                 rewritten = self._fallback_process(raw_payload)
@@ -257,6 +270,10 @@ Réponds UNIQUEMENT en JSON valide avec ce format:
             full_content = f"{rewritten.get('title_fr', '')} {rewritten.get('content_md', '')}"
             country = self._detect_country(full_content, raw_item.get("source_country"))
             tags = self._extract_tags(full_content, raw_payload.get("tags", []))
+            
+            # Get category and sentiment from AI response or default
+            category = rewritten.get("category") or (tags[0].capitalize() if tags else "Actualité")
+            sentiment = rewritten.get("sentiment", "neutral")
             
             # Generate slug
             slug = self._generate_slug(rewritten.get("title_fr", "article"))
@@ -277,7 +294,10 @@ Réponds UNIQUEMENT en JSON valide avec ce format:
                 "source_url": raw_item.get("url"),
                 "canonical_url": raw_item.get("url"),
                 "published_at": raw_item.get("published_at"),
-                "status": "published"
+                "status": "published",
+                "category": category,
+                "sentiment": sentiment,
+                "is_ai_processed": is_ai_processed
             }
             
             # Insert article

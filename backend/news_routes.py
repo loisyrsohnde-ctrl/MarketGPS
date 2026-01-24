@@ -40,6 +40,8 @@ class NewsArticleSummary(BaseModel):
     image_url: Optional[str]
     source_name: str
     published_at: Optional[str]
+    category: Optional[str] = None
+    sentiment: Optional[str] = None
     
     @classmethod
     def from_db(cls, row: dict) -> "NewsArticleSummary":
@@ -68,7 +70,9 @@ class NewsArticleSummary(BaseModel):
             country=row.get("country"),
             image_url=row.get("image_url"),
             source_name=row.get("source_name", "Unknown"),
-            published_at=row.get("published_at")
+            published_at=row.get("published_at"),
+            category=row.get("category"),
+            sentiment=row.get("sentiment")
         )
 
 

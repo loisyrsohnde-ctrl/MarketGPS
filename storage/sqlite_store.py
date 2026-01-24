@@ -2328,7 +2328,8 @@ class SQLiteStore:
         offset = (page - 1) * page_size
         data_sql = f"""
             SELECT id, slug, title, excerpt, tldr_json, tags_json, country, 
-                   image_url, source_name, source_url, published_at, created_at, view_count
+                   image_url, source_name, source_url, published_at, created_at, view_count,
+                   category, sentiment
             FROM news_articles
             WHERE {where_clause}
             ORDER BY published_at DESC
@@ -2437,8 +2438,9 @@ class SQLiteStore:
             INSERT INTO news_articles (
                 slug, raw_item_id, title, excerpt, content_md, tldr_json,
                 tags_json, country, language, image_url, source_name, 
-                source_url, canonical_url, published_at, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                source_url, canonical_url, published_at, status,
+                category, sentiment, is_ai_processed
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         
         try:
@@ -2458,7 +2460,10 @@ class SQLiteStore:
                     article.get("source_url"),
                     article.get("canonical_url"),
                     article.get("published_at"),
-                    article.get("status", "published")
+                    article.get("status", "published"),
+                    article.get("category"),
+                    article.get("sentiment", "neutral"),
+                    1 if article.get("is_ai_processed") else 0
                 ))
                 return cursor.lastrowid
         except Exception as e:

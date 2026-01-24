@@ -87,7 +87,12 @@ CREATE TABLE IF NOT EXISTS news_articles (
     
     -- Status
     status TEXT DEFAULT 'published',         -- 'draft', 'published', 'archived'
-    view_count INTEGER DEFAULT 0
+    view_count INTEGER DEFAULT 0,
+    
+    -- AI Processing (NEW)
+    category TEXT,                           -- 'Fintech', 'Finance', 'Startup', etc.
+    sentiment TEXT DEFAULT 'neutral',        -- 'positive', 'negative', 'neutral'
+    is_ai_processed INTEGER DEFAULT 0        -- 1 if processed by AI, 0 if fallback
 );
 
 CREATE INDEX IF NOT EXISTS idx_news_articles_slug ON news_articles(slug);
