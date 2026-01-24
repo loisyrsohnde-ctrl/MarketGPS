@@ -18,6 +18,7 @@ from api_routes import router as api_router
 from user_routes import router as user_router
 from barbell_routes import router as barbell_router
 from strategies_routes import router as strategies_router
+from news_routes import router as news_router
 
 # Load environment variables
 load_dotenv()
@@ -258,6 +259,7 @@ app.include_router(api_router)
 app.include_router(user_router)
 app.include_router(barbell_router)  # Barbell strategy module (ADD-ON)
 app.include_router(strategies_router)  # Strategies module (ADD-ON)
+app.include_router(news_router)  # News/Actualités module (ADD-ON)
 
 
 # ============================================================================

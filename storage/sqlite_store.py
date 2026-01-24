@@ -268,6 +268,7 @@ class SQLiteStore:
         self._init_schema()
         self._ensure_auth_tables()
         self._ensure_strategy_tables()
+        self._ensure_news_tables()
 
     def _ensure_strategy_tables(self):
         """Ensure strategy tables exist and have seed data (idempotent)."""
@@ -295,6 +296,25 @@ class SQLiteStore:
                     with open(migration_path, "r") as f:
                         conn.executescript(f.read())
                     logger.info("Strategy templates seeded successfully")
+
+    def _ensure_news_tables(self):
+        """Ensure news module tables exist (idempotent)."""
+        migration_path = Path(__file__).parent / \
+            "migrations" / "add_news_tables.sql"
+        if not migration_path.exists():
+            return
+
+        with self._get_connection() as conn:
+            # Check if main table exists
+            result = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='news_articles'"
+            ).fetchone()
+
+            if not result:
+                logger.info("Creating news tables...")
+                with open(migration_path, "r") as f:
+                    conn.executescript(f.read())
+                logger.info("News tables created successfully")
 
     def reset_schema(self):
         """Force reset the database schema."""
@@ -2256,3 +2276,313 @@ class SQLiteStore:
         with self._get_connection() as conn:
             rows = conn.execute(sql, (market_scope, limit)).fetchall()
             return [dict(row) for row in rows]
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # NEWS MODULE - CRUD Operations
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def get_news_articles(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        query: Optional[str] = None,
+        country: Optional[str] = None,
+        tag: Optional[str] = None,
+        status: str = "published"
+    ) -> Dict:
+        """
+        Get paginated news articles with filtering.
+        
+        Returns:
+            Dict with {data, total, page, page_size, total_pages}
+        """
+        conditions = ["status = ?"]
+        params = [status]
+        
+        if query:
+            conditions.append("(title LIKE ? OR excerpt LIKE ? OR content_md LIKE ?)")
+            pattern = f"%{query}%"
+            params.extend([pattern, pattern, pattern])
+        
+        if country:
+            conditions.append("country = ?")
+            params.append(country)
+        
+        if tag:
+            conditions.append("tags_json LIKE ?")
+            params.append(f'%"{tag}"%')
+        
+        where_clause = " AND ".join(conditions)
+        
+        # Count total
+        count_sql = f"SELECT COUNT(*) FROM news_articles WHERE {where_clause}"
+        
+        # Get paginated data
+        offset = (page - 1) * page_size
+        data_sql = f"""
+            SELECT id, slug, title, excerpt, tldr_json, tags_json, country, 
+                   image_url, source_name, source_url, published_at, created_at, view_count
+            FROM news_articles
+            WHERE {where_clause}
+            ORDER BY published_at DESC
+            LIMIT ? OFFSET ?
+        """
+        
+        with self._get_connection() as conn:
+            total = conn.execute(count_sql, params).fetchone()[0]
+            rows = conn.execute(data_sql, params + [page_size, offset]).fetchall()
+            
+            return {
+                "data": [dict(row) for row in rows],
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": (total + page_size - 1) // page_size
+            }
+
+    def get_news_article_by_slug(self, slug: str) -> Optional[Dict]:
+        """Get a single news article by slug."""
+        sql = """
+            SELECT id, slug, title, excerpt, content_md, tldr_json, tags_json, 
+                   country, language, image_url, source_name, source_url, 
+                   canonical_url, published_at, created_at, view_count
+            FROM news_articles
+            WHERE slug = ? AND status = 'published'
+        """
+        
+        with self._get_connection() as conn:
+            row = conn.execute(sql, (slug,)).fetchone()
+            if row:
+                # Increment view count
+                conn.execute(
+                    "UPDATE news_articles SET view_count = view_count + 1 WHERE slug = ?",
+                    (slug,)
+                )
+                return dict(row)
+            return None
+
+    def save_news_article_for_user(self, user_id: str, article_id: int) -> bool:
+        """Save an article to user's saved list."""
+        try:
+            with self._get_connection() as conn:
+                conn.execute("""
+                    INSERT OR IGNORE INTO news_user_saves (user_id, article_id)
+                    VALUES (?, ?)
+                """, (user_id, article_id))
+                return True
+        except Exception as e:
+            logger.error(f"Failed to save article {article_id} for user {user_id}: {e}")
+            return False
+
+    def unsave_news_article_for_user(self, user_id: str, article_id: int) -> bool:
+        """Remove an article from user's saved list."""
+        try:
+            with self._get_connection() as conn:
+                conn.execute("""
+                    DELETE FROM news_user_saves WHERE user_id = ? AND article_id = ?
+                """, (user_id, article_id))
+                return True
+        except Exception as e:
+            logger.error(f"Failed to unsave article {article_id} for user {user_id}: {e}")
+            return False
+
+    def get_saved_news_articles(self, user_id: str, page: int = 1, page_size: int = 20) -> Dict:
+        """Get user's saved articles with pagination."""
+        offset = (page - 1) * page_size
+        
+        count_sql = """
+            SELECT COUNT(*) FROM news_user_saves WHERE user_id = ?
+        """
+        
+        data_sql = """
+            SELECT a.id, a.slug, a.title, a.excerpt, a.tldr_json, a.tags_json, 
+                   a.country, a.image_url, a.source_name, a.published_at, s.created_at as saved_at
+            FROM news_user_saves s
+            JOIN news_articles a ON s.article_id = a.id
+            WHERE s.user_id = ?
+            ORDER BY s.created_at DESC
+            LIMIT ? OFFSET ?
+        """
+        
+        with self._get_connection() as conn:
+            total = conn.execute(count_sql, (user_id,)).fetchone()[0]
+            rows = conn.execute(data_sql, (user_id, page_size, offset)).fetchall()
+            
+            return {
+                "data": [dict(row) for row in rows],
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": (total + page_size - 1) // page_size
+            }
+
+    def is_article_saved_by_user(self, user_id: str, article_id: int) -> bool:
+        """Check if an article is saved by a user."""
+        with self._get_connection() as conn:
+            result = conn.execute("""
+                SELECT 1 FROM news_user_saves WHERE user_id = ? AND article_id = ?
+            """, (user_id, article_id)).fetchone()
+            return result is not None
+
+    def insert_news_article(self, article: Dict) -> Optional[int]:
+        """Insert a new article. Returns the article ID."""
+        sql = """
+            INSERT INTO news_articles (
+                slug, raw_item_id, title, excerpt, content_md, tldr_json,
+                tags_json, country, language, image_url, source_name, 
+                source_url, canonical_url, published_at, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.execute(sql, (
+                    article.get("slug"),
+                    article.get("raw_item_id"),
+                    article.get("title"),
+                    article.get("excerpt"),
+                    article.get("content_md"),
+                    article.get("tldr_json"),
+                    article.get("tags_json"),
+                    article.get("country"),
+                    article.get("language", "fr"),
+                    article.get("image_url"),
+                    article.get("source_name"),
+                    article.get("source_url"),
+                    article.get("canonical_url"),
+                    article.get("published_at"),
+                    article.get("status", "published")
+                ))
+                return cursor.lastrowid
+        except Exception as e:
+            logger.error(f"Failed to insert article: {e}")
+            return None
+
+    def insert_news_raw_item(self, item: Dict) -> Optional[int]:
+        """Insert a raw news item. Returns the item ID, or None if duplicate."""
+        sql = """
+            INSERT OR IGNORE INTO news_raw_items (
+                source_id, url, title, published_at, raw_payload, content_hash
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        """
+        
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.execute(sql, (
+                    item.get("source_id"),
+                    item.get("url"),
+                    item.get("title"),
+                    item.get("published_at"),
+                    item.get("raw_payload"),
+                    item.get("content_hash")
+                ))
+                if cursor.rowcount > 0:
+                    return cursor.lastrowid
+                return None  # Duplicate
+        except Exception as e:
+            logger.error(f"Failed to insert raw item: {e}")
+            return None
+
+    def get_unprocessed_raw_items(self, limit: int = 50) -> List[Dict]:
+        """Get raw items that haven't been processed yet."""
+        sql = """
+            SELECT r.*, s.name as source_name, s.country as source_country, 
+                   s.language as source_language
+            FROM news_raw_items r
+            JOIN news_sources s ON r.source_id = s.id
+            WHERE r.processed = 0 AND r.process_error IS NULL
+            ORDER BY r.fetched_at DESC
+            LIMIT ?
+        """
+        
+        with self._get_connection() as conn:
+            rows = conn.execute(sql, (limit,)).fetchall()
+            return [dict(row) for row in rows]
+
+    def mark_raw_item_processed(self, item_id: int, error: Optional[str] = None) -> bool:
+        """Mark a raw item as processed or failed."""
+        try:
+            with self._get_connection() as conn:
+                if error:
+                    conn.execute("""
+                        UPDATE news_raw_items SET process_error = ? WHERE id = ?
+                    """, (error, item_id))
+                else:
+                    conn.execute("""
+                        UPDATE news_raw_items SET processed = 1 WHERE id = ?
+                    """, (item_id,))
+                return True
+        except Exception as e:
+            logger.error(f"Failed to mark raw item {item_id}: {e}")
+            return False
+
+    def get_news_sources(self, enabled_only: bool = True) -> List[Dict]:
+        """Get all news sources."""
+        conditions = ["1=1"]
+        if enabled_only:
+            conditions.append("enabled = 1")
+        
+        sql = f"""
+            SELECT * FROM news_sources 
+            WHERE {' AND '.join(conditions)}
+            ORDER BY trust_score DESC, name
+        """
+        
+        with self._get_connection() as conn:
+            rows = conn.execute(sql).fetchall()
+            return [dict(row) for row in rows]
+
+    def upsert_news_source(self, source: Dict) -> Optional[int]:
+        """Insert or update a news source."""
+        sql = """
+            INSERT INTO news_sources (name, url, type, rss_url, country, language, tags, trust_score, enabled)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(url) DO UPDATE SET
+                name = excluded.name,
+                type = excluded.type,
+                rss_url = excluded.rss_url,
+                country = excluded.country,
+                language = excluded.language,
+                tags = excluded.tags,
+                trust_score = excluded.trust_score,
+                enabled = excluded.enabled,
+                updated_at = datetime('now')
+        """
+        
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.execute(sql, (
+                    source.get("name"),
+                    source.get("url"),
+                    source.get("type", "rss"),
+                    source.get("rss_url"),
+                    source.get("country"),
+                    source.get("language", "en"),
+                    source.get("tags"),
+                    source.get("trust_score", 0.7),
+                    source.get("enabled", 1)
+                ))
+                return cursor.lastrowid
+        except Exception as e:
+            logger.error(f"Failed to upsert source: {e}")
+            return None
+
+    def update_source_fetch_status(
+        self, 
+        source_id: int, 
+        error: Optional[str] = None
+    ) -> bool:
+        """Update source's last fetch timestamp and error status."""
+        try:
+            with self._get_connection() as conn:
+                conn.execute("""
+                    UPDATE news_sources SET 
+                        last_fetched_at = datetime('now'),
+                        fetch_error = ?,
+                        updated_at = datetime('now')
+                    WHERE id = ?
+                """, (error, source_id))
+                return True
+        except Exception as e:
+            logger.error(f"Failed to update source {source_id}: {e}")
+            return False

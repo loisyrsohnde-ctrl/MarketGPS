@@ -494,6 +494,97 @@ def show_status(args) -> int:
         return 1
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# NEWS PIPELINE HANDLERS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def run_news_ingest(args) -> int:
+    """Run news RSS ingestion job."""
+    print("\n" + "=" * 60)
+    print("MarketGPS News Pipeline - RSS Ingestion")
+    print("=" * 60 + "\n")
+    
+    try:
+        from pipeline.news.ingest_rss import run_ingest
+        
+        limit = getattr(args, 'news_limit', None)
+        result = run_ingest(limit=limit)
+        
+        print(f"\n✓ Ingestion complete:")
+        print(f"  Sources: {result.get('sources_success', 0)}/{result.get('sources_total', 0)} OK")
+        print(f"  Items fetched: {result.get('items_fetched', 0)}")
+        print(f"  New items: {result.get('items_new', 0)}")
+        print(f"  Time: {result.get('elapsed_seconds', 0)}s")
+        
+        if result.get('errors'):
+            print(f"\n  Errors ({len(result['errors'])}):")
+            for err in result['errors'][:5]:
+                print(f"    - {err.get('source', 'Unknown')}: {err.get('error', '')[:50]}")
+        
+        return 0 if result.get('sources_error', 0) < result.get('sources_total', 1) else 1
+        
+    except Exception as e:
+        logger.error(f"News ingestion failed: {e}")
+        print(f"\n✗ Error: {e}")
+        return 1
+
+
+def run_news_rewrite(args) -> int:
+    """Run news processing and publishing job."""
+    print("\n" + "=" * 60)
+    print("MarketGPS News Pipeline - Process & Publish")
+    print("=" * 60 + "\n")
+    
+    try:
+        from pipeline.news.publish import run_publish
+        
+        limit = getattr(args, 'news_limit', 50)
+        result = run_publish(limit=limit)
+        
+        print(f"\n✓ Publishing complete:")
+        print(f"  Articles published: {result.get('items_published', 0)}/{result.get('items_total', 0)}")
+        print(f"  Errors: {result.get('items_error', 0)}")
+        print(f"  LLM provider: {result.get('llm_provider', 'fallback')}")
+        print(f"  Time: {result.get('elapsed_seconds', 0)}s")
+        
+        return 0
+        
+    except Exception as e:
+        logger.error(f"News publishing failed: {e}")
+        print(f"\n✗ Error: {e}")
+        return 1
+
+
+def run_news_full(args) -> int:
+    """Run full news pipeline (ingest + publish)."""
+    print("\n" + "=" * 60)
+    print("MarketGPS News Pipeline - Full Run")
+    print("=" * 60 + "\n")
+    
+    try:
+        from pipeline.news.publish import run_full_pipeline
+        
+        ingest_limit = getattr(args, 'news_limit', None)
+        publish_limit = getattr(args, 'news_limit', 50)
+        
+        result = run_full_pipeline(ingest_limit=ingest_limit, publish_limit=publish_limit)
+        
+        ingest = result.get('ingest', {})
+        publish = result.get('publish', {})
+        
+        print(f"\n✓ Full pipeline complete:")
+        print(f"  [Ingest] Sources: {ingest.get('sources_success', 0)}/{ingest.get('sources_total', 0)}, New items: {ingest.get('items_new', 0)}")
+        print(f"  [Publish] Articles: {publish.get('items_published', 0)}/{publish.get('items_total', 0)}")
+        print(f"  LLM: {publish.get('llm_provider', 'fallback')}")
+        
+        return 0
+        
+    except Exception as e:
+        logger.error(f"News full pipeline failed: {e}")
+        print(f"\n✗ Error: {e}")
+        return 1
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -611,6 +702,36 @@ Examples:
         help="Also compute long-term institutional scores (US_EU only)"
     )
     
+    # News pipeline arguments
+    parser.add_argument(
+        "--news-ingest",
+        action="store_true",
+        dest="news_ingest",
+        help="Run news RSS ingestion"
+    )
+    
+    parser.add_argument(
+        "--news-rewrite",
+        action="store_true",
+        dest="news_rewrite",
+        help="Process and publish pending news articles"
+    )
+    
+    parser.add_argument(
+        "--news-full",
+        action="store_true",
+        dest="news_full",
+        help="Run full news pipeline (ingest + rewrite)"
+    )
+    
+    parser.add_argument(
+        "--news-limit",
+        type=int,
+        default=50,
+        dest="news_limit",
+        help="Limit number of items for news processing (default: 50)"
+    )
+    
     args = parser.parse_args()
     
     print(f"\nMarketGPS Pipeline [{args.scope}] - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -627,6 +748,12 @@ Examples:
         sys.exit(run_worker(args))
     elif args.status:
         sys.exit(show_status(args))
+    elif args.news_ingest:
+        sys.exit(run_news_ingest(args))
+    elif args.news_rewrite:
+        sys.exit(run_news_rewrite(args))
+    elif args.news_full:
+        sys.exit(run_news_full(args))
 
 
 if __name__ == "__main__":
