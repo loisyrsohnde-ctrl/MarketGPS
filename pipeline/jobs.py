@@ -651,6 +651,24 @@ Examples:
         action="store_true",
         help="Show system status"
     )
+    group.add_argument(
+        "--news-ingest",
+        action="store_true",
+        dest="news_ingest",
+        help="Run news RSS ingestion"
+    )
+    group.add_argument(
+        "--news-rewrite",
+        action="store_true",
+        dest="news_rewrite",
+        help="Process and publish pending news articles"
+    )
+    group.add_argument(
+        "--news-full",
+        action="store_true",
+        dest="news_full",
+        help="Run full news pipeline (ingest + rewrite)"
+    )
     
     parser.add_argument(
         "--scope",
@@ -702,28 +720,7 @@ Examples:
         help="Also compute long-term institutional scores (US_EU only)"
     )
     
-    # News pipeline arguments
-    parser.add_argument(
-        "--news-ingest",
-        action="store_true",
-        dest="news_ingest",
-        help="Run news RSS ingestion"
-    )
-    
-    parser.add_argument(
-        "--news-rewrite",
-        action="store_true",
-        dest="news_rewrite",
-        help="Process and publish pending news articles"
-    )
-    
-    parser.add_argument(
-        "--news-full",
-        action="store_true",
-        dest="news_full",
-        help="Run full news pipeline (ingest + rewrite)"
-    )
-    
+    # News pipeline optional limit
     parser.add_argument(
         "--news-limit",
         type=int,
