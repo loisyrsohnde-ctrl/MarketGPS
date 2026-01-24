@@ -208,17 +208,17 @@ Article original ({source_language}):
 Titre: {title}
 Contenu: {content[:4000]}
 
-Réponds UNIQUEMENT en JSON valide :
-{{
+Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown ```json ... ```) :
+{
   "skip": false,
-  "title_fr": "Titre percutant (max 100 car)",
-  "excerpt_fr": "Chapeau de l'article (2 phrases accrocheuses)",
-  "content_md": "Corps de l'article en markdown (sans titres de sections scolaires)",
-  "category": "Une catégorie parmi: Fintech, Finance, Startup, Tech, Économie, Business",
-  "sentiment": "positive/neutral/negative",
-  "image_search_query": "requête précise en anglais pour l'image",
-  "tldr": ["Point clé 1", "Point clé 2", "Point clé 3"]
-}}
+  "title_fr": "Titre percutant ici",
+  "excerpt_fr": "Résumé ici",
+  "content_md": "Contenu ici",
+  "category": "Tech",
+  "sentiment": "neutral",
+  "image_search_query": "requête image",
+  "tldr": ["point 1", "point 2"]
+}
 """
         
         try:
@@ -236,18 +236,28 @@ Réponds UNIQUEMENT en JSON valide :
             else:
                 return None
             
-            # Extract JSON from response
-            json_match = re.search(r'\{[\s\S]*\}', text)
-            if json_match:
-                result = json.loads(json_match.group())
+            # Extract JSON from response - handle markdown code blocks
+            json_str = text.strip()
+            if "```json" in json_str:
+                json_str = json_str.split("```json")[1].split("```")[0].strip()
+            elif "```" in json_str:
+                json_str = json_str.split("```")[1].split("```")[0].strip()
+            
+            try:
+                result = json.loads(json_str)
                 # Validate that we got French content
+                if result.get("skip") is True:
+                     return result
+                     
                 if result.get("title_fr") and result.get("content_md"):
-                    content_length = len(result.get("content_md", ""))
-                    logger.debug(f"LLM response OK: {content_length} chars")
                     return result
                 else:
-                    logger.warning("LLM response missing required fields")
-            else:
+                    logger.warning(f"LLM response missing fields. Got keys: {list(result.keys())}")
+            except json.JSONDecodeError:
+                # Try regex as fallback
+                json_match = re.search(r'\{[\s\S]*\}', text)
+                if json_match:
+                    return json.loads(json_match.group())
                 logger.warning(f"LLM response not valid JSON: {text[:200]}...")
             
         except Exception as e:
