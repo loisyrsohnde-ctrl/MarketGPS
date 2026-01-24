@@ -52,6 +52,7 @@ export function Sidebar({ scopeCounts, onLogout }: SidebarProps) {
           { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
           { href: '/dashboard/explorer', icon: Search, label: 'Explorer' },
           { href: '/watchlist', icon: Star, label: 'Liste de suivi' },
+          { href: '/dashboard/explorer', icon: TrendingUp, label: 'Marchés' },
           { href: '/news', icon: Newspaper, label: 'Actualités' },
         ],
       },
