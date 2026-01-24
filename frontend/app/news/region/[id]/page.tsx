@@ -125,7 +125,7 @@ export default function RegionPage() {
     queryKey: ['news', 'region', regionId],
     queryFn: async () => {
       const API_BASE = getApiBaseUrl();
-      const res = await fetch(`${API_BASE}/api/news?countries=${countryCodes}&limit=30`);
+      const res = await fetch(`${API_BASE}/api/news?country=${countryCodes}&page_size=30`);
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       return data.data || data || [];
@@ -143,17 +143,18 @@ export default function RegionPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <Link href="/news" className="inline-flex items-center text-sm text-slate-500 hover:text-blue-600 mb-4">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Retour aux actualités
-        </Link>
-        
-        <h1 className="text-4xl font-serif font-bold text-slate-900 mb-2">{region.label}</h1>
-        <p className="text-lg text-slate-600">{region.description}</p>
-      </div>
+    <div className="min-h-screen bg-zinc-50">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <Link href="/news" className="inline-flex items-center text-sm text-slate-500 hover:text-blue-600 mb-4">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Retour aux actualités
+          </Link>
+          
+          <h1 className="text-4xl font-serif font-bold text-slate-900 mb-2">{region.label}</h1>
+          <p className="text-lg text-slate-600">{region.description}</p>
+        </div>
 
       {/* Country Tabs */}
       <div className="mb-8">
@@ -197,6 +198,7 @@ export default function RegionPage() {
           <p className="text-slate-500">Revenez plus tard pour de nouvelles actualités.</p>
         </div>
       )}
+      </div>
     </div>
   );
 }

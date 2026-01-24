@@ -73,7 +73,7 @@ export default function CountryPage() {
     queryKey: ['news', 'country', countryCode],
     queryFn: async () => {
       const API_BASE = getApiBaseUrl();
-      const res = await fetch(`${API_BASE}/api/news?countries=${countryCode.toUpperCase()}&limit=30`);
+      const res = await fetch(`${API_BASE}/api/news?country=${countryCode.toUpperCase()}&page_size=30`);
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       return data.data || data || [];
@@ -81,43 +81,45 @@ export default function CountryPage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <Link href={`/news/region/${regionId}`} className="inline-flex items-center text-sm text-slate-500 hover:text-blue-600 mb-4">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Retour à la région
-        </Link>
-        
-        <div className="flex items-center gap-4">
-          <span className="text-5xl">{countryFlag}</span>
-          <div>
-            <h1 className="text-4xl font-serif font-bold text-slate-900">{countryName}</h1>
-            <p className="text-lg text-slate-600">Actualités économiques et business</p>
+    <div className="min-h-screen bg-zinc-50">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <Link href={`/news/region/${regionId}`} className="inline-flex items-center text-sm text-slate-500 hover:text-blue-600 mb-4">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Retour à la région
+          </Link>
+          
+          <div className="flex items-center gap-4">
+            <span className="text-5xl">{countryFlag}</span>
+            <div>
+              <h1 className="text-4xl font-serif font-bold text-slate-900">{countryName}</h1>
+              <p className="text-lg text-slate-600">Actualités économiques et business</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Articles Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="h-80 bg-slate-100 rounded-lg animate-pulse" />
-          ))}
-        </div>
-      ) : articles && articles.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {articles.map((article: any) => (
-            <ArticleCard key={article.id} article={article} />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-16">
-          <Newspaper className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-xl font-medium text-slate-600 mb-2">Aucun article pour {countryName}</h3>
-          <p className="text-slate-500">Revenez plus tard pour de nouvelles actualités.</p>
-        </div>
-      )}
+        {/* Articles Grid */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="h-80 bg-slate-100 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : articles && articles.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {articles.map((article: any) => (
+              <ArticleCard key={article.id} article={article} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <Newspaper className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+            <h3 className="text-xl font-medium text-slate-600 mb-2">Aucun article pour {countryName}</h3>
+            <p className="text-slate-500">Revenez plus tard pour de nouvelles actualités.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
