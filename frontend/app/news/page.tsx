@@ -460,12 +460,12 @@ export default function NewsPage() {
                 <div className="bg-white rounded-sm shadow-sm border border-slate-200 p-6">
                   <nav className="space-y-3">
                     {[
-                      { name: 'CEMAC', desc: 'Afrique Centrale', href: '/news/cemac' },
-                      { name: 'UEMOA', desc: 'Afrique de l\'Ouest', href: '/news/uemoa' },
-                      { name: 'Afrique du Nord', desc: 'Maghreb & Égypte', href: '/news/north-africa' },
-                      { name: 'Afrique de l\'Est', desc: 'Kenya, Rwanda...', href: '/news/east-africa' },
-                      { name: 'Afrique Australe', desc: 'Afrique du Sud...', href: '/news/southern-africa' },
-                      { name: 'Nigeria', desc: 'La puissance économique', href: '/news/nigeria' },
+                      { name: 'CEMAC', desc: 'Afrique Centrale', href: '/news/region/cemac' },
+                      { name: 'UEMOA', desc: 'Afrique de l\'Ouest', href: '/news/region/uemoa' },
+                      { name: 'Afrique du Nord', desc: 'Maghreb & Égypte', href: '/news/region/north-africa' },
+                      { name: 'Afrique de l\'Est', desc: 'Kenya, Rwanda...', href: '/news/region/east-africa' },
+                      { name: 'Afrique Australe', desc: 'Afrique du Sud...', href: '/news/region/southern-africa' },
+                      { name: 'Nigeria', desc: 'La puissance économique', href: '/news/region/nigeria' },
                     ].map((region) => (
                       <Link
                         key={region.name}
