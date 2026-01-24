@@ -433,73 +433,77 @@ export default function NewsPage() {
           </section>
         )}
         
-        {/* Latest News Section */}
-        {latestArticles.length > 0 && (
-          <section className="mb-16">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-              {/* Latest News List */}
-              <div className="lg:col-span-2">
-                <SectionHeader 
-                  title="Dernières Dépêches" 
-                  subtitle="Fil d'actualité en temps réel"
-                />
-                <div className="bg-white rounded-sm shadow-sm border border-slate-200 p-6">
-                  {latestArticles.map((article, idx) => (
+        {/* Latest News & Sidebar Section */}
+        <section className="mb-16">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+            {/* Latest News List */}
+            <div className="lg:col-span-2">
+              <SectionHeader 
+                title="Dernières Dépêches" 
+                subtitle="Fil d'actualité en temps réel"
+              />
+              <div className="bg-white rounded-sm shadow-sm border border-slate-200 p-6">
+                {latestArticles.length > 0 ? (
+                  latestArticles.map((article, idx) => (
                     <LatestNewsItem 
                       key={article.id} 
                       article={article} 
                       index={idx}
                     />
-                  ))}
-                </div>
-              </div>
-              
-              {/* Sidebar */}
-              <div className="lg:col-span-1">
-                <SectionHeader title="Régions" />
-                <div className="bg-white rounded-sm shadow-sm border border-slate-200 p-6">
-                  <nav className="space-y-3">
-                    {[
-                      { name: 'CEMAC', desc: 'Afrique Centrale', href: '/news/region/cemac' },
-                      { name: 'UEMOA', desc: 'Afrique de l\'Ouest', href: '/news/region/uemoa' },
-                      { name: 'Afrique du Nord', desc: 'Maghreb & Égypte', href: '/news/region/north-africa' },
-                      { name: 'Afrique de l\'Est', desc: 'Kenya, Rwanda...', href: '/news/region/east-africa' },
-                      { name: 'Afrique Australe', desc: 'Afrique du Sud...', href: '/news/region/southern-africa' },
-                      { name: 'Nigeria', desc: 'La puissance économique', href: '/news/region/nigeria' },
-                    ].map((region) => (
-                      <Link
-                        key={region.name}
-                        href={region.href}
-                        className="w-full flex items-center justify-between p-3 rounded hover:bg-slate-50 transition-colors text-left group"
-                      >
-                        <div>
-                          <span className="font-medium text-slate-800 group-hover:text-blue-700">
-                            {region.name}
-                          </span>
-                          <p className="text-xs text-slate-500">{region.desc}</p>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-700" />
-                      </Link>
-                    ))}
-                  </nav>
-                </div>
-                
-                {/* Newsletter CTA */}
-                <div className="mt-8 bg-slate-900 rounded-sm p-6 text-white">
-                  <h3 className="font-serif text-xl font-bold mb-2">
-                    Newsletter Premium
-                  </h3>
-                  <p className="text-slate-300 text-sm mb-4">
-                    Recevez chaque matin le résumé des marchés africains.
+                  ))
+                ) : (
+                  <p className="text-slate-500 text-center py-8">
+                    Chargement des dernières actualités...
                   </p>
-                  <button className="w-full bg-white text-slate-900 font-semibold py-2 px-4 rounded-sm hover:bg-slate-100 transition-colors">
-                    S&apos;inscrire gratuitement
-                  </button>
-                </div>
+                )}
               </div>
             </div>
-          </section>
-        )}
+            
+            {/* Sidebar - Always visible */}
+            <div className="lg:col-span-1">
+              <SectionHeader title="Régions" />
+              <div className="bg-white rounded-sm shadow-sm border border-slate-200 p-6">
+                <nav className="space-y-3">
+                  {[
+                    { name: 'CEMAC', desc: 'Afrique Centrale', href: '/news/region/cemac' },
+                    { name: 'UEMOA', desc: 'Afrique de l\'Ouest', href: '/news/region/uemoa' },
+                    { name: 'Afrique du Nord', desc: 'Maghreb & Égypte', href: '/news/region/north-africa' },
+                    { name: 'Afrique de l\'Est', desc: 'Kenya, Rwanda...', href: '/news/region/east-africa' },
+                    { name: 'Afrique Australe', desc: 'Afrique du Sud...', href: '/news/region/southern-africa' },
+                    { name: 'Nigeria', desc: 'La puissance économique', href: '/news/region/nigeria' },
+                  ].map((region) => (
+                    <Link
+                      key={region.name}
+                      href={region.href}
+                      className="w-full flex items-center justify-between p-3 rounded hover:bg-slate-50 transition-colors text-left group"
+                    >
+                      <div>
+                        <span className="font-medium text-slate-800 group-hover:text-blue-700">
+                          {region.name}
+                        </span>
+                        <p className="text-xs text-slate-500">{region.desc}</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-700" />
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+              
+              {/* Newsletter CTA */}
+              <div className="mt-8 bg-slate-900 rounded-sm p-6 text-white">
+                <h3 className="font-serif text-xl font-bold mb-2">
+                  Newsletter Premium
+                </h3>
+                <p className="text-slate-300 text-sm mb-4">
+                  Recevez chaque matin le résumé des marchés africains.
+                </p>
+                <button className="w-full bg-white text-slate-900 font-semibold py-2 px-4 rounded-sm hover:bg-slate-100 transition-colors">
+                  S&apos;inscrire gratuitement
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
         
         {/* View All Link */}
         <div className="text-center pb-12">
