@@ -41,11 +41,40 @@ function BillingContent() {
 
   const handleSubscribe = async (plan: 'monthly' | 'yearly') => {
     setLoading(plan);
-    // In real implementation, this would call api.createCheckoutSession
-    // For demo, just simulate
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setLoading(null);
-    // window.location.href = checkout_url;
+    
+    try {
+      // Get session token (assuming useAuth hook exists)
+      const token = typeof window !== 'undefined' 
+        ? localStorage.getItem('supabase.auth.token') 
+        : null;
+      
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'https://api.marketgps.online'}/api/billing/checkout-session`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ plan: plan === 'yearly' ? 'annual' : plan }),
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session');
+      }
+      
+      const data = await response.json();
+      
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Checkout error:', error);
+      alert('Erreur lors de la création de la session de paiement. Veuillez réessayer.');
+    } finally {
+      setLoading(null);
+    }
   };
 
   const plans = [

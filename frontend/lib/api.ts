@@ -300,11 +300,43 @@ export async function createCheckoutSession(
 }
 
 /**
- * Get current subscription
+ * Get current subscription (legacy endpoint)
  * @endpoint GET /api/billing/subscription
  */
 export async function getSubscription(token: string): Promise<Subscription> {
   return apiFetch<Subscription>('/api/billing/subscription', { token });
+}
+
+/**
+ * Subscription status response (v13)
+ */
+export interface SubscriptionStatus {
+  user_id: string;
+  plan: 'free' | 'monthly' | 'annual';
+  status: 'active' | 'trialing' | 'past_due' | 'canceled' | 'inactive';
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  is_active: boolean;
+  grace_period_remaining_hours: number | null;
+}
+
+/**
+ * Get my subscription status (v13)
+ * @endpoint GET /api/billing/me
+ */
+export async function getMySubscription(token: string): Promise<SubscriptionStatus> {
+  return apiFetch<SubscriptionStatus>('/api/billing/me', { token });
+}
+
+/**
+ * Create Stripe portal session
+ * @endpoint POST /api/billing/portal-session
+ */
+export async function createPortalSession(token: string): Promise<{ url: string }> {
+  return apiFetch<{ url: string }>('/api/billing/portal-session', {
+    method: 'POST',
+    token,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -329,6 +361,8 @@ export const api = {
   // Billing
   createCheckoutSession,
   getSubscription,
+  getMySubscription,
+  createPortalSession,
 };
 
 export default api;
