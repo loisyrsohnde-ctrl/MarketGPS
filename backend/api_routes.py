@@ -741,17 +741,19 @@ async def get_asset_type_counts(market_scope: Optional[str] = Query(None)):
             scope_filter = ""
             params = []
             if market_scope:
-                scope_filter = "WHERE market_scope = ?"
+                scope_filter = "WHERE u.market_scope = ?"
                 params.append(market_scope)
             
+            # Join with rotation_state to get scores (score_total is in rotation_state, not universe)
             query = f"""
                 SELECT 
-                    asset_type,
+                    u.asset_type,
                     COUNT(*) as count,
-                    ROUND(AVG(score_total), 1) as avg_score
-                FROM universe
+                    ROUND(AVG(rs.score_total), 1) as avg_score
+                FROM universe u
+                LEFT JOIN rotation_state rs ON u.asset_id = rs.asset_id
                 {scope_filter}
-                GROUP BY asset_type
+                GROUP BY u.asset_type
             """
             rows = conn.execute(query, params).fetchall()
             
