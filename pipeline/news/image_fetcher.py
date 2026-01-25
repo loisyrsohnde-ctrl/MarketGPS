@@ -9,7 +9,13 @@ import os
 import random
 import requests
 from typing import Optional
-from duckduckgo_search import DDGS
+
+try:
+    from duckduckgo_search import DDGS
+    DDGS_AVAILABLE = True
+except ImportError:
+    DDGS_AVAILABLE = False
+    DDGS = None
 
 from core.config import get_logger
 
@@ -19,7 +25,7 @@ class ImageFetcher:
     """Fetches real-world context images for news articles."""
     
     def __init__(self):
-        self.ddgs = DDGS()
+        self.ddgs = DDGS() if DDGS_AVAILABLE else None
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -30,6 +36,10 @@ class ImageFetcher:
         Search for a specific image on the web using DuckDuckGo.
         Returns a direct image URL.
         """
+        if not self.ddgs:
+            logger.warning("DuckDuckGo search not available - using fallback images")
+            return None
+            
         try:
             # Search for images (Safe search on, Aspect ratio Wide)
             # We add "news" or "business" to context to avoid weird memes
