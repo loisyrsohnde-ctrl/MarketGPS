@@ -332,6 +332,11 @@ class SQLiteStore:
                     logger.info("Adding region column to news_articles...")
                     conn.execute("ALTER TABLE news_articles ADD COLUMN region TEXT")
             
+            # Ensure is_ai_processed column exists on news_articles
+            if "is_ai_processed" not in column_names:
+                logger.info("Adding is_ai_processed column to news_articles...")
+                conn.execute("ALTER TABLE news_articles ADD COLUMN is_ai_processed INTEGER DEFAULT 0")
+            
             # Ensure news_sources has region column
             source_columns = conn.execute("PRAGMA table_info(news_sources)").fetchall()
             source_column_names = [c[1] for c in source_columns]
@@ -339,10 +344,6 @@ class SQLiteStore:
             if "region" not in source_column_names:
                 logger.info("Adding region column to news_sources...")
                 conn.execute("ALTER TABLE news_sources ADD COLUMN region TEXT")
-                
-                if "is_ai_processed" not in column_names:
-                    logger.info("Adding is_ai_processed column to news_articles...")
-                    conn.execute("ALTER TABLE news_articles ADD COLUMN is_ai_processed INTEGER DEFAULT 0")
 
     def reset_schema(self):
         """Force reset the database schema."""
