@@ -228,6 +228,118 @@ async def get_saved_articles(
         raise HTTPException(status_code=500, detail="Failed to fetch saved articles")
 
 
+@router.get("/health")
+async def get_news_health():
+    """
+    Get news pipeline health status.
+    Returns last run time, article counts, and error status.
+    """
+    import json
+    from pathlib import Path
+    from datetime import datetime, timedelta
+    
+    metrics_file = Path(__file__).parent.parent / "data" / "news_metrics.json"
+    
+    # Load metrics
+    metrics = {}
+    if metrics_file.exists():
+        try:
+            with open(metrics_file, 'r') as f:
+                metrics = json.load(f)
+        except:
+            pass
+    
+    # Get article counts from DB
+    try:
+        total_articles = db.get_news_articles(page=1, page_size=1).get("total", 0)
+        
+        # Count articles from last 24h
+        recent_articles = db.get_news_articles(page=1, page_size=100)
+        now = datetime.now()
+        articles_24h = sum(
+            1 for a in recent_articles.get("data", [])
+            if a.get("published_at") and 
+            (now - datetime.fromisoformat(a["published_at"].replace('Z', ''))).total_seconds() < 86400
+        )
+    except:
+        total_articles = 0
+        articles_24h = 0
+    
+    # Check if pipeline is healthy (ran in last 45 min)
+    last_run = metrics.get("last_run")
+    is_healthy = False
+    minutes_since_last_run = None
+    
+    if last_run:
+        try:
+            last_run_dt = datetime.fromisoformat(last_run)
+            minutes_since_last_run = int((datetime.now() - last_run_dt).total_seconds() / 60)
+            is_healthy = minutes_since_last_run < 45  # Allow some slack
+        except:
+            pass
+    
+    return {
+        "status": "healthy" if is_healthy else "degraded",
+        "last_run": last_run,
+        "minutes_since_last_run": minutes_since_last_run,
+        "last_success": metrics.get("last_success", False),
+        "total_articles": total_articles,
+        "articles_last_24h": articles_24h,
+        "last_result": metrics.get("last_result", {}),
+        "history": metrics.get("history", [])[:5]
+    }
+
+
+@router.get("/regions")
+async def get_regions_with_counts():
+    """
+    Get regions with article counts for dynamic UI.
+    Returns real counts from database.
+    """
+    # Get all articles and count by region
+    try:
+        all_articles = db.get_news_articles(page=1, page_size=500)
+        articles = all_articles.get("data", [])
+        
+        # Region mapping based on country
+        country_to_region = {
+            "MA": "NORTH", "DZ": "NORTH", "TN": "NORTH", "EG": "NORTH", "LY": "NORTH",
+            "NG": "WEST", "GH": "WEST", "SN": "WEST", "CI": "WEST", "BF": "WEST", 
+            "ML": "WEST", "NE": "WEST", "TG": "WEST", "BJ": "WEST", "GN": "WEST",
+            "CM": "CENTRAL", "GA": "CENTRAL", "CG": "CENTRAL", "TD": "CENTRAL", 
+            "CF": "CENTRAL", "GQ": "CENTRAL", "CD": "CENTRAL",
+            "KE": "EAST", "TZ": "EAST", "UG": "EAST", "RW": "EAST", "ET": "EAST", "SS": "EAST",
+            "ZA": "SOUTH", "AO": "SOUTH", "MZ": "SOUTH", "ZW": "SOUTH", 
+            "NA": "SOUTH", "BW": "SOUTH", "ZM": "SOUTH", "MW": "SOUTH"
+        }
+        
+        # Count by region
+        counts = {"PAN": 0, "NORTH": 0, "WEST": 0, "CENTRAL": 0, "EAST": 0, "SOUTH": 0}
+        
+        for article in articles:
+            country = article.get("country")
+            if country:
+                region = country_to_region.get(country, "PAN")
+                counts[region] = counts.get(region, 0) + 1
+            else:
+                counts["PAN"] += 1
+        
+        return {
+            "regions": [
+                {"id": "cemac", "name": "CEMAC", "description": "Afrique Centrale", "count": counts["CENTRAL"]},
+                {"id": "uemoa", "name": "UEMOA", "description": "Afrique de l'Ouest", "count": counts["WEST"]},
+                {"id": "north-africa", "name": "Afrique du Nord", "description": "Maghreb & Égypte", "count": counts["NORTH"]},
+                {"id": "east-africa", "name": "Afrique de l'Est", "description": "Kenya, Rwanda...", "count": counts["EAST"]},
+                {"id": "southern-africa", "name": "Afrique Australe", "description": "Afrique du Sud...", "count": counts["SOUTH"]},
+                {"id": "pan-africa", "name": "Panafricain", "description": "Tout le continent", "count": counts["PAN"]}
+            ],
+            "total": sum(counts.values())
+        }
+    except Exception as e:
+        logger.error(f"Error getting region counts: {e}")
+        return {"regions": [], "total": 0}
+
+
 @router.get("/countries")
 async def get_available_countries():
     """Get list of countries with articles."""

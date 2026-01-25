@@ -84,7 +84,7 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
 
   # ──────────────────────────────────────────────────────────────────────────
-  # SCHEDULER (Pipeline jobs)
+  # SCHEDULER (Pipeline jobs - Market data)
   # ──────────────────────────────────────────────────────────────────────────
   scheduler:
     build:
@@ -116,6 +116,38 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # NEWS SCHEDULER (News pipeline - every 30 minutes)
+  # ──────────────────────────────────────────────────────────────────────────
+  news-scheduler:
+    build:
+      context: .
+      dockerfile: ./pipeline/Dockerfile
+    container_name: marketgps-news-scheduler
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      # Share data with backend
+      - marketgps_data:/app/data
+      - ./data/sqlite:/app/data/sqlite
+      # Logs
+      - news_scheduler_logs:/app/logs
+    env_file:
+      - .env.prod
+    environment:
+      - PYTHONPATH=/app
+      - TZ=UTC
+      # News scheduler settings
+      - NEWS_INTERVAL_MINUTES=30
+      - NEWS_RUN_ON_START=true
+    command: python -m pipeline.news.news_scheduler
+    networks:
+      - marketgps-network
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
 # ──────────────────────────────────────────────────────────────────────────
 # VOLUMES
 # ──────────────────────────────────────────────────────────────────────────
@@ -125,6 +157,8 @@ volumes:
   backend_logs:
     driver: local
   scheduler_logs:
+    driver: local
+  news_scheduler_logs:
     driver: local
 
 # ──────────────────────────────────────────────────────────────────────────

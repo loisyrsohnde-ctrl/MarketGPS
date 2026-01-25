@@ -49,6 +49,9 @@ class RSSIngester:
             with open(registry_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 
+            # Load country-to-region mapping
+            self.country_to_region = data.get("country_to_region", {})
+            
             # Sync sources to database
             for source in data.get("sources", []):
                 if source.get("enabled", False):
@@ -58,6 +61,7 @@ class RSSIngester:
                         "type": source.get("type", "rss"),
                         "rss_url": source.get("rss_url"),
                         "country": source.get("country"),
+                        "region": source.get("region"),  # NEW: region field
                         "language": source.get("language", "en"),
                         "tags": json.dumps(source.get("tags", [])),
                         "trust_score": source.get("trust_score", 0.7),

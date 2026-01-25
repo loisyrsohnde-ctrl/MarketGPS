@@ -328,6 +328,18 @@ class SQLiteStore:
                     logger.info("Adding sentiment column to news_articles...")
                     conn.execute("ALTER TABLE news_articles ADD COLUMN sentiment TEXT DEFAULT 'neutral'")
                 
+                if "region" not in column_names:
+                    logger.info("Adding region column to news_articles...")
+                    conn.execute("ALTER TABLE news_articles ADD COLUMN region TEXT")
+            
+            # Ensure news_sources has region column
+            source_columns = conn.execute("PRAGMA table_info(news_sources)").fetchall()
+            source_column_names = [c[1] for c in source_columns]
+            
+            if "region" not in source_column_names:
+                logger.info("Adding region column to news_sources...")
+                conn.execute("ALTER TABLE news_sources ADD COLUMN region TEXT")
+                
                 if "is_ai_processed" not in column_names:
                     logger.info("Adding is_ai_processed column to news_articles...")
                     conn.execute("ALTER TABLE news_articles ADD COLUMN is_ai_processed INTEGER DEFAULT 0")
@@ -2563,13 +2575,14 @@ class SQLiteStore:
     def upsert_news_source(self, source: Dict) -> Optional[int]:
         """Insert or update a news source."""
         sql = """
-            INSERT INTO news_sources (name, url, type, rss_url, country, language, tags, trust_score, enabled)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO news_sources (name, url, type, rss_url, country, region, language, tags, trust_score, enabled)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(url) DO UPDATE SET
                 name = excluded.name,
                 type = excluded.type,
                 rss_url = excluded.rss_url,
                 country = excluded.country,
+                region = excluded.region,
                 language = excluded.language,
                 tags = excluded.tags,
                 trust_score = excluded.trust_score,
@@ -2585,6 +2598,7 @@ class SQLiteStore:
                     source.get("type", "rss"),
                     source.get("rss_url"),
                     source.get("country"),
+                    source.get("region"),
                     source.get("language", "en"),
                     source.get("tags"),
                     source.get("trust_score", 0.7),

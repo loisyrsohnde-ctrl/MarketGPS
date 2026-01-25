@@ -365,11 +365,24 @@ function LoadingState() {
 // Main Page Component
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Fetch regions with dynamic counts
+async function fetchRegions(): Promise<{ regions: Array<{ id: string; name: string; description: string; count: number }>; total: number }> {
+  const res = await fetch(`${API_BASE}/api/news/regions`);
+  if (!res.ok) return { regions: [], total: 0 };
+  return res.json();
+}
+
 export default function NewsPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['news-premium'],
     queryFn: () => fetchNewsFeed(1),
     staleTime: 60000,
+  });
+  
+  const { data: regionsData } = useQuery({
+    queryKey: ['news-regions'],
+    queryFn: fetchRegions,
+    staleTime: 120000, // 2 minutes cache
   });
   
   if (isLoading) return <LoadingState />;
@@ -464,26 +477,32 @@ export default function NewsPage() {
               <SectionHeader title="Régions" />
               <div className="bg-white rounded-sm shadow-sm border border-slate-200 p-6">
                 <nav className="space-y-3">
-                  {[
-                    { name: 'CEMAC', desc: 'Afrique Centrale', href: '/news/region/cemac' },
-                    { name: 'UEMOA', desc: 'Afrique de l\'Ouest', href: '/news/region/uemoa' },
-                    { name: 'Afrique du Nord', desc: 'Maghreb & Égypte', href: '/news/region/north-africa' },
-                    { name: 'Afrique de l\'Est', desc: 'Kenya, Rwanda...', href: '/news/region/east-africa' },
-                    { name: 'Afrique Australe', desc: 'Afrique du Sud...', href: '/news/region/southern-africa' },
-                    { name: 'Nigeria', desc: 'La puissance économique', href: '/news/region/nigeria' },
-                  ].map((region) => (
+                  {(regionsData?.regions || [
+                    { id: 'cemac', name: 'CEMAC', description: 'Afrique Centrale', count: 0 },
+                    { id: 'uemoa', name: 'UEMOA', description: 'Afrique de l\'Ouest', count: 0 },
+                    { id: 'north-africa', name: 'Afrique du Nord', description: 'Maghreb & Égypte', count: 0 },
+                    { id: 'east-africa', name: 'Afrique de l\'Est', description: 'Kenya, Rwanda...', count: 0 },
+                    { id: 'southern-africa', name: 'Afrique Australe', description: 'Afrique du Sud...', count: 0 },
+                  ]).filter(r => r.id !== 'pan-africa').map((region) => (
                     <Link
-                      key={region.name}
-                      href={region.href}
+                      key={region.id}
+                      href={`/news/region/${region.id}`}
                       className="w-full flex items-center justify-between p-3 rounded hover:bg-slate-50 transition-colors text-left group"
                     >
                       <div>
                         <span className="font-medium text-slate-800 group-hover:text-blue-700">
                           {region.name}
                         </span>
-                        <p className="text-xs text-slate-500">{region.desc}</p>
+                        <p className="text-xs text-slate-500">{region.description}</p>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-700" />
+                      <div className="flex items-center gap-2">
+                        {region.count > 0 && (
+                          <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+                            {region.count}
+                          </span>
+                        )}
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-700" />
+                      </div>
                     </Link>
                   ))}
                 </nav>

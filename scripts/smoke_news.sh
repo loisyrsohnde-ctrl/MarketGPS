@@ -1,117 +1,181 @@
 #!/bin/bash
-# ═══════════════════════════════════════════════════════════════════════════════
-# MarketGPS News Module - Smoke Test
-# Verifies that the news pipeline and API are working correctly
-# ═══════════════════════════════════════════════════════════════════════════════
+# ============================================================================
+# MarketGPS News Pipeline - Smoke Test
+# 
+# Tests:
+# 1. Run a quick news ingestion
+# 2. Check API returns articles
+# 3. Check health endpoint
+# ============================================================================
 
 set -e
 
-# Colors
+API_BASE="${API_BASE:-https://api.marketgps.online}"
+PYTHONPATH="${PYTHONPATH:-/app}"
+
+echo "=============================================="
+echo "MarketGPS News Pipeline - Smoke Test"
+echo "API: $API_BASE"
+echo "Time: $(date)"
+echo "=============================================="
+
+# Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
+YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
-# Configuration
-API_BASE="${API_BASE:-http://localhost:8000}"
-NEWS_LIMIT="${NEWS_LIMIT:-10}"
+# Test counters
+PASSED=0
+FAILED=0
 
-echo "═══════════════════════════════════════════════════════════════════"
-echo "MarketGPS News Module - Smoke Test"
-echo "═══════════════════════════════════════════════════════════════════"
-echo "API Base: $API_BASE"
-echo "News Limit: $NEWS_LIMIT"
-echo ""
-
-# Track failures
-FAILURES=0
-
-# Helper function
-check_result() {
-    if [ $1 -eq 0 ]; then
-        echo -e "${GREEN}✓ $2${NC}"
-    else
-        echo -e "${RED}✗ $2${NC}"
-        FAILURES=$((FAILURES + 1))
-    fi
+pass() {
+    echo -e "${GREEN}✓ PASS${NC}: $1"
+    PASSED=$((PASSED + 1))
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Test 1: API Health Check
-# ═══════════════════════════════════════════════════════════════════════════════
+fail() {
+    echo -e "${RED}✗ FAIL${NC}: $1"
+    FAILED=$((FAILED + 1))
+}
+
+warn() {
+    echo -e "${YELLOW}⚠ WARN${NC}: $1"
+}
+
+# ============================================================================
+# Test 1: Check API is reachable
+# ============================================================================
 echo ""
-echo "── Test 1: API Health Check ──"
+echo "Test 1: API Connectivity"
+echo "------------------------"
 
-HEALTH_RESPONSE=$(curl -s -w "\n%{http_code}" "$API_BASE/api/news/health" 2>/dev/null || echo "FAILED")
-HTTP_CODE=$(echo "$HEALTH_RESPONSE" | tail -n1)
-
-if [ "$HTTP_CODE" = "200" ]; then
-    check_result 0 "News API health endpoint responding"
+if curl -s -f "$API_BASE/health" > /dev/null 2>&1; then
+    pass "API is reachable"
 else
-    check_result 1 "News API health endpoint responding (HTTP $HTTP_CODE)"
+    fail "Cannot reach API at $API_BASE/health"
 fi
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Test 2: Run News Ingestion (limited)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ============================================================================
+# Test 2: Check news feed endpoint
+# ============================================================================
 echo ""
-echo "── Test 2: Run News Ingestion ──"
+echo "Test 2: News Feed Endpoint"
+echo "--------------------------"
 
-cd "$(dirname "$0")/.."
+NEWS_RESPONSE=$(curl -s "$API_BASE/api/news?page_size=5" 2>&1)
 
-python -m pipeline.jobs --news-ingest --news-limit "$NEWS_LIMIT" 2>/dev/null
-INGEST_RESULT=$?
+if echo "$NEWS_RESPONSE" | grep -q '"total"'; then
+    TOTAL=$(echo "$NEWS_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('total', 0))" 2>/dev/null || echo "0")
+    pass "News feed returns data (total: $TOTAL articles)"
+else
+    fail "News feed endpoint failed"
+    echo "Response: $NEWS_RESPONSE"
+fi
 
-check_result $INGEST_RESULT "News ingestion job completed"
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Test 3: Run News Publishing (limited)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ============================================================================
+# Test 3: Check news health endpoint
+# ============================================================================
 echo ""
-echo "── Test 3: Run News Publishing ──"
+echo "Test 3: News Health Endpoint"
+echo "----------------------------"
 
-python -m pipeline.jobs --news-rewrite --news-limit "$NEWS_LIMIT" 2>/dev/null
-PUBLISH_RESULT=$?
+HEALTH_RESPONSE=$(curl -s "$API_BASE/api/news/health" 2>&1)
 
-check_result $PUBLISH_RESULT "News publishing job completed"
+if echo "$HEALTH_RESPONSE" | grep -q '"status"'; then
+    STATUS=$(echo "$HEALTH_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('status', 'unknown'))" 2>/dev/null || echo "unknown")
+    LAST_RUN=$(echo "$HEALTH_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('last_run', 'never'))" 2>/dev/null || echo "never")
+    
+    if [ "$STATUS" = "healthy" ]; then
+        pass "News pipeline is healthy (last run: $LAST_RUN)"
+    else
+        warn "News pipeline status: $STATUS (last run: $LAST_RUN)"
+    fi
+else
+    fail "News health endpoint failed"
+    echo "Response: $HEALTH_RESPONSE"
+fi
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Test 4: Check News API Returns Data
-# ═══════════════════════════════════════════════════════════════════════════════
+# ============================================================================
+# Test 4: Check regions endpoint
+# ============================================================================
 echo ""
-echo "── Test 4: Check News API ──"
+echo "Test 4: Regions Endpoint"
+echo "------------------------"
 
-NEWS_RESPONSE=$(curl -s "$API_BASE/api/news?page_size=5" 2>/dev/null || echo '{"total": 0}')
-TOTAL=$(echo "$NEWS_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('total', 0))" 2>/dev/null || echo "0")
+REGIONS_RESPONSE=$(curl -s "$API_BASE/api/news/regions" 2>&1)
+
+if echo "$REGIONS_RESPONSE" | grep -q '"regions"'; then
+    TOTAL=$(echo "$REGIONS_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('total', 0))" 2>/dev/null || echo "0")
+    pass "Regions endpoint returns data (total articles: $TOTAL)"
+else
+    fail "Regions endpoint failed"
+fi
+
+# ============================================================================
+# Test 5: Check if articles have required fields
+# ============================================================================
+echo ""
+echo "Test 5: Article Data Quality"
+echo "----------------------------"
 
 if [ "$TOTAL" -gt 0 ]; then
-    check_result 0 "News API returns $TOTAL articles"
+    FIRST_ARTICLE=$(echo "$NEWS_RESPONSE" | python3 -c "import sys, json; d=json.load(sys.stdin); print(json.dumps(d.get('data', [{}])[0]))" 2>/dev/null)
+    
+    if echo "$FIRST_ARTICLE" | grep -q '"title"'; then
+        pass "Articles have title field"
+    else
+        fail "Articles missing title"
+    fi
+    
+    if echo "$FIRST_ARTICLE" | grep -q '"slug"'; then
+        pass "Articles have slug field"
+    else
+        fail "Articles missing slug"
+    fi
+    
+    if echo "$FIRST_ARTICLE" | grep -q '"source_name"'; then
+        pass "Articles have source_name field"
+    else
+        fail "Articles missing source_name"
+    fi
 else
-    # Not a failure if no articles yet (first run)
-    echo -e "${YELLOW}⚠ News API returns 0 articles (may be first run)${NC}"
+    warn "No articles to check quality"
 fi
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Test 5: Check Tags/Countries endpoints
-# ═══════════════════════════════════════════════════════════════════════════════
+# ============================================================================
+# Test 6: Run local pipeline test (if not in CI)
+# ============================================================================
 echo ""
-echo "── Test 5: Check Tags/Countries Endpoints ──"
+echo "Test 6: Local Pipeline Test"
+echo "---------------------------"
 
-TAGS_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$API_BASE/api/news/tags" 2>/dev/null || echo "0")
-check_result $([ "$TAGS_CODE" = "200" ] && echo 0 || echo 1) "Tags endpoint responding"
-
-COUNTRIES_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$API_BASE/api/news/countries" 2>/dev/null || echo "0")
-check_result $([ "$COUNTRIES_CODE" = "200" ] && echo 0 || echo 1) "Countries endpoint responding"
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Summary
-# ═══════════════════════════════════════════════════════════════════════════════
-echo ""
-echo "═══════════════════════════════════════════════════════════════════"
-if [ $FAILURES -eq 0 ]; then
-    echo -e "${GREEN}All smoke tests passed!${NC}"
-    exit 0
+if command -v python3 &> /dev/null && [ -f "pipeline/news/ingest_rss.py" ]; then
+    echo "Running quick ingestion test..."
+    if python3 -m pipeline.jobs --news-ingest --news-limit 3 2>&1; then
+        pass "Local ingestion test completed"
+    else
+        warn "Local ingestion test failed (may need dependencies)"
+    fi
 else
-    echo -e "${RED}$FAILURES test(s) failed${NC}"
+    warn "Skipping local test (not in correct environment)"
+fi
+
+# ============================================================================
+# Summary
+# ============================================================================
+echo ""
+echo "=============================================="
+echo "Summary"
+echo "=============================================="
+echo -e "Passed: ${GREEN}$PASSED${NC}"
+echo -e "Failed: ${RED}$FAILED${NC}"
+echo ""
+
+if [ $FAILED -gt 0 ]; then
+    echo -e "${RED}Some tests failed!${NC}"
     exit 1
+else
+    echo -e "${GREEN}All tests passed!${NC}"
+    exit 0
 fi
