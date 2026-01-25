@@ -730,6 +730,43 @@ async def get_landing_metrics(market_scope: str = Query("US_EU")):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/metrics/asset-type-counts")
+async def get_asset_type_counts(market_scope: Optional[str] = Query(None)):
+    """
+    Get asset counts and average scores by asset type.
+    Used by the Markets page to show breakdown by asset type.
+    """
+    try:
+        with db._get_connection() as conn:
+            scope_filter = ""
+            params = []
+            if market_scope:
+                scope_filter = "WHERE market_scope = ?"
+                params.append(market_scope)
+            
+            query = f"""
+                SELECT 
+                    asset_type,
+                    COUNT(*) as count,
+                    ROUND(AVG(score_total), 1) as avg_score
+                FROM universe
+                {scope_filter}
+                GROUP BY asset_type
+            """
+            rows = conn.execute(query, params).fetchall()
+            
+            result = {}
+            for row in rows:
+                asset_type = row[0] or "UNKNOWN"
+                result[asset_type] = {
+                    "count": row[1],
+                    "avgScore": row[2]
+                }
+            return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Watchlist Endpoints
 # ═══════════════════════════════════════════════════════════════════════════
