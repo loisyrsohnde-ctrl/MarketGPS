@@ -126,7 +126,7 @@ function BillingSuccessContent() {
                   Activation en cours...
                 </h2>
                 <p className="text-text-secondary">
-                  Nous configurons votre abonnement. Cela ne prendra qu'un instant.
+                  Nous configurons votre abonnement. Cela ne prendra qu&apos;un instant.
                 </p>
                 <div className="mt-6 flex items-center justify-center gap-1">
                   {[...Array(3)].map((_, i) => (
@@ -185,7 +185,7 @@ function BillingSuccessContent() {
                   Activation en attente
                 </h2>
                 <p className="text-text-secondary mb-6">
-                  Votre paiement a bien été reçu. L'activation peut prendre quelques minutes.
+                  Votre paiement a bien été reçu. L&apos;activation peut prendre quelques minutes.
                 </p>
                 <div className="space-y-3">
                   <Button

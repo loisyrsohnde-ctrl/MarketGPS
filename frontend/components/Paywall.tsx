@@ -1,54 +1,95 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
-import { useSubscription } from '@/hooks/useSubscription';
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { SubscriptionRequired } from '@/components/subscription/SubscriptionGate';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PAYWALL COMPONENT
-// Wraps protected content and redirects to choose-plan if no active subscription
+// Wraps content and shows paywall if user doesn't have active subscription
 // ═══════════════════════════════════════════════════════════════════════════
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.marketgps.online';
+
+interface SubscriptionStatus {
+  user_id: string;
+  plan: string;
+  status: string;
+  is_active: boolean;
+  grace_period_remaining_hours?: number;
+}
 
 interface PaywallProps {
   children: React.ReactNode;
-  /** If true, allow free users to see content (useful for partial paywalls) */
-  allowFree?: boolean;
 }
 
-export function Paywall({ children, allowFree = false }: PaywallProps) {
-  const router = useRouter();
-  const { isActive, isLoading } = useSubscription();
+export function Paywall({ children }: PaywallProps) {
+  const { session, isLoading: authLoading, isAuthenticated } = useAuth();
+  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Don't redirect while loading
-    if (isLoading) return;
+    const fetchSubscription = async () => {
+      if (!session?.access_token) {
+        setLoading(false);
+        return;
+      }
 
-    // Allow access if subscription is active or if free users are allowed
-    if (isActive || allowFree) return;
+      try {
+        const response = await fetch(`${API_URL}/api/billing/me`, {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        });
 
-    // Redirect to choose plan page
-    router.push('/billing/choose-plan');
-  }, [isActive, isLoading, allowFree, router]);
+        if (response.ok) {
+          const data = await response.json();
+          setSubscription(data);
+        }
+      } catch (error) {
+        console.error('Error fetching subscription:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Show loading while checking subscription
-  if (isLoading) {
+    if (!authLoading) {
+      if (session?.access_token) {
+        fetchSubscription();
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [session, authLoading]);
+
+  // Show loading skeleton while checking
+  if (loading || authLoading) {
+    return <>{children}</>;
+  }
+
+  // Not logged in - show login prompt
+  if (!isAuthenticated) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-accent" />
+      <div className="py-8">
+        <SubscriptionRequired 
+          message="Connectez-vous pour accéder à cette fonctionnalité"
+          showLogin
+        />
       </div>
     );
   }
 
-  // Allow access if subscription is active or if free users are allowed
-  if (isActive || allowFree) {
+  // Has active subscription - show content
+  if (subscription?.is_active) {
     return <>{children}</>;
   }
 
-  // Show nothing while redirecting
+  // No active subscription - show paywall
   return (
-    <div className="min-h-[400px] flex items-center justify-center">
-      <Loader2 className="w-8 h-8 animate-spin text-accent" />
+    <div className="py-8">
+      <SubscriptionRequired 
+        gracePeriod={subscription?.grace_period_remaining_hours}
+      />
     </div>
   );
 }
