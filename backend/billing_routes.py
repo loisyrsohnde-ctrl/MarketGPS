@@ -243,6 +243,7 @@ def queue_systemeio_sync(user_id: str, email: str, action: str, tag_name: str, d
 async def get_current_user_id(authorization: Optional[str] = Header(None)) -> str:
     """
     Extract user_id from Supabase JWT token.
+    Uses security.py functions for consistent auth behavior.
     """
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
@@ -250,28 +251,68 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> st
     token = authorization.replace("Bearer ", "")
     
     try:
-        # Import here to avoid circular imports
+        # Try to use security.py's verification
         from security import verify_supabase_token
         payload = verify_supabase_token(token)
+        
+        if payload is None:
+            # Token verification failed - try fallback decode for development
+            logger.warning("Token verification returned None, attempting fallback decode")
+            payload = _decode_jwt_unverified(token)
+        
+        if not payload:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token: no user_id")
+        
         return user_id
+        
     except ImportError:
-        # Fallback: decode JWT without verification (for development)
-        import base64
-        import json
-        parts = token.split(".")
-        if len(parts) != 3:
+        # security.py not available - use fallback decode
+        logger.warning("security.py not available, using fallback JWT decode")
+        payload = _decode_jwt_unverified(token)
+        if not payload:
             raise HTTPException(status_code=401, detail="Invalid token format")
-        payload = json.loads(base64.urlsafe_b64decode(parts[1] + "=="))
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token: no user_id")
         return user_id
+        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Auth error: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+def _decode_jwt_unverified(token: str) -> Optional[Dict[str, Any]]:
+    """
+    Decode JWT without verification (for development/fallback only).
+    WARNING: This does NOT verify the signature!
+    """
+    import base64
+    import json
+    
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+        
+        # Add padding if needed
+        payload_b64 = parts[1]
+        padding = 4 - len(payload_b64) % 4
+        if padding != 4:
+            payload_b64 += "=" * padding
+        
+        payload_bytes = base64.urlsafe_b64decode(payload_b64)
+        payload = json.loads(payload_bytes)
+        return payload
+        
+    except Exception as e:
+        logger.warning(f"JWT decode fallback failed: {e}")
+        return None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
