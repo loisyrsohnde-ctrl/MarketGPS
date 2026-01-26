@@ -1403,3 +1403,151 @@ async def update_asset_quarantine_status(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Ad-Hoc Scoring Endpoints - Score ANY ticker on-the-fly
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.post("/score/adhoc")
+async def score_adhoc(
+    ticker: str = Query(..., description="Ticker symbol (e.g., AAPL, VOD.LSE, NPN.JSE)"),
+    exchange: Optional[str] = Query(None, description="Exchange code (e.g., US, LSE, JSE) - auto-detected if not provided"),
+    asset_type: Optional[str] = Query(None, description="Asset type override (EQUITY, ETF, CRYPTO)"),
+    add_to_universe: bool = Query(False, description="Add asset to universe for future batch scoring"),
+    force_refresh: bool = Query(False, description="Force data refresh even if cached"),
+):
+    """
+    Score any ticker on-the-fly, even if it's not in the universe.
+
+    This endpoint uses the same scoring algorithms as the batch pipeline:
+    - Fetches OHLCV data from EODHD/yfinance
+    - Calculates technical indicators (RSI, volatility, drawdown)
+    - Fetches fundamentals for EQUITY (P/E, margins, ROE)
+    - Computes multi-pillar score (Value, Momentum, Safety)
+
+    Examples:
+    - /api/score/adhoc?ticker=AAPL  → Scores Apple (auto-detects .US)
+    - /api/score/adhoc?ticker=VOD&exchange=LSE  → Scores Vodafone on LSE
+    - /api/score/adhoc?ticker=NPN.JSE  → Scores Naspers (exchange in ticker)
+    - /api/score/adhoc?ticker=BTC-USD  → Scores Bitcoin (crypto)
+
+    Returns full score breakdown with technical metrics and fundamentals.
+    """
+    try:
+        from adhoc_scoring import AdHocScoringService
+
+        service = AdHocScoringService(store=db)
+        result = service.score_ticker(
+            ticker=ticker,
+            exchange=exchange,
+            asset_type=asset_type,
+            add_to_universe=add_to_universe,
+            force_refresh=force_refresh,
+        )
+
+        if not result.success:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "scoring_failed",
+                    "ticker": ticker,
+                    "message": result.error,
+                }
+            )
+
+        return result.to_dict()
+
+    except HTTPException:
+        raise
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="adhoc_scoring module not available"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/score/adhoc/batch")
+async def score_adhoc_batch(
+    tickers: str = Query(..., description="Comma-separated list of tickers (max 10)"),
+    add_to_universe: bool = Query(False, description="Add assets to universe"),
+):
+    """
+    Score multiple tickers in batch.
+
+    Example: /api/score/adhoc/batch?tickers=AAPL,MSFT,GOOGL
+
+    Returns list of score results (max 10 tickers per request).
+    """
+    try:
+        from adhoc_scoring import AdHocScoringService
+
+        ticker_list = [t.strip() for t in tickers.split(",") if t.strip()]
+
+        if not ticker_list:
+            raise HTTPException(status_code=400, detail="No tickers provided")
+
+        if len(ticker_list) > 10:
+            raise HTTPException(
+                status_code=400,
+                detail="Maximum 10 tickers per batch request"
+            )
+
+        service = AdHocScoringService(store=db)
+        results = service.score_batch(ticker_list, add_to_universe=add_to_universe)
+
+        return {
+            "total": len(results),
+            "success": sum(1 for r in results if r.success),
+            "failed": sum(1 for r in results if not r.success),
+            "results": [r.to_dict() for r in results],
+        }
+
+    except HTTPException:
+        raise
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="adhoc_scoring module not available"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/score/adhoc/resolve")
+async def resolve_ticker(
+    ticker: str = Query(..., description="Ticker to resolve"),
+    exchange: Optional[str] = Query(None, description="Exchange hint"),
+):
+    """
+    Resolve a ticker to its full asset_id without scoring.
+
+    Useful to verify how a ticker will be interpreted before scoring.
+
+    Returns:
+    - asset_id: Full identifier (e.g., AAPL.US)
+    - symbol: Base symbol
+    - exchange: Detected exchange
+    - asset_type: Detected asset type
+    - market_scope: US_EU, AFRICA, or ASIA
+    """
+    try:
+        from adhoc_scoring import AdHocScoringService
+
+        service = AdHocScoringService(store=db)
+        resolved = service._resolve_ticker(ticker, exchange)
+
+        return {
+            "original": ticker,
+            "resolved": resolved,
+        }
+
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="adhoc_scoring module not available"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
