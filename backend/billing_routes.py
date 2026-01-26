@@ -41,9 +41,17 @@ logger = logging.getLogger(__name__)
 GRACE_PERIOD_HOURS = int(os.environ.get("BILLING_GRACE_PERIOD_HOURS", "48"))
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://app.marketgps.online")
 
-# Price IDs from environment
-STRIPE_PRICE_ID_MONTHLY = os.environ.get("STRIPE_PRICE_ID_MONTHLY", "")
-STRIPE_PRICE_ID_ANNUAL = os.environ.get("STRIPE_PRICE_ID_ANNUAL", "")
+# Price IDs from environment (support both naming conventions for backward compatibility)
+STRIPE_PRICE_ID_MONTHLY = (
+    os.environ.get("STRIPE_PRICE_ID_MONTHLY") or
+    os.environ.get("STRIPE_PRICE_MONTHLY_ID") or
+    ""
+)
+STRIPE_PRICE_ID_ANNUAL = (
+    os.environ.get("STRIPE_PRICE_ID_ANNUAL") or
+    os.environ.get("STRIPE_PRICE_YEARLY_ID") or
+    ""
+)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ROUTER

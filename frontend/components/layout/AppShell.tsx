@@ -12,6 +12,7 @@ import { Topbar } from './topbar';
 import { TopbarMobile } from './TopbarMobile';
 import { MobileTabBar } from './MobileTabBar';
 import { AssetInspector } from '@/components/AssetInspector';
+import { Paywall } from '@/components/Paywall';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // APP SHELL
@@ -22,9 +23,11 @@ import { AssetInspector } from '@/components/AssetInspector';
 
 interface AppShellProps {
   children: React.ReactNode;
+  /** If true, bypass the paywall (for settings, profile, etc.) */
+  bypassPaywall?: boolean;
 }
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [user, setUser] = useState<{
@@ -166,7 +169,9 @@ export function AppShell({ children }: AppShellProps) {
           'md:pt-16 md:pb-0' // Desktop: only topbar offset
         )}
       >
-        <div className="p-4 md:p-6">{children}</div>
+        <div className="p-4 md:p-6">
+          {bypassPaywall ? children : <Paywall>{children}</Paywall>}
+        </div>
       </main>
 
       {/* Global Asset Inspector Slide-Over */}

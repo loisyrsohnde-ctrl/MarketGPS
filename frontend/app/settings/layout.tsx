@@ -12,5 +12,6 @@ interface LayoutProps {
 }
 
 export default function SettingsLayout({ children }: LayoutProps) {
-  return <AppShell>{children}</AppShell>;
+  // Settings pages should be accessible without subscription (billing, profile, etc.)
+  return <AppShell bypassPaywall={true}>{children}</AppShell>;
 }

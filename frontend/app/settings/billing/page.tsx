@@ -2,8 +2,8 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { GlassCard, GlassCardAccent } from '@/components/ui/glass-card';
 import { Button } from '@/components/ui/button';
@@ -16,8 +16,12 @@ import {
   Crown,
   ArrowLeft,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.marketgps.online';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BILLING PAGE
@@ -31,41 +35,89 @@ export default function BillingPage() {
   );
 }
 
+interface SubscriptionData {
+  user_id: string;
+  plan: 'free' | 'monthly' | 'annual';
+  status: string;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  is_active: boolean;
+  grace_period_remaining_hours: number | null;
+}
+
 function BillingContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { session, isLoading: authLoading, isAuthenticated } = useAuth();
+
   const success = searchParams.get('success') === '1';
   const canceled = searchParams.get('canceled') === '1';
 
-  const [currentPlan] = useState<'free' | 'monthly' | 'yearly'>('free');
+  const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
+  const [loadingSubscription, setLoadingSubscription] = useState(true);
   const [loading, setLoading] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login?redirect=/settings/billing');
+    }
+  }, [authLoading, isAuthenticated, router]);
+
+  // Fetch current subscription status
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      if (!session?.access_token) return;
+
+      try {
+        const response = await fetch(`${API_URL}/api/billing/me`, {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setSubscription(data);
+        }
+      } catch (error) {
+        console.error('Error fetching subscription:', error);
+      } finally {
+        setLoadingSubscription(false);
+      }
+    };
+
+    if (session?.access_token) {
+      fetchSubscription();
+    }
+  }, [session]);
 
   const handleSubscribe = async (plan: 'monthly' | 'yearly') => {
+    if (!session?.access_token) {
+      router.push('/login?redirect=/settings/billing');
+      return;
+    }
+
     setLoading(plan);
-    
+
     try {
-      // Get session token (assuming useAuth hook exists)
-      const token = typeof window !== 'undefined' 
-        ? localStorage.getItem('supabase.auth.token') 
-        : null;
-      
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'https://api.marketgps.online'}/api/billing/checkout-session`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ plan: plan === 'yearly' ? 'annual' : plan }),
-        }
-      );
-      
+      const response = await fetch(`${API_URL}/api/billing/checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ plan: plan === 'yearly' ? 'annual' : plan }),
+      });
+
       if (!response.ok) {
-        throw new Error('Failed to create checkout session');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to create checkout session');
       }
-      
+
       const data = await response.json();
-      
+
       if (data.url) {
         window.location.href = data.url;
       }
@@ -76,6 +128,50 @@ function BillingContent() {
       setLoading(null);
     }
   };
+
+  const handleManageSubscription = async () => {
+    if (!session?.access_token) return;
+
+    setPortalLoading(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/billing/portal-session`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create portal session');
+      }
+
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Portal error:', error);
+      alert('Erreur lors de l\'ouverture du portail. Veuillez réessayer.');
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
+  // Determine current plan for display
+  const currentPlan = subscription?.is_active
+    ? (subscription.plan === 'annual' ? 'yearly' : subscription.plan as 'monthly')
+    : 'free';
+
+  // Show loading while checking auth
+  if (authLoading || loadingSubscription) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
+      </div>
+    );
+  }
 
   const plans = [
     {
@@ -180,22 +276,43 @@ function BillingContent() {
             <p className="text-xl font-bold text-text-primary mt-1">
               {currentPlan === 'free' ? 'Gratuit' : currentPlan === 'monthly' ? 'Pro Mensuel' : 'Pro Annuel'}
             </p>
+            {subscription?.status === 'past_due' && subscription.grace_period_remaining_hours && (
+              <p className="text-sm text-score-yellow mt-1">
+                ⚠️ Paiement en attente - {subscription.grace_period_remaining_hours}h restantes
+              </p>
+            )}
+            {subscription?.cancel_at_period_end && (
+              <p className="text-sm text-score-yellow mt-1">
+                Annulation prévue à la fin de la période
+              </p>
+            )}
           </div>
-          {currentPlan !== 'free' && (
+          {currentPlan !== 'free' && subscription?.current_period_end && (
             <div className="text-right">
-              <p className="text-sm text-text-muted">Prochain renouvellement</p>
-              <p className="text-text-secondary">15 février 2025</p>
+              <p className="text-sm text-text-muted">
+                {subscription.cancel_at_period_end ? 'Expire le' : 'Prochain renouvellement'}
+              </p>
+              <p className="text-text-secondary">
+                {new Date(subscription.current_period_end).toLocaleDateString('fr-FR', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </p>
             </div>
           )}
         </div>
 
         {currentPlan !== 'free' && (
           <div className="mt-4 pt-4 border-t border-glass-border flex gap-3">
-            <Button variant="secondary" size="sm" leftIcon={<ExternalLink className="w-4 h-4" />}>
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<ExternalLink className="w-4 h-4" />}
+              onClick={handleManageSubscription}
+              loading={portalLoading}
+            >
               Gérer sur Stripe
-            </Button>
-            <Button variant="danger" size="sm">
-              Annuler l&apos;abonnement
             </Button>
           </div>
         )}
