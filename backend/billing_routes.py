@@ -444,10 +444,10 @@ async def create_checkout_session(
             upsert_subscription(user_id, {"stripe_customer_id": stripe_customer_id}, db)
             logger.info(f"Created Stripe customer {stripe_customer_id} for user {user_id}")
         
-        # Create checkout session
+        # Create checkout session (one-time payment)
         session = stripe.checkout.Session.create(
             customer=stripe_customer_id,
-            mode="subscription",
+            mode="payment",  # One-time payment, not subscription
             payment_method_types=["card"],
             line_items=[{"price": price_id, "quantity": 1}],
             success_url=f"{FRONTEND_URL}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
