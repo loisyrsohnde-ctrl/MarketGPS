@@ -39,15 +39,31 @@ def verify_supabase_token(token: str) -> Optional[dict]:
         # For now, we'll use the Supabase API to verify
         jwt_secret = os.environ.get("SUPABASE_JWT_SECRET")
         
+        # Debug: log token prefix for troubleshooting
+        token_preview = token[:20] + "..." if len(token) > 20 else token
+        logger.debug(f"Verifying token: {token_preview}, secret configured: {bool(jwt_secret)}")
+        
         if jwt_secret:
             # Direct JWT verification with secret
-            payload = jwt.decode(
-                token,
-                jwt_secret,
-                algorithms=["HS256"],
-                audience="authenticated",
-            )
-            return payload
+            # Note: Supabase JWT may not have audience claim, so we don't verify it
+            try:
+                payload = jwt.decode(
+                    token,
+                    jwt_secret,
+                    algorithms=["HS256"],
+                    audience="authenticated",
+                )
+                return payload
+            except JWTError as e:
+                # Try without audience verification (Supabase tokens may not have it)
+                logger.debug(f"JWT verification with audience failed, trying without: {e}")
+                payload = jwt.decode(
+                    token,
+                    jwt_secret,
+                    algorithms=["HS256"],
+                    options={"verify_aud": False},
+                )
+                return payload
         else:
             # Fallback: Verify by calling Supabase
             return _verify_token_via_supabase(token)

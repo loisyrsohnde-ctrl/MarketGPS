@@ -253,12 +253,19 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> st
     try:
         # Try to use security.py's verification
         from security import verify_supabase_token
+        
+        # Debug log
+        token_preview = token[:30] + "..." if len(token) > 30 else token
+        logger.info(f"Billing auth: verifying token {token_preview}")
+        
         payload = verify_supabase_token(token)
         
         if payload is None:
             # Token verification failed - try fallback decode for development
             logger.warning("Token verification returned None, attempting fallback decode")
             payload = _decode_jwt_unverified(token)
+        else:
+            logger.info(f"Billing auth: token verified, user_id={payload.get('sub')}")
         
         if not payload:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
