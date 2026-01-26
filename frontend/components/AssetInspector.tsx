@@ -237,32 +237,55 @@ export function AssetInspector() {
     }
   };
 
-  // Recalculate score on-demand
+  // Recalculate score on-demand using ad-hoc scoring API
   const recalculateScore = async () => {
     if (!asset) return;
-    
+
     setRecalculating(true);
     try {
-      const res = await fetch(`${API_BASE}/api/assets/${encodeURIComponent(asset.ticker)}/score?force=true`, {
+      // Use the ad-hoc scoring endpoint
+      const ticker = asset.ticker || asset.symbol;
+      const exchange = asset.exchange || asset.market_code;
+
+      const params = new URLSearchParams({
+        ticker: ticker,
+        force_refresh: 'true',
+      });
+      if (exchange) {
+        params.append('exchange', exchange);
+      }
+
+      const res = await fetch(`${API_BASE}/api/score/adhoc?${params}`, {
         method: 'POST',
       });
-      
+
       if (res.ok) {
         const newScore = await res.json();
-        setAsset(prev => prev ? {
-          ...prev,
-          score_total: newScore.score_total,
-          score_value: newScore.score_value,
-          score_momentum: newScore.score_momentum,
-          score_safety: newScore.score_safety,
-          confidence: newScore.confidence,
-        } : null);
+        if (newScore.success) {
+          setAsset(prev => prev ? {
+            ...prev,
+            score_total: newScore.score_total,
+            score_value: newScore.score_value,
+            score_momentum: newScore.score_momentum,
+            score_safety: newScore.score_safety,
+            confidence: newScore.confidence,
+            rsi: newScore.rsi,
+            volatility: newScore.vol_annual,
+          } : null);
+        } else {
+          // Scoring failed (insufficient data, etc.)
+          alert(`Impossible de calculer le score: ${newScore.error || 'Données insuffisantes'}`);
+        }
       } else if (res.status === 403) {
         // Quota exceeded
         alert('Quota de calculs atteint. Passez Pro pour des analyses illimitées.');
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        alert(`Erreur: ${errorData.detail?.message || errorData.detail || 'Échec du calcul'}`);
       }
     } catch (err) {
       console.error('Failed to recalculate score:', err);
+      alert('Erreur de connexion au serveur');
     } finally {
       setRecalculating(false);
     }
@@ -476,8 +499,8 @@ export function AssetInspector() {
                     </div>
 
                     <div className="flex items-center justify-center py-4">
-                      <ScoreGauge 
-                        score={asset.score_total || 0} 
+                      <ScoreGauge
+                        score={asset.score_total ?? null}
                         size="xl"
                         showLabel
                       />

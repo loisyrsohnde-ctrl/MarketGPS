@@ -189,15 +189,26 @@ export interface ScoreConfig {
 }
 
 export const getScoreConfig = (score: number | null): ScoreConfig => {
-  if (score === null) {
+  // Null or undefined = not scored yet
+  if (score === null || score === undefined) {
     return {
       color: 'var(--text-muted)',
       bgColor: 'var(--surface)',
-      label: 'N/A',
+      label: 'Non scoré',
       cssClass: 'score-badge-neutral',
     };
   }
-  
+
+  // Score of exactly 0 usually means not calculated
+  if (score === 0) {
+    return {
+      color: 'var(--text-muted)',
+      bgColor: 'var(--surface)',
+      label: 'À calculer',
+      cssClass: 'score-badge-neutral',
+    };
+  }
+
   if (score <= 30) {
     return {
       color: 'var(--score-red)',
