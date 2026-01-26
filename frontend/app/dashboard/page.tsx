@@ -481,12 +481,12 @@ export default function DashboardPage() {
                 {/* Score + Pillars */}
                 <div className="grid md:grid-cols-2 gap-8">
                   <div className="flex justify-center">
-                    <ScoreGauge score={selectedAsset.score_total || 0} size="lg" />
+                    <ScoreGauge score={selectedAsset.score_total ?? null} size="lg" />
                   </div>
                   <div className="space-y-4 py-4">
-                    <PillarBar label="Valeur" value={selectedAsset.score_value || 0} icon="📈" />
-                    <PillarBar label="Momentum" value={selectedAsset.score_momentum || 0} icon="🚀" />
-                    <PillarBar label="Sécurité" value={selectedAsset.score_safety || 0} icon="🛡️" />
+                    <PillarBar label="Valeur" value={selectedAsset.score_value ?? null} icon="📈" />
+                    <PillarBar label="Momentum" value={selectedAsset.score_momentum ?? null} icon="🚀" />
+                    <PillarBar label="Sécurité" value={selectedAsset.score_safety ?? null} icon="🛡️" />
                   </div>
                 </div>
               </GlassCard>

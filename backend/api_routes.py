@@ -19,6 +19,14 @@ from storage.sqlite_store import SQLiteStore
 from security import get_user_id_from_request
 from storage.parquet_store import ParquetStore
 
+# Centralized asset query module (PR3)
+try:
+    from asset_query import AssetQueryBuilder, AssetFilters, AFRICA_REGIONS
+    ASSET_QUERY_AVAILABLE = True
+except ImportError:
+    ASSET_QUERY_AVAILABLE = False
+    AFRICA_REGIONS = {}
+
 # Initialize SQLite store
 db = SQLiteStore()
 
@@ -743,10 +751,10 @@ async def get_asset_type_counts(market_scope: Optional[str] = Query(None)):
             if market_scope:
                 scope_filter = "WHERE u.market_scope = ?"
                 params.append(market_scope)
-            
+
             # Join with scores_latest to get scores (score_total is in scores_latest)
             query = f"""
-                SELECT 
+                SELECT
                     u.asset_type,
                     COUNT(*) as count,
                     ROUND(AVG(sl.score_total), 1) as avg_score
@@ -756,7 +764,7 @@ async def get_asset_type_counts(market_scope: Optional[str] = Query(None)):
                 GROUP BY u.asset_type
             """
             rows = conn.execute(query, params).fetchall()
-            
+
             result = {}
             for row in rows:
                 asset_type = row[0] or "UNKNOWN"
@@ -765,6 +773,192 @@ async def get_asset_type_counts(market_scope: Optional[str] = Query(None)):
                     "avgScore": row[2]
                 }
             return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/metrics/counts/v2")
+async def get_counts_v2(
+    market_scope: Optional[str] = Query(None, description="Filter by market scope: US_EU or AFRICA"),
+    asset_type: Optional[str] = Query(None, description="Filter by asset type: EQUITY, ETF, etc."),
+    country: Optional[str] = Query(None, description="Filter by country code (AFRICA only): ZA, NG, KE, etc."),
+    region: Optional[str] = Query(None, description="Filter by region (AFRICA only): SOUTHERN, WEST, EAST, NORTH"),
+    only_scored: Optional[bool] = Query(None, description="Filter by scored status: true/false/null for all"),
+):
+    """
+    Get dynamic asset counts with flexible filtering (PR4).
+
+    Returns counts broken down by:
+    - Total assets matching filters
+    - Scored vs unscored breakdown
+    - By scope (if no scope filter)
+    - By asset type (if no type filter)
+
+    This endpoint is designed to replace hardcoded counts in the frontend.
+    """
+    try:
+        with db._get_connection() as conn:
+            # Build base conditions
+            conditions = ["u.active = 1"]
+            params = []
+
+            if market_scope:
+                conditions.append("u.market_scope = ?")
+                params.append(market_scope)
+
+            if asset_type:
+                conditions.append("u.asset_type = ?")
+                params.append(asset_type)
+
+            # Country filter (AFRICA only - uses exchange prefix)
+            if country and ASSET_QUERY_AVAILABLE:
+                from asset_query import AFRICA_COUNTRY_EXCHANGES
+                exchanges = AFRICA_COUNTRY_EXCHANGES.get(country, [])
+                if exchanges:
+                    exchange_conditions = []
+                    for exch in exchanges:
+                        exchange_conditions.append("u.asset_id LIKE ?")
+                        params.append(f"{exch}:%")
+                    if exchange_conditions:
+                        conditions.append(f"({' OR '.join(exchange_conditions)})")
+
+            # Region filter (AFRICA only - expand to countries)
+            if region and not country and ASSET_QUERY_AVAILABLE:
+                region_countries = AFRICA_REGIONS.get(region, [])
+                if region_countries:
+                    from asset_query import AFRICA_COUNTRY_EXCHANGES
+                    exchange_conditions = []
+                    for country_code in region_countries:
+                        exchanges = AFRICA_COUNTRY_EXCHANGES.get(country_code, [])
+                        for exch in exchanges:
+                            exchange_conditions.append("u.asset_id LIKE ?")
+                            params.append(f"{exch}:%")
+                    if exchange_conditions:
+                        conditions.append(f"({' OR '.join(exchange_conditions)})")
+
+            where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+            # Query 1: Total counts and scored breakdown
+            count_query = f"""
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN sl.score_total IS NOT NULL THEN 1 ELSE 0 END) as scored,
+                    SUM(CASE WHEN sl.score_total IS NULL THEN 1 ELSE 0 END) as unscored
+                FROM universe u
+                LEFT JOIN scores_latest sl ON u.asset_id = sl.asset_id
+                {where_clause}
+            """
+            row = conn.execute(count_query, params).fetchone()
+            total = row[0] or 0
+            scored = row[1] or 0
+            unscored = row[2] or 0
+
+            # Apply only_scored filter for the main count
+            if only_scored is True:
+                main_count = scored
+            elif only_scored is False:
+                main_count = unscored
+            else:
+                main_count = total
+
+            result = {
+                "total": main_count,
+                "breakdown": {
+                    "scored": scored,
+                    "unscored": unscored,
+                },
+                "filters": {
+                    "market_scope": market_scope,
+                    "asset_type": asset_type,
+                    "country": country,
+                    "region": region,
+                    "only_scored": only_scored,
+                },
+            }
+
+            # Query 2: Breakdown by scope (if no scope filter)
+            if not market_scope:
+                scope_query = f"""
+                    SELECT
+                        u.market_scope,
+                        COUNT(*) as total,
+                        SUM(CASE WHEN sl.score_total IS NOT NULL THEN 1 ELSE 0 END) as scored
+                    FROM universe u
+                    LEFT JOIN scores_latest sl ON u.asset_id = sl.asset_id
+                    {where_clause}
+                    GROUP BY u.market_scope
+                """
+                scope_rows = conn.execute(scope_query, params).fetchall()
+                result["by_scope"] = {}
+                for srow in scope_rows:
+                    scope_name = srow[0] or "UNKNOWN"
+                    result["by_scope"][scope_name] = {
+                        "total": srow[1],
+                        "scored": srow[2],
+                    }
+
+            # Query 3: Breakdown by asset type (if no type filter)
+            if not asset_type:
+                type_query = f"""
+                    SELECT
+                        u.asset_type,
+                        COUNT(*) as total,
+                        SUM(CASE WHEN sl.score_total IS NOT NULL THEN 1 ELSE 0 END) as scored,
+                        ROUND(AVG(sl.score_total), 1) as avg_score
+                    FROM universe u
+                    LEFT JOIN scores_latest sl ON u.asset_id = sl.asset_id
+                    {where_clause}
+                    GROUP BY u.asset_type
+                    ORDER BY total DESC
+                """
+                type_rows = conn.execute(type_query, params).fetchall()
+                result["by_asset_type"] = {}
+                for trow in type_rows:
+                    type_name = trow[0] or "UNKNOWN"
+                    result["by_asset_type"][type_name] = {
+                        "total": trow[1],
+                        "scored": trow[2],
+                        "avgScore": trow[3],
+                    }
+
+            # Query 4: Breakdown by region (if AFRICA scope and no region filter)
+            if market_scope == "AFRICA" and not region and ASSET_QUERY_AVAILABLE:
+                result["by_region"] = {}
+                for region_name, region_countries in AFRICA_REGIONS.items():
+                    from asset_query import AFRICA_COUNTRY_EXCHANGES
+                    # Build exchange patterns for this region
+                    exchange_patterns = []
+                    region_params = list(params)  # Copy base params
+                    for country_code in region_countries:
+                        exchanges = AFRICA_COUNTRY_EXCHANGES.get(country_code, [])
+                        for exch in exchanges:
+                            exchange_patterns.append("u.asset_id LIKE ?")
+                            region_params.append(f"{exch}:%")
+
+                    if exchange_patterns:
+                        region_where = where_clause
+                        if region_where:
+                            region_where += f" AND ({' OR '.join(exchange_patterns)})"
+                        else:
+                            region_where = f"WHERE ({' OR '.join(exchange_patterns)})"
+
+                        region_query = f"""
+                            SELECT
+                                COUNT(*) as total,
+                                SUM(CASE WHEN sl.score_total IS NOT NULL THEN 1 ELSE 0 END) as scored
+                            FROM universe u
+                            LEFT JOIN scores_latest sl ON u.asset_id = sl.asset_id
+                            {region_where}
+                        """
+                        rrow = conn.execute(region_query, region_params).fetchone()
+                        if rrow and rrow[0] > 0:
+                            result["by_region"][region_name] = {
+                                "total": rrow[0],
+                                "scored": rrow[1] or 0,
+                            }
+
+            return result
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1053,5 +1247,159 @@ async def get_universe_metrics():
             "by_type": by_type,
             "scoring_coverage": round(scored / total * 100, 1) if total > 0 else 0,
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Geographic Validation Endpoints (PR6)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/validation/geo/run")
+async def run_geo_validation(
+    limit: Optional[int] = Query(None, description="Limit number of assets to validate (for testing)"),
+    quarantine: bool = Query(True, description="Add invalid assets to quarantine table"),
+):
+    """
+    Run geographic validation pipeline on all assets.
+
+    Validates:
+    - scope → region → country → exchange hierarchy
+    - No cross-scope leaks
+    - No cross-region leaks
+
+    Returns validation report with summary and list of invalid assets.
+    """
+    try:
+        from geo_validation import run_validation_pipeline
+        report = run_validation_pipeline(db, quarantine=quarantine)
+
+        # Add limit to report if used
+        if limit:
+            report["note"] = f"Validation limited to {limit} assets"
+
+        return report
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="geo_validation module not available"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/validation/geo/asset/{asset_id}")
+async def validate_single_asset(asset_id: str):
+    """
+    Validate a single asset's geographic data.
+
+    Returns validation result with any errors or warnings.
+    """
+    try:
+        from geo_validation import GeoValidator
+
+        # Get asset from database
+        with db._get_connection() as conn:
+            row = conn.execute("""
+                SELECT asset_id, symbol, name, market_scope, market_code,
+                       exchange_code, country
+                FROM universe
+                WHERE asset_id = ?
+            """, (asset_id,)).fetchone()
+
+            if not row:
+                raise HTTPException(status_code=404, detail=f"Asset {asset_id} not found")
+
+            asset = {
+                "asset_id": row[0],
+                "symbol": row[1],
+                "name": row[2],
+                "market_scope": row[3],
+                "market_code": row[4],
+                "exchange": row[5],
+                "country": row[6],
+            }
+
+        validator = GeoValidator()
+        result = validator.validate_asset(asset)
+
+        return {
+            "asset": asset,
+            "validation": result.to_dict(),
+        }
+    except HTTPException:
+        raise
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="geo_validation module not available"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/validation/quarantine")
+async def get_quarantine_list(
+    status: Optional[str] = Query(None, description="Filter by status: pending, fixed, ignored"),
+    limit: int = Query(100, description="Maximum number of assets to return"),
+):
+    """
+    Get list of quarantined assets with geographic validation errors.
+
+    Returns summary counts and detailed list of quarantined assets.
+    """
+    try:
+        from geo_validation import get_quarantine_report, ensure_quarantine_table
+
+        # Ensure table exists
+        ensure_quarantine_table(db)
+
+        report = get_quarantine_report(db, status=status, limit=limit)
+        return report
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="geo_validation module not available"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/validation/quarantine/{asset_id}/status")
+async def update_asset_quarantine_status(
+    asset_id: str,
+    status: str = Query(..., description="New status: pending, fixed, or ignored"),
+    notes: Optional[str] = Query(None, description="Review notes"),
+):
+    """
+    Update the quarantine status for an asset.
+
+    Status options:
+    - pending: Awaiting review
+    - fixed: Issue has been fixed
+    - ignored: Issue acknowledged but ignored
+    """
+    try:
+        from geo_validation import update_quarantine_status
+
+        if status not in ("pending", "fixed", "ignored"):
+            raise HTTPException(
+                status_code=400,
+                detail="Status must be: pending, fixed, or ignored"
+            )
+
+        success = update_quarantine_status(db, asset_id, status, notes)
+
+        if success:
+            return {"status": "updated", "asset_id": asset_id, "new_status": status}
+        else:
+            raise HTTPException(status_code=400, detail="Failed to update status")
+    except HTTPException:
+        raise
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="geo_validation module not available"
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

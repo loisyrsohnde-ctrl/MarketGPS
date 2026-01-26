@@ -2,6 +2,16 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Standard fallback text for unavailable values (PR5) */
+export const SCORE_FALLBACK_TEXT = '—' as const;
+
+/** Standard label for unscored assets (PR5) */
+export const UNSCORED_LABEL = 'Non scoré' as const;
+
+// ═══════════════════════════════════════════════════════════════════════════
 // UTILITY FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -29,9 +39,42 @@ export function formatNumber(value: number, locale = 'fr-FR'): string {
  * Format number with consistent separator (space) to avoid hydration issues
  */
 export function formatNumberSafe(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '—';
+  if (value === null || value === undefined) return SCORE_FALLBACK_TEXT;
   // Always use space as separator for consistency
   return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+
+/**
+ * Format score value for display (PR5)
+ * @param score - Score value (0-100 or null)
+ * @param options - Formatting options
+ * @returns Formatted score string
+ */
+export function formatScore(
+  score: number | null | undefined,
+  options: {
+    decimals?: number;
+    showUnit?: boolean;
+    fallback?: string;
+  } = {}
+): string {
+  const { decimals = 0, showUnit = false, fallback = SCORE_FALLBACK_TEXT } = options;
+
+  if (score === null || score === undefined) {
+    return fallback;
+  }
+
+  const formatted = decimals > 0 ? score.toFixed(decimals) : Math.round(score).toString();
+  return showUnit ? `${formatted}/100` : formatted;
+}
+
+/**
+ * Check if an asset has been scored (PR5)
+ * @param asset - Asset object with score_total
+ * @returns true if the asset has a valid score
+ */
+export function isAssetScored(asset: { score_total?: number | null } | null | undefined): boolean {
+  return asset?.score_total !== null && asset?.score_total !== undefined;
 }
 
 /**

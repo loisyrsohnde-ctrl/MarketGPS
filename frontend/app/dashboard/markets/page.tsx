@@ -72,12 +72,20 @@ const ASSET_TYPES: { type: AssetType | null; label: string; icon: React.ReactNod
 export default function MarketsPage() {
   const [selectedMarket, setSelectedMarket] = useState<MarketScope>('US_EU');
 
-  // Fetch scope counts
-  const { data: scopeCounts, isLoading: isLoadingCounts } = useQuery({
-    queryKey: ['scopeCounts'],
-    queryFn: api.getScopeCounts,
+  // Fetch scope counts (v2 with scored/unscored breakdown)
+  const { data: countsV2, isLoading: isLoadingCounts } = useQuery({
+    queryKey: ['countsV2'],
+    queryFn: () => api.getCountsV2({}),
     staleTime: 300000, // 5 minutes
   });
+
+  // Legacy scopeCounts format for backward compatibility
+  const scopeCounts = countsV2?.by_scope
+    ? {
+        US_EU: countsV2.by_scope.US_EU?.total || 0,
+        AFRICA: countsV2.by_scope.AFRICA?.total || 0,
+      }
+    : undefined;
 
   // Fetch top assets for selected market
   const {
@@ -162,6 +170,16 @@ export default function MarketsPage() {
                   )}
                 </span>
               </div>
+              {/* Scored/Unscored breakdown */}
+              {countsV2?.by_scope?.[market.scope] && (
+                <div className="flex items-center justify-between mt-2 text-xs">
+                  <span className="text-text-muted">
+                    <span className="text-score-green">{formatNumberSafe(countsV2.by_scope[market.scope]?.scored)}</span> scorés
+                    {' · '}
+                    <span className="text-text-muted">{formatNumberSafe((countsV2.by_scope[market.scope]?.total || 0) - (countsV2.by_scope[market.scope]?.scored || 0))}</span> en attente
+                  </span>
+                </div>
+              )}
             </div>
           </motion.button>
         ))}

@@ -32,6 +32,17 @@ from pydantic import BaseModel
 # Local imports
 from storage.sqlite_store import SQLiteStore
 
+# Email service (optional - graceful degradation if not available)
+try:
+    from email_service import (
+        send_subscription_confirmed_email,
+        send_subscription_canceled_email,
+        send_payment_failed_email,
+    )
+    EMAIL_SERVICE_AVAILABLE = True
+except ImportError:
+    EMAIL_SERVICE_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -642,29 +653,65 @@ async def handle_checkout_completed(data: dict, db: SQLiteStore):
     customer_id = data.get("customer")
     subscription_id = data.get("subscription")
     plan = data.get("metadata", {}).get("plan", "monthly")
-    
+
     if not user_id:
         logger.error(f"Checkout completed but no user_id found: {data}")
         return
-    
+
     upsert_subscription(user_id, {
         "stripe_customer_id": customer_id,
         "stripe_subscription_id": subscription_id,
         "plan": plan,
         "status": "active",
     }, db)
-    
-    # Queue Systeme.io sync
+
+    # Get user email for notifications
+    user_email = None
     try:
         from supabase_admin import SupabaseAdmin
         admin = SupabaseAdmin()
         user_data = admin.get_user_profile(user_id)
-        if user_data and user_data.get("email"):
-            queue_systemeio_sync(user_id, user_data["email"], "tag_add", f"subscriber_{plan}", db)
-            queue_systemeio_sync(user_id, user_data["email"], "tag_add", "active_subscriber", db)
+        if user_data:
+            user_email = user_data.get("email")
     except Exception as e:
-        logger.warning(f"Failed to queue Systeme.io sync: {e}")
-    
+        logger.warning(f"Failed to get user profile: {e}")
+
+    # Queue Systeme.io sync
+    if user_email:
+        try:
+            queue_systemeio_sync(user_id, user_email, "tag_add", f"subscriber_{plan}", db)
+            queue_systemeio_sync(user_id, user_email, "tag_add", "active_subscriber", db)
+        except Exception as e:
+            logger.warning(f"Failed to queue Systeme.io sync: {e}")
+
+    # Send welcome email
+    if EMAIL_SERVICE_AVAILABLE and user_email:
+        try:
+            # Get amount from session
+            amount_total = data.get("amount_total", 0)  # in cents
+            currency = data.get("currency", "eur")
+
+            # Try to get subscription period end if available
+            period_end = None
+            if subscription_id:
+                try:
+                    stripe = get_stripe()
+                    sub = stripe.Subscription.retrieve(subscription_id)
+                    period_end = sub.current_period_end
+                except Exception:
+                    pass
+
+            send_subscription_confirmed_email(
+                user_email=user_email,
+                plan=plan,
+                amount_cents=amount_total,
+                currency=currency,
+                period_end_timestamp=period_end,
+            )
+            logger.info(f"Sent subscription confirmed email to {user_email}")
+        except Exception as e:
+            logger.warning(f"Failed to send subscription email: {e}")
+
     logger.info(f"Checkout completed: user={user_id}, plan={plan}")
 
 
@@ -708,30 +755,53 @@ async def handle_invoice_paid(data: dict, db: SQLiteStore):
 async def handle_invoice_payment_failed(data: dict, db: SQLiteStore):
     """Handle failed payment - set past_due with grace period."""
     customer_id = data.get("customer")
-    
+
     user_id = _find_user_by_customer(customer_id, db)
     if not user_id:
         logger.warning(f"invoice.payment_failed: no user found for customer {customer_id}")
         return
-    
+
     # Set grace period
     grace_end = (datetime.utcnow() + timedelta(hours=GRACE_PERIOD_HOURS)).isoformat()
-    
+
     upsert_subscription(user_id, {
         "status": "past_due",
         "grace_period_end": grace_end,
     }, db)
-    
-    # Queue Systeme.io sync (payment_failed tag)
+
+    # Get user email for notifications
+    user_email = None
     try:
         from supabase_admin import SupabaseAdmin
         admin = SupabaseAdmin()
         user_data = admin.get_user_profile(user_id)
-        if user_data and user_data.get("email"):
-            queue_systemeio_sync(user_id, user_data["email"], "tag_add", "payment_failed", db)
+        if user_data:
+            user_email = user_data.get("email")
     except Exception as e:
-        logger.warning(f"Failed to queue Systeme.io sync: {e}")
-    
+        logger.warning(f"Failed to get user profile: {e}")
+
+    # Queue Systeme.io sync (payment_failed tag)
+    if user_email:
+        try:
+            queue_systemeio_sync(user_id, user_email, "tag_add", "payment_failed", db)
+        except Exception as e:
+            logger.warning(f"Failed to queue Systeme.io sync: {e}")
+
+    # Send payment failed email
+    if EMAIL_SERVICE_AVAILABLE and user_email:
+        try:
+            amount_due = data.get("amount_due", 0)  # in cents
+            currency = data.get("currency", "eur")
+
+            send_payment_failed_email(
+                user_email=user_email,
+                amount_cents=amount_due,
+                currency=currency,
+            )
+            logger.info(f"Sent payment failed email to {user_email}")
+        except Exception as e:
+            logger.warning(f"Failed to send payment failed email: {e}")
+
     logger.info(f"Payment failed: user={user_id}, grace_period_end={grace_end}")
 
 
@@ -782,30 +852,60 @@ async def handle_subscription_updated(data: dict, db: SQLiteStore):
 async def handle_subscription_deleted(data: dict, db: SQLiteStore):
     """Handle subscription cancellation."""
     customer_id = data.get("customer")
-    
+
     user_id = _find_user_by_customer(customer_id, db)
     if not user_id:
         logger.warning(f"subscription.deleted: no user found for customer {customer_id}")
         return
-    
+
+    # Get current period end before updating (for "access until" info)
+    current_subscription = get_subscription(user_id, db)
+    period_end_timestamp = None
+    if current_subscription and current_subscription.get("current_period_end"):
+        try:
+            period_end_str = current_subscription["current_period_end"]
+            period_end_dt = datetime.fromisoformat(period_end_str.replace("Z", "+00:00"))
+            period_end_timestamp = int(period_end_dt.timestamp())
+        except Exception:
+            pass
+
     upsert_subscription(user_id, {
         "status": "canceled",
         "plan": "free",
         "stripe_subscription_id": None,
         "canceled_at": datetime.utcnow().isoformat(),
     }, db)
-    
-    # Queue Systeme.io sync
+
+    # Get user email for notifications
+    user_email = None
     try:
         from supabase_admin import SupabaseAdmin
         admin = SupabaseAdmin()
         user_data = admin.get_user_profile(user_id)
-        if user_data and user_data.get("email"):
-            queue_systemeio_sync(user_id, user_data["email"], "tag_remove", "active_subscriber", db)
-            queue_systemeio_sync(user_id, user_data["email"], "tag_add", "churned", db)
+        if user_data:
+            user_email = user_data.get("email")
     except Exception as e:
-        logger.warning(f"Failed to queue Systeme.io sync: {e}")
-    
+        logger.warning(f"Failed to get user profile: {e}")
+
+    # Queue Systeme.io sync
+    if user_email:
+        try:
+            queue_systemeio_sync(user_id, user_email, "tag_remove", "active_subscriber", db)
+            queue_systemeio_sync(user_id, user_email, "tag_add", "churned", db)
+        except Exception as e:
+            logger.warning(f"Failed to queue Systeme.io sync: {e}")
+
+    # Send cancellation email
+    if EMAIL_SERVICE_AVAILABLE and user_email:
+        try:
+            send_subscription_canceled_email(
+                user_email=user_email,
+                access_until_timestamp=period_end_timestamp,
+            )
+            logger.info(f"Sent subscription canceled email to {user_email}")
+        except Exception as e:
+            logger.warning(f"Failed to send cancellation email: {e}")
+
     logger.info(f"Subscription deleted: user={user_id}")
 
 

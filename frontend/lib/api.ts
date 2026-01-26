@@ -273,6 +273,55 @@ export async function getLandingMetrics(): Promise<LandingMetrics> {
   return apiFetch<LandingMetrics>('/api/metrics/landing');
 }
 
+/**
+ * Dynamic counts v2 response (PR4)
+ */
+export interface CountsV2Response {
+  total: number;
+  breakdown: {
+    scored: number;
+    unscored: number;
+  };
+  filters: {
+    market_scope: string | null;
+    asset_type: string | null;
+    country: string | null;
+    region: string | null;
+    only_scored: boolean | null;
+  };
+  by_scope?: Record<string, { total: number; scored: number }>;
+  by_asset_type?: Record<string, { total: number; scored: number; avgScore: number | null }>;
+  by_region?: Record<string, { total: number; scored: number }>;
+}
+
+/**
+ * Parameters for dynamic counts v2
+ */
+export interface CountsV2Params {
+  market_scope?: 'US_EU' | 'AFRICA';
+  asset_type?: string;
+  country?: string;
+  region?: string;
+  only_scored?: boolean;
+}
+
+/**
+ * Get dynamic asset counts with flexible filtering (PR4)
+ * @endpoint GET /api/metrics/counts/v2
+ */
+export async function getCountsV2(params: CountsV2Params = {}): Promise<CountsV2Response> {
+  const searchParams = new URLSearchParams();
+
+  if (params.market_scope) searchParams.append('market_scope', params.market_scope);
+  if (params.asset_type) searchParams.append('asset_type', params.asset_type);
+  if (params.country) searchParams.append('country', params.country);
+  if (params.region) searchParams.append('region', params.region);
+  if (params.only_scored !== undefined) searchParams.append('only_scored', String(params.only_scored));
+
+  const query = searchParams.toString();
+  return apiFetch<CountsV2Response>(`/api/metrics/counts/v2${query ? `?${query}` : ''}`);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Billing API
 // ─────────────────────────────────────────────────────────────────────────────
@@ -358,6 +407,7 @@ export const api = {
   getScopeCounts,
   getAssetTypeCounts,
   getLandingMetrics,
+  getCountsV2,
   // Billing
   createCheckoutSession,
   getSubscription,
