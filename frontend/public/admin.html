@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarketGPS - Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary: #0a0f0d;
+            --bg-secondary: #141a17;
+            --bg-card: #1a1f1d;
+            --accent: #10b981;
+            --accent-light: #34d399;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: rgba(255,255,255,0.1);
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--accent), #059669);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-light);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        /* Login Form */
+        .login-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 69px);
+            padding: 20px;
+        }
+
+        .login-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid var(--border);
+        }
+
+        .login-card h2 {
+            margin-bottom: 8px;
+        }
+
+        .login-card p {
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Dashboard */
+        .dashboard {
+            display: none;
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .dashboard.active {
+            display: block;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .stat-card .label {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-card .value.accent { color: var(--accent); }
+        .stat-card .value.warning { color: var(--warning); }
+        .stat-card .value.success { color: var(--success); }
+
+        .stat-card .change {
+            font-size: 12px;
+            color: var(--success);
+            margin-top: 4px;
+        }
+
+        /* Sections */
+        .section {
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .section-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 20px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: rgba(255,255,255,0.02);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-pro {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent);
+        }
+
+        .badge-free {
+            background: rgba(100, 116, 139, 0.15);
+            color: var(--text-muted);
+        }
+
+        .badge-active {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--success);
+        }
+
+        .badge-new {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+
+        .badge-bug {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--error);
+        }
+
+        .badge-feature {
+            background: rgba(139, 92, 246, 0.15);
+            color: #a78bfa;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 12px;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+            background: var(--bg-card);
+        }
+
+        .tab.active {
+            color: var(--accent);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .dashboard {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">◉</div>
+            <span>MarketGPS Admin</span>
+        </div>
+        <div class="header-actions" id="headerActions">
+            <button class="btn btn-secondary" onclick="refreshData()">↻ Actualiser</button>
+            <button class="btn btn-secondary" onclick="logout()">Déconnexion</button>
+        </div>
+    </header>
+
+    <!-- Login -->
+    <div class="login-container" id="loginContainer">
+        <div class="login-card">
+            <h2>Connexion Admin</h2>
+            <p>Entrez la clé d'administration pour accéder au dashboard.</p>
+
+            <div class="form-group">
+                <label>Clé Admin</label>
+                <input type="password" id="adminKey" placeholder="Entrez la clé admin" onkeypress="if(event.key==='Enter') login()">
+            </div>
+
+            <button class="btn btn-primary" style="width: 100%; padding: 12px;" onclick="login()">
+                Accéder au Dashboard
+            </button>
+
+            <p id="loginError" style="color: var(--error); margin-top: 16px; display: none;"></p>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="dashboard" id="dashboard">
+        <!-- Stats -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="label">Total Utilisateurs</div>
+                <div class="value" id="statTotalUsers">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Utilisateurs Pro</div>
+                <div class="value accent" id="statProUsers">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Utilisateurs Free</div>
+                <div class="value" id="statFreeUsers">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Nouveaux (7j)</div>
+                <div class="value success" id="statNewWeek">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Abonnements Actifs</div>
+                <div class="value accent" id="statActiveSubscriptions">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Feedbacks Reçus</div>
+                <div class="value warning" id="statFeedbacks">-</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('users')">Utilisateurs</button>
+            <button class="tab" onclick="showTab('subscriptions')">Abonnements</button>
+            <button class="tab" onclick="showTab('feedbacks')">Feedbacks</button>
+        </div>
+
+        <!-- Users Section -->
+        <div class="section" id="usersSection">
+            <div class="section-header">
+                <h3>Utilisateurs Récents</h3>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>Statut</th>
+                            <th>Plan</th>
+                            <th>Inscription</th>
+                            <th>Dernière connexion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTable">
+                        <tr><td colspan="5" class="loading"><div class="spinner"></div>Chargement...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Subscriptions Section -->
+        <div class="section" id="subscriptionsSection" style="display: none;">
+            <div class="section-header">
+                <h3>Abonnements</h3>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>User ID</th>
+                            <th>Plan</th>
+                            <th>Statut</th>
+                            <th>Créé le</th>
+                            <th>Fin période</th>
+                        </tr>
+                    </thead>
+                    <tbody id="subscriptionsTable">
+                        <tr><td colspan="5" class="loading"><div class="spinner"></div>Chargement...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Feedbacks Section -->
+        <div class="section" id="feedbacksSection" style="display: none;">
+            <div class="section-header">
+                <h3>Feedbacks Récents</h3>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Message</th>
+                            <th>Email</th>
+                            <th>Note</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="feedbacksTable">
+                        <tr><td colspan="5" class="loading"><div class="spinner"></div>Chargement...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://api.marketgps.online';
+        let adminKey = localStorage.getItem('adminKey') || '';
+
+        // Check if already logged in
+        if (adminKey) {
+            checkAuth();
+        }
+
+        async function checkAuth() {
+            try {
+                const response = await fetch(`${API_URL}/admin/stats`, {
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+                if (response.ok) {
+                    showDashboard();
+                    loadAllData();
+                } else {
+                    logout();
+                }
+            } catch (e) {
+                console.error('Auth check failed:', e);
+            }
+        }
+
+        async function login() {
+            const key = document.getElementById('adminKey').value;
+            const errorEl = document.getElementById('loginError');
+
+            if (!key) {
+                errorEl.textContent = 'Veuillez entrer une clé admin';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/admin/stats`, {
+                    headers: { 'X-Admin-Key': key }
+                });
+
+                if (response.ok) {
+                    adminKey = key;
+                    localStorage.setItem('adminKey', key);
+                    showDashboard();
+                    loadAllData();
+                } else {
+                    errorEl.textContent = 'Clé admin invalide';
+                    errorEl.style.display = 'block';
+                }
+            } catch (e) {
+                errorEl.textContent = 'Erreur de connexion au serveur';
+                errorEl.style.display = 'block';
+            }
+        }
+
+        function logout() {
+            adminKey = '';
+            localStorage.removeItem('adminKey');
+            document.getElementById('loginContainer').style.display = 'flex';
+            document.getElementById('dashboard').classList.remove('active');
+            document.getElementById('headerActions').style.display = 'none';
+        }
+
+        function showDashboard() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('dashboard').classList.add('active');
+            document.getElementById('headerActions').style.display = 'flex';
+        }
+
+        async function loadAllData() {
+            await Promise.all([
+                loadStats(),
+                loadUsers(),
+                loadSubscriptions(),
+                loadFeedbacks()
+            ]);
+        }
+
+        async function refreshData() {
+            await loadAllData();
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_URL}/admin/stats`, {
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+                const data = await response.json();
+
+                document.getElementById('statTotalUsers').textContent = data.total_users || 0;
+                document.getElementById('statProUsers').textContent = data.pro_users || 0;
+                document.getElementById('statFreeUsers').textContent = data.free_users || 0;
+                document.getElementById('statNewWeek').textContent = `+${data.new_users_week || 0}`;
+                document.getElementById('statActiveSubscriptions').textContent = data.active_subscriptions || 0;
+                document.getElementById('statFeedbacks').textContent = data.total_feedbacks || 0;
+            } catch (e) {
+                console.error('Error loading stats:', e);
+            }
+        }
+
+        async function loadUsers() {
+            const tbody = document.getElementById('usersTable');
+            try {
+                const response = await fetch(`${API_URL}/admin/users?limit=50`, {
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+                const users = await response.json();
+
+                if (users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Aucun utilisateur trouvé</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = users.map(user => `
+                    <tr>
+                        <td>${user.email || '-'}</td>
+                        <td><span class="badge ${user.is_pro ? 'badge-pro' : 'badge-free'}">${user.is_pro ? 'PRO' : 'FREE'}</span></td>
+                        <td>${user.plan || 'FREE'}</td>
+                        <td>${formatDate(user.created_at)}</td>
+                        <td>${formatDate(user.last_sign_in)}</td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Erreur lors du chargement</td></tr>';
+            }
+        }
+
+        async function loadSubscriptions() {
+            const tbody = document.getElementById('subscriptionsTable');
+            try {
+                const response = await fetch(`${API_URL}/admin/subscriptions?limit=50`, {
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+                const subs = await response.json();
+
+                if (subs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Aucun abonnement trouvé</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = subs.map(sub => `
+                    <tr>
+                        <td style="font-family: monospace; font-size: 12px;">${sub.user_id?.substring(0, 16)}...</td>
+                        <td><span class="badge badge-pro">${sub.plan}</span></td>
+                        <td><span class="badge badge-active">${sub.status}</span></td>
+                        <td>${formatDate(sub.created_at)}</td>
+                        <td>${formatDate(sub.current_period_end)}</td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Erreur lors du chargement</td></tr>';
+            }
+        }
+
+        async function loadFeedbacks() {
+            const tbody = document.getElementById('feedbacksTable');
+            try {
+                const response = await fetch(`${API_URL}/admin/feedbacks?limit=50`, {
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+                const feedbacks = await response.json();
+
+                if (feedbacks.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Aucun feedback reçu</td></tr>';
+                    return;
+                }
+
+                const typeBadges = {
+                    'bug': 'badge-bug',
+                    'feature': 'badge-feature',
+                    'general': 'badge-new',
+                    'question': 'badge-new',
+                    'praise': 'badge-pro'
+                };
+
+                tbody.innerHTML = feedbacks.map(fb => `
+                    <tr>
+                        <td><span class="badge ${typeBadges[fb.type] || 'badge-new'}">${fb.type}</span></td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fb.message}</td>
+                        <td>${fb.user_email || '-'}</td>
+                        <td>${fb.rating ? '★'.repeat(fb.rating) + '☆'.repeat(5-fb.rating) : '-'}</td>
+                        <td>${formatDate(fb.created_at)}</td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Erreur lors du chargement</td></tr>';
+            }
+        }
+
+        function showTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Show/hide sections
+            document.getElementById('usersSection').style.display = tabName === 'users' ? 'block' : 'none';
+            document.getElementById('subscriptionsSection').style.display = tabName === 'subscriptions' ? 'block' : 'none';
+            document.getElementById('feedbacksSection').style.display = tabName === 'feedbacks' ? 'block' : 'none';
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('fr-FR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch {
+                return dateStr;
+            }
+        }
+    </script>
+</body>
+</html>
