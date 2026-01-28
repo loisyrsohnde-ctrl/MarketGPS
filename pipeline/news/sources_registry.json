@@ -343,6 +343,78 @@
       "enabled": true
     },
     {
+      "name": "Abidjan.net Économie",
+      "url": "https://news.abidjan.net/economie/",
+      "rss_url": "https://news.abidjan.net/rss/economie.xml",
+      "type": "rss",
+      "country": "CI",
+      "region": "WEST",
+      "language": "fr",
+      "tags": ["business", "economy", "fintech"],
+      "trust_score": 0.8,
+      "enabled": true
+    },
+    {
+      "name": "Fraternité Matin Économie",
+      "url": "https://www.fratmat.info",
+      "rss_url": "https://www.fratmat.info/feed/",
+      "type": "rss",
+      "country": "CI",
+      "region": "WEST",
+      "language": "fr",
+      "tags": ["business", "economy", "politics"],
+      "trust_score": 0.8,
+      "enabled": true
+    },
+    {
+      "name": "CIO Mag Afrique",
+      "url": "https://cio-mag.com",
+      "rss_url": "https://cio-mag.com/feed/",
+      "type": "rss",
+      "country": null,
+      "region": "PAN",
+      "language": "fr",
+      "tags": ["tech", "digital", "fintech"],
+      "trust_score": 0.8,
+      "enabled": true
+    },
+    {
+      "name": "Le Matinal Bénin",
+      "url": "https://lematinal.media",
+      "rss_url": "https://lematinal.media/feed/",
+      "type": "rss",
+      "country": "BJ",
+      "region": "WEST",
+      "language": "fr",
+      "tags": ["business", "economy"],
+      "trust_score": 0.75,
+      "enabled": true
+    },
+    {
+      "name": "La Nation Bénin",
+      "url": "https://lanationbenin.info",
+      "rss_url": "https://lanationbenin.info/feed/",
+      "type": "rss",
+      "country": "BJ",
+      "region": "WEST",
+      "language": "fr",
+      "tags": ["business", "economy", "politics"],
+      "trust_score": 0.8,
+      "enabled": true
+    },
+    {
+      "name": "Dakar Actu Économie",
+      "url": "https://www.dakaractu.com/economie/",
+      "rss_url": "https://www.dakaractu.com/xml/syndication.rss",
+      "type": "rss",
+      "country": "SN",
+      "region": "WEST",
+      "language": "fr",
+      "tags": ["business", "economy", "fintech"],
+      "trust_score": 0.8,
+      "enabled": true
+    },
+    {
       "name": "EcoMatin Cameroun",
       "url": "https://ecomatin.net",
       "rss_url": "https://ecomatin.net/feed/",

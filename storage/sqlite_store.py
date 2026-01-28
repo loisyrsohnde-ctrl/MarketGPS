@@ -150,6 +150,33 @@ class SQLiteStore:
                     
                     -- Insert default user settings
                     INSERT OR IGNORE INTO user_settings (user_id) VALUES ('default');
+                    
+                    -- User entitlements (for billing/subscription)
+                    CREATE TABLE IF NOT EXISTS user_entitlements (
+                        user_id TEXT PRIMARY KEY,
+                        plan TEXT DEFAULT 'FREE',
+                        status TEXT DEFAULT 'active',
+                        stripe_customer_id TEXT,
+                        stripe_subscription_id TEXT,
+                        daily_requests_limit INTEGER DEFAULT 10,
+                        daily_requests_used INTEGER DEFAULT 0,
+                        current_period_end TEXT,
+                        created_at TEXT DEFAULT (datetime('now')),
+                        updated_at TEXT DEFAULT (datetime('now'))
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_user_entitlements_plan ON user_entitlements(plan);
+                    CREATE INDEX IF NOT EXISTS idx_user_entitlements_status ON user_entitlements(status);
+                    
+                    -- User preferences (for notifications)
+                    CREATE TABLE IF NOT EXISTS user_preferences (
+                        user_id TEXT PRIMARY KEY,
+                        email_notifications INTEGER DEFAULT 1,
+                        market_alerts INTEGER DEFAULT 1,
+                        price_alerts INTEGER DEFAULT 1,
+                        portfolio_updates INTEGER DEFAULT 1,
+                        created_at TEXT DEFAULT (datetime('now')),
+                        updated_at TEXT DEFAULT (datetime('now'))
+                    );
                 """)
                 logger.info("Authentication tables created successfully")
             else:
@@ -175,6 +202,34 @@ class SQLiteStore:
                         expires_at TEXT
                     );
                     CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
+                    
+                    -- User entitlements (for billing/subscription)
+                    CREATE TABLE IF NOT EXISTS user_entitlements (
+                        user_id TEXT PRIMARY KEY,
+                        plan TEXT DEFAULT 'FREE',
+                        status TEXT DEFAULT 'active',
+                        stripe_customer_id TEXT,
+                        stripe_subscription_id TEXT,
+                        daily_requests_limit INTEGER DEFAULT 10,
+                        daily_requests_used INTEGER DEFAULT 0,
+                        current_period_end TEXT,
+                        created_at TEXT DEFAULT (datetime('now')),
+                        updated_at TEXT DEFAULT (datetime('now'))
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_user_entitlements_plan ON user_entitlements(plan);
+                    CREATE INDEX IF NOT EXISTS idx_user_entitlements_status ON user_entitlements(status);
+                    
+                    -- User preferences (for notifications)
+                    CREATE TABLE IF NOT EXISTS user_preferences (
+                        user_id TEXT PRIMARY KEY,
+                        email_notifications INTEGER DEFAULT 1,
+                        market_alerts INTEGER DEFAULT 1,
+                        price_alerts INTEGER DEFAULT 1,
+                        portfolio_updates INTEGER DEFAULT 1,
+                        created_at TEXT DEFAULT (datetime('now')),
+                        updated_at TEXT DEFAULT (datetime('now'))
+                    );
+                    
                     INSERT OR IGNORE INTO user_settings (user_id) VALUES ('default');
                 """)
 
@@ -2310,6 +2365,11 @@ class SQLiteStore:
     # NEWS MODULE - CRUD Operations
     # ═══════════════════════════════════════════════════════════════════════════
 
+    # Pays francophones prioritaires (Afrique de l'Ouest et Centrale)
+    FRANCOPHONE_PRIORITY_COUNTRIES = [
+        'CM', 'CI', 'SN', 'BJ', 'TG', 'GA', 'CG', 'ML', 'BF', 'NE', 'TD', 'GN', 'RW', 'CD'
+    ]
+    
     def get_news_articles(
         self,
         page: int = 1,
@@ -2317,10 +2377,14 @@ class SQLiteStore:
         query: Optional[str] = None,
         country: Optional[str] = None,
         tag: Optional[str] = None,
-        status: str = "published"
+        status: str = "published",
+        prioritize_francophone: bool = True
     ) -> Dict:
         """
         Get paginated news articles with filtering.
+        
+        Args:
+            prioritize_francophone: If True (default), francophone countries appear first
         
         Returns:
             Dict with {data, total, page, page_size, total_pages}
@@ -2353,6 +2417,19 @@ class SQLiteStore:
         # Count total
         count_sql = f"SELECT COUNT(*) FROM news_articles WHERE {where_clause}"
         
+        # Build ORDER BY clause - prioritize francophone countries if no specific country filter
+        if prioritize_francophone and not country:
+            # Create CASE statement for priority sorting
+            # Francophone countries get priority 0, others get priority 1
+            franco_countries = ','.join([f"'{c}'" for c in self.FRANCOPHONE_PRIORITY_COUNTRIES])
+            order_clause = f"""
+                ORDER BY 
+                    CASE WHEN country IN ({franco_countries}) THEN 0 ELSE 1 END,
+                    published_at DESC
+            """
+        else:
+            order_clause = "ORDER BY published_at DESC"
+        
         # Get paginated data
         offset = (page - 1) * page_size
         data_sql = f"""
@@ -2361,7 +2438,7 @@ class SQLiteStore:
                    category, sentiment
             FROM news_articles
             WHERE {where_clause}
-            ORDER BY published_at DESC
+            {order_clause}
             LIMIT ? OFFSET ?
         """
         

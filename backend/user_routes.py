@@ -743,11 +743,39 @@ async def get_entitlements(
     """
     Get user plan and entitlements.
     Returns subscription plan, status, and daily request limit.
+
+    Priority order (to ensure Stripe-paying users are always recognized):
+    1. Check 'subscriptions' table (Stripe-synced, source of truth for paid users)
+    2. Fallback to 'user_entitlements' table (legacy/local)
+    3. Default to FREE plan
     """
     try:
         with db._get_conn() as conn:
+            # FIRST: Check Stripe-synced subscriptions table (source of truth)
             cursor = conn.execute(
-                """SELECT plan, status, daily_requests_limit 
+                """SELECT plan, status, current_period_end
+                   FROM subscriptions WHERE user_id = ?""",
+                (user_id,)
+            )
+            stripe_row = cursor.fetchone()
+
+            if stripe_row and stripe_row[0]:
+                stripe_plan = stripe_row[0].upper()
+                stripe_status = stripe_row[1] or "active"
+
+                # If user has an active Stripe subscription (not FREE)
+                if stripe_plan in ("PRO", "MONTHLY", "ANNUAL", "PREMIUM") and stripe_status in ("active", "trialing"):
+                    # Map plan names to our internal format
+                    plan_display = "PRO_ANNUAL" if stripe_plan == "ANNUAL" else "PRO_MONTHLY" if stripe_plan == "MONTHLY" else "PRO"
+                    return {
+                        "plan": plan_display,
+                        "status": stripe_status,
+                        "dailyRequestsLimit": 1000,  # Pro users get high limit
+                    }
+
+            # SECOND: Fallback to legacy user_entitlements table
+            cursor = conn.execute(
+                """SELECT plan, status, daily_requests_limit
                    FROM user_entitlements WHERE user_id = ?""",
                 (user_id,)
             )
@@ -769,3 +797,204 @@ async def get_entitlements(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/subscription-debug/{email}")
+async def debug_subscription_by_email(email: str):
+    """
+    DEBUG ENDPOINT: Check subscription status by email address.
+    Useful for verifying why a user may not be recognized as Pro.
+
+    Returns data from both tables (subscriptions + user_entitlements)
+    to help diagnose synchronization issues.
+    """
+    try:
+        with db._get_conn() as conn:
+            result = {
+                "email": email,
+                "stripe_subscriptions_table": None,
+                "user_entitlements_table": None,
+                "resolved_status": None,
+            }
+
+            # Check subscriptions table (Stripe-synced)
+            cursor = conn.execute(
+                """SELECT s.user_id, s.plan, s.status, s.stripe_customer_id,
+                          s.stripe_subscription_id, s.current_period_end, s.created_at
+                   FROM subscriptions s
+                   JOIN users u ON s.user_id = u.id
+                   WHERE LOWER(u.email) = LOWER(?)""",
+                (email,)
+            )
+            stripe_row = cursor.fetchone()
+            if stripe_row:
+                result["stripe_subscriptions_table"] = {
+                    "user_id": stripe_row[0],
+                    "plan": stripe_row[1],
+                    "status": stripe_row[2],
+                    "stripe_customer_id": stripe_row[3],
+                    "stripe_subscription_id": stripe_row[4],
+                    "current_period_end": stripe_row[5],
+                    "created_at": stripe_row[6],
+                }
+
+            # Check user_entitlements table (legacy)
+            cursor = conn.execute(
+                """SELECT ue.user_id, ue.plan, ue.status, ue.daily_requests_limit
+                   FROM user_entitlements ue
+                   JOIN users u ON ue.user_id = u.id
+                   WHERE LOWER(u.email) = LOWER(?)""",
+                (email,)
+            )
+            entitlements_row = cursor.fetchone()
+            if entitlements_row:
+                result["user_entitlements_table"] = {
+                    "user_id": entitlements_row[0],
+                    "plan": entitlements_row[1],
+                    "status": entitlements_row[2],
+                    "daily_requests_limit": entitlements_row[3],
+                }
+
+            # Determine resolved status (same logic as get_entitlements)
+            if stripe_row and stripe_row[1]:
+                stripe_plan = stripe_row[1].upper()
+                stripe_status = stripe_row[2] or "active"
+                if stripe_plan in ("PRO", "MONTHLY", "ANNUAL", "PREMIUM") and stripe_status in ("active", "trialing"):
+                    result["resolved_status"] = {
+                        "plan": "PRO",
+                        "status": stripe_status,
+                        "source": "subscriptions (Stripe)",
+                        "is_pro": True,
+                    }
+                else:
+                    result["resolved_status"] = {
+                        "plan": stripe_plan,
+                        "status": stripe_status,
+                        "source": "subscriptions (Stripe) - inactive",
+                        "is_pro": False,
+                    }
+            elif entitlements_row:
+                plan = entitlements_row[1] or "FREE"
+                result["resolved_status"] = {
+                    "plan": plan,
+                    "status": entitlements_row[2] or "active",
+                    "source": "user_entitlements (legacy)",
+                    "is_pro": plan.upper() not in ("FREE", ""),
+                }
+            else:
+                result["resolved_status"] = {
+                    "plan": "FREE",
+                    "status": "active",
+                    "source": "default (no record found)",
+                    "is_pro": False,
+                }
+
+            return result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/grant-pro/{user_id}")
+async def grant_pro_subscription(
+    user_id: str,
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+):
+    """
+    ADMIN ENDPOINT: Manually grant Pro subscription to a user by their Supabase user_id.
+
+    Requires X-Admin-Key header for security.
+    Use this to grant Pro access to users who have paid via external systems.
+
+    Example: POST /users/grant-pro/abc123-uuid-here
+    Header: X-Admin-Key: your-secret-key
+    """
+    import os
+    from datetime import datetime, timedelta
+
+    # Simple admin key protection
+    expected_key = os.environ.get("ADMIN_KEY", "marketgps-admin-2024")
+    if admin_key != expected_key:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    try:
+        with db._get_conn() as conn:
+            now = datetime.utcnow()
+            period_end = now + timedelta(days=365)  # 1 year
+
+            # Ensure subscriptions table exists
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS subscriptions (
+                    user_id TEXT PRIMARY KEY,
+                    stripe_customer_id TEXT,
+                    stripe_subscription_id TEXT,
+                    plan TEXT DEFAULT 'free',
+                    status TEXT DEFAULT 'inactive',
+                    current_period_start TEXT,
+                    current_period_end TEXT,
+                    cancel_at_period_end INTEGER DEFAULT 0,
+                    canceled_at TEXT,
+                    grace_period_end TEXT,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    updated_at TEXT DEFAULT (datetime('now'))
+                )
+            """)
+
+            # Insert/Update subscription
+            conn.execute("""
+                INSERT OR REPLACE INTO subscriptions
+                (user_id, plan, status, current_period_start, current_period_end, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                user_id,
+                "PRO",
+                "active",
+                now.isoformat(),
+                period_end.isoformat(),
+                now.isoformat(),
+                now.isoformat(),
+            ))
+
+            # Also update user_entitlements
+            conn.execute("""
+                INSERT OR REPLACE INTO user_entitlements
+                (user_id, plan, status, daily_requests_limit, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                user_id,
+                "PRO",
+                "active",
+                1000,
+                now.isoformat(),
+                now.isoformat(),
+            ))
+
+            conn.commit()
+
+            return {
+                "success": True,
+                "user_id": user_id,
+                "plan": "PRO",
+                "status": "active",
+                "valid_until": period_end.isoformat(),
+                "message": f"Pro subscription granted to user {user_id} for 1 year",
+            }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/my-id")
+async def get_my_user_id(
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Get the current user's Supabase user_id from their token.
+    Useful for debugging - shows what ID the backend sees for the logged-in user.
+    """
+    user_id = get_user_id_from_request(authorization, fallback_user_id="anonymous")
+
+    return {
+        "user_id": user_id,
+        "is_authenticated": user_id != "anonymous" and user_id != "default_user",
+    }

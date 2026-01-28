@@ -20,6 +20,8 @@ from barbell_routes import router as barbell_router
 from strategies_routes import router as strategies_router
 from news_routes import router as news_router
 from billing_routes import router as billing_router
+from feedback_routes import router as feedback_router
+from admin_routes import router as admin_router
 
 # Load environment variables
 load_dotenv()
@@ -262,6 +264,8 @@ app.include_router(barbell_router)  # Barbell strategy module (ADD-ON)
 app.include_router(strategies_router)  # Strategies module (ADD-ON)
 app.include_router(news_router)  # News/Actualités module (ADD-ON)
 app.include_router(billing_router)  # Stripe billing module v13 (ADD-ON)
+app.include_router(feedback_router)  # Feedback system (ADD-ON)
+app.include_router(admin_router)  # Admin dashboard (READ-ONLY, ADD-ON)
 
 
 # ============================================================================
@@ -301,15 +305,54 @@ async def health_check():
 # Billing Endpoints (Require Auth) - Only available if services are configured
 # ============================================================================
 
-def get_current_user_id_safe():
-    """Placeholder for user_id dependency when security module not loaded."""
-    return "anonymous"
+def get_current_user_id_safe(
+    authorization: str = Header(None, alias="Authorization"),
+) -> str:
+    """
+    Safe wrapper for get_current_user_id.
+    Uses proper auth if available, otherwise returns error.
+    """
+    if 'get_current_user_id' in dir():
+        return get_current_user_id(authorization)
+    
+    # Manual verification when security module not fully imported
+    if not authorization:
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization header required for billing",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authorization format",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    token = parts[1]
+    payload = verify_supabase_token(token) if 'verify_supabase_token' in dir() else None
+    
+    if not payload:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Token missing user ID")
+    
+    return user_id
 
 
 @app.post("/billing/checkout-session", response_model=CheckoutResponse)
 @app.post("/api/billing/checkout-session", response_model=CheckoutResponse)
 async def create_checkout_session(
     request: CheckoutRequest,
+    user_id: str = Depends(get_current_user_id_safe),
 ):
     """
     Create a Stripe Checkout Session for subscription.
@@ -318,9 +361,6 @@ async def create_checkout_session(
     if not stripe_service or not supabase_admin:
         raise HTTPException(
             status_code=503, detail="Billing services not configured")
-
-    # Placeholder user_id - implement proper auth later
-    user_id = "anonymous"
 
     try:
         # Get user email from Supabase
@@ -385,7 +425,9 @@ async def create_checkout_session(
 
 @app.post("/billing/portal-session", response_model=PortalResponse)
 @app.post("/api/billing/portal-session", response_model=PortalResponse)
-async def create_portal_session():
+async def create_portal_session(
+    user_id: str = Depends(get_current_user_id_safe),
+):
     """
     Create a Stripe Customer Portal session for managing subscription.
     Requires valid Supabase access token.
@@ -393,9 +435,6 @@ async def create_portal_session():
     if not stripe_service or not supabase_admin:
         raise HTTPException(
             status_code=503, detail="Billing services not configured")
-
-    # Placeholder user_id - implement proper auth later
-    user_id = "anonymous"
 
     try:
         # Get Stripe customer ID

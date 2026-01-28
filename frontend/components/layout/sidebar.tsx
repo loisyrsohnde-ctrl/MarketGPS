@@ -19,7 +19,9 @@ import {
   Dumbbell,
   Briefcase,
   Newspaper,
+  MessageSquare,
 } from 'lucide-react';
+import { FeedbackButton } from '@/components/feedback';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SIDEBAR COMPONENT
@@ -196,6 +198,9 @@ export function Sidebar({ scopeCounts, onLogout }: SidebarProps) {
            FOOTER
            ───────────────────────────────────────────────────────────────── */}
         <div className="border-t border-glass-border p-4">
+          {/* Feedback button */}
+          <FeedbackButton collapsed={collapsed} />
+
           {/* Logout button */}
           {onLogout && (
             <button
