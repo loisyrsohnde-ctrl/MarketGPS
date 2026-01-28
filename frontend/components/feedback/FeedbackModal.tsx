@@ -165,7 +165,7 @@ export function FeedbackModal({ isOpen, onClose, userEmail, userId }: FeedbackMo
                       Merci pour votre feedback !
                     </h3>
                     <p className="text-text-secondary text-center">
-                      Nous l'avons bien reçu et nous vous répondrons si nécessaire.
+                      Nous l&apos;avons bien reçu et nous vous répondrons si nécessaire.
                     </p>
                   </motion.div>
                 ) : (
