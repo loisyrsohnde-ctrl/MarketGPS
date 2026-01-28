@@ -22,6 +22,7 @@ from news_routes import router as news_router
 from billing_routes import router as billing_router
 from feedback_routes import router as feedback_router
 from admin_routes import router as admin_router
+from news_admin_routes import router as news_admin_router
 
 # Load environment variables
 load_dotenv()
@@ -266,6 +267,7 @@ app.include_router(news_router)  # News/Actualités module (ADD-ON)
 app.include_router(billing_router)  # Stripe billing module v13 (ADD-ON)
 app.include_router(feedback_router)  # Feedback system (ADD-ON)
 app.include_router(admin_router)  # Admin dashboard (READ-ONLY, ADD-ON)
+app.include_router(news_admin_router)  # News scraping admin (ADD-ON)
 
 
 # ============================================================================

@@ -439,6 +439,7 @@
             <button class="tab active" onclick="showTab('users')">Utilisateurs</button>
             <button class="tab" onclick="showTab('subscriptions')">Abonnements</button>
             <button class="tab" onclick="showTab('feedbacks')">Feedbacks</button>
+            <button class="tab" onclick="showTab('news')">📰 Actualités</button>
         </div>
 
         <!-- Users Section -->
@@ -504,6 +505,62 @@
                         </tr>
                     </thead>
                     <tbody id="feedbacksTable">
+                        <tr><td colspan="5" class="loading"><div class="spinner"></div>Chargement...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- News Section -->
+        <div class="section" id="newsSection" style="display: none;">
+            <div class="section-header">
+                <h3>📰 Actualités Économiques Africaines</h3>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" onclick="triggerScraping()">🔄 Lancer Scraping</button>
+                    <select id="newsFilter" onchange="loadNews()" style="padding: 8px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);">
+                        <option value="all">Tous</option>
+                        <option value="trending">🔥 Trending (100+)</option>
+                        <option value="pending">En attente</option>
+                        <option value="published">Publiés</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- News Stats -->
+            <div style="display: flex; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap;">
+                <div style="text-align: center;">
+                    <div style="font-size: 24px; font-weight: 700; color: var(--text-primary);" id="newsTotal">-</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">Total Articles</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 24px; font-weight: 700; color: var(--warning);" id="newsTrending">-</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">Trending</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 24px; font-weight: 700; color: var(--accent);" id="newsPublished">-</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">Publiés</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 24px; font-weight: 700; color: var(--text-secondary);" id="newsPending">-</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">En attente</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 12px; color: var(--text-muted);" id="newsLastScrape">Dernier scan: -</div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Article</th>
+                            <th>Source</th>
+                            <th>Interactions</th>
+                            <th>Statut</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="newsTable">
                         <tr><td colspan="5" class="loading"><div class="spinner"></div>Chargement...</td></tr>
                     </tbody>
                 </table>
@@ -709,6 +766,205 @@
             document.getElementById('usersSection').style.display = tabName === 'users' ? 'block' : 'none';
             document.getElementById('subscriptionsSection').style.display = tabName === 'subscriptions' ? 'block' : 'none';
             document.getElementById('feedbacksSection').style.display = tabName === 'feedbacks' ? 'block' : 'none';
+            document.getElementById('newsSection').style.display = tabName === 'news' ? 'block' : 'none';
+
+            // Load news data when tab is opened
+            if (tabName === 'news') {
+                loadNews();
+                loadNewsStats();
+            }
+        }
+
+        // ============ NEWS FUNCTIONS ============
+
+        async function loadNewsStats() {
+            try {
+                const response = await fetch(`${API_URL}/news-admin/stats`, {
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+                const stats = await response.json();
+
+                document.getElementById('newsTotal').textContent = stats.total_articles || 0;
+                document.getElementById('newsTrending').textContent = stats.trending || 0;
+                document.getElementById('newsPublished').textContent = stats.published || 0;
+                document.getElementById('newsPending').textContent = stats.pending || 0;
+                document.getElementById('newsLastScrape').textContent = stats.last_scraping
+                    ? `Dernier scan: ${formatDate(stats.last_scraping)}`
+                    : 'Jamais scanné';
+            } catch (e) {
+                console.error('Error loading news stats:', e);
+            }
+        }
+
+        async function loadNews() {
+            const tbody = document.getElementById('newsTable');
+            const filter = document.getElementById('newsFilter').value;
+
+            try {
+                let url = `${API_URL}/news-admin/articles?limit=50`;
+
+                if (filter === 'trending') {
+                    url = `${API_URL}/news-admin/trending?limit=50`;
+                } else if (filter === 'pending') {
+                    url = `${API_URL}/news-admin/pending?limit=50`;
+                } else if (filter === 'published') {
+                    url = `${API_URL}/news-admin/published?limit=50`;
+                }
+
+                const response = await fetch(url, {
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+                const data = await response.json();
+                const articles = data.articles || data || [];
+
+                if (articles.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Aucun article trouvé. Lancez un scraping pour commencer.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = articles.map(article => `
+                    <tr>
+                        <td style="max-width: 350px;">
+                            <a href="${article.url}" target="_blank" style="color: var(--text-primary); text-decoration: none;">
+                                <strong>${truncate(article.title, 60)}</strong>
+                            </a>
+                            ${article.image_url ? '<span style="color: var(--accent); margin-left: 4px;">📷</span>' : ''}
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                                ${formatDate(article.scraped_at)}
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge" style="background: rgba(100,116,139,0.15); color: var(--text-secondary);">
+                                ${article.source_name}
+                            </span>
+                            <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+                                ${article.category || '-'}
+                            </div>
+                        </td>
+                        <td>
+                            <span style="font-size: 18px; font-weight: 700; ${article.total_interactions >= 100 ? 'color: var(--warning);' : ''}">
+                                ${article.total_interactions || 0}
+                            </span>
+                            <div style="font-size: 10px; color: var(--text-muted);">
+                                👍${article.likes || 0} 💬${article.comments || 0} 🔄${article.shares || 0}
+                            </div>
+                        </td>
+                        <td>
+                            ${article.published_to_app
+                                ? '<span class="badge badge-pro">Publié</span>'
+                                : article.status === 'rejected'
+                                    ? '<span class="badge badge-bug">Rejeté</span>'
+                                    : '<span class="badge badge-new">En attente</span>'
+                            }
+                        </td>
+                        <td>
+                            ${!article.published_to_app && article.status !== 'rejected' ? `
+                                <button class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;" onclick="publishArticle('${article.id}')">
+                                    ✓ Publier
+                                </button>
+                                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; margin-left: 4px;" onclick="rejectArticle('${article.id}')">
+                                    ✗
+                                </button>
+                            ` : '-'}
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error('Error loading news:', e);
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Erreur lors du chargement. Vérifiez que le backend est déployé.</td></tr>';
+            }
+        }
+
+        async function publishArticle(articleId) {
+            if (!confirm('Publier cet article dans l\'app ?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/news-admin/publish`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Admin-Key': adminKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ article_id: articleId })
+                });
+
+                if (response.ok) {
+                    alert('Article publié !');
+                    loadNews();
+                    loadNewsStats();
+                } else {
+                    const data = await response.json();
+                    alert('Erreur: ' + (data.detail || 'Échec de la publication'));
+                }
+            } catch (e) {
+                alert('Erreur de connexion');
+            }
+        }
+
+        async function rejectArticle(articleId) {
+            const reason = prompt('Raison du rejet (optionnel):');
+            if (reason === null) return; // Cancelled
+
+            try {
+                const response = await fetch(`${API_URL}/news-admin/reject`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Admin-Key': adminKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ article_id: articleId, reason: reason })
+                });
+
+                if (response.ok) {
+                    alert('Article rejeté');
+                    loadNews();
+                    loadNewsStats();
+                } else {
+                    alert('Erreur lors du rejet');
+                }
+            } catch (e) {
+                alert('Erreur de connexion');
+            }
+        }
+
+        async function triggerScraping() {
+            if (!confirm('Lancer le scraping des actualités africaines ? Cela peut prendre quelques minutes.')) return;
+
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '⏳ Scraping en cours...';
+
+            try {
+                const response = await fetch(`${API_URL}/news-admin/scrape?min_interactions=50`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert(`Scraping terminé !\n\n` +
+                        `Sources scannées: ${data.results?.sources_scraped || 0}\n` +
+                        `Articles trouvés: ${data.results?.articles_found || 0}\n` +
+                        `Articles sauvegardés: ${data.results?.articles_saved || 0}\n` +
+                        `Articles trending: ${data.results?.trending_articles || 0}`
+                    );
+                    loadNews();
+                    loadNewsStats();
+                } else {
+                    alert('Erreur: ' + (data.detail || 'Échec du scraping'));
+                }
+            } catch (e) {
+                alert('Erreur de connexion au serveur');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 Lancer Scraping';
+            }
+        }
+
+        function truncate(str, len) {
+            if (!str) return '';
+            return str.length > len ? str.substring(0, len) + '...' : str;
         }
 
         function formatDate(dateStr) {
