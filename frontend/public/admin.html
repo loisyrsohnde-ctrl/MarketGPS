@@ -355,6 +355,160 @@
             color: var(--text-muted);
         }
 
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 700px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            background: var(--bg-card);
+        }
+
+        .modal-header h2 {
+            font-size: 18px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .detail-section {
+            margin-bottom: 24px;
+        }
+
+        .detail-section h4 {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .detail-item {
+            background: var(--bg-primary);
+            padding: 12px 16px;
+            border-radius: 8px;
+        }
+
+        .detail-item .label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .detail-item .value {
+            font-size: 14px;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+
+        .detail-item .value.highlight {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .detail-item.full-width {
+            grid-column: span 2;
+        }
+
+        /* Filter bar */
+        .filter-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-bar select {
+            padding: 8px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .filter-bar input {
+            padding: 8px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            width: 200px;
+        }
+
+        /* Clickable row */
+        tr.clickable {
+            cursor: pointer;
+        }
+
+        tr.clickable:hover {
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        /* Pro indicator */
+        .pro-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pro-indicator::before {
+            content: '⭐';
+            font-size: 12px;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .header {
@@ -368,6 +522,14 @@
 
             .dashboard {
                 padding: 16px;
+            }
+
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .detail-item.full-width {
+                grid-column: span 1;
             }
         }
     </style>
@@ -445,21 +607,31 @@
         <!-- Users Section -->
         <div class="section" id="usersSection">
             <div class="section-header">
-                <h3>Utilisateurs Récents</h3>
+                <h3>👥 Utilisateurs Inscrits</h3>
+                <div class="filter-bar">
+                    <input type="text" id="userSearch" placeholder="🔍 Rechercher email..." oninput="filterUsers()">
+                    <select id="userFilter" onchange="loadUsers()">
+                        <option value="all">Tous les utilisateurs</option>
+                        <option value="pro">⭐ Abonnés PRO</option>
+                        <option value="free">Utilisateurs FREE</option>
+                    </select>
+                    <span id="userCount" style="font-size: 13px; color: var(--text-muted);">0 utilisateurs</span>
+                </div>
             </div>
             <div class="table-container">
                 <table>
                     <thead>
                         <tr>
-                            <th>Email</th>
+                            <th>Utilisateur</th>
                             <th>Statut</th>
-                            <th>Plan</th>
+                            <th>Abonnement</th>
                             <th>Inscription</th>
                             <th>Dernière connexion</th>
+                            <th>Connexions</th>
                         </tr>
                     </thead>
                     <tbody id="usersTable">
-                        <tr><td colspan="5" class="loading"><div class="spinner"></div>Chargement...</td></tr>
+                        <tr><td colspan="6" class="loading"><div class="spinner"></div>Chargement...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -468,21 +640,32 @@
         <!-- Subscriptions Section -->
         <div class="section" id="subscriptionsSection" style="display: none;">
             <div class="section-header">
-                <h3>Abonnements</h3>
+                <h3>💳 Abonnements Payants</h3>
+                <div class="filter-bar">
+                    <select id="subFilter" onchange="loadSubscriptions()">
+                        <option value="">Tous les statuts</option>
+                        <option value="active">✅ Actifs</option>
+                        <option value="canceled">❌ Annulés</option>
+                        <option value="past_due">⚠️ En retard</option>
+                    </select>
+                    <span id="subCount" style="font-size: 13px; color: var(--text-muted);">0 abonnements</span>
+                </div>
             </div>
             <div class="table-container">
                 <table>
                     <thead>
                         <tr>
-                            <th>User ID</th>
+                            <th>Abonné</th>
                             <th>Plan</th>
+                            <th>Montant</th>
                             <th>Statut</th>
-                            <th>Créé le</th>
+                            <th>Début</th>
                             <th>Fin période</th>
+                            <th>Stripe</th>
                         </tr>
                     </thead>
                     <tbody id="subscriptionsTable">
-                        <tr><td colspan="5" class="loading"><div class="spinner"></div>Chargement...</td></tr>
+                        <tr><td colspan="7" class="loading"><div class="spinner"></div>Chargement...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -564,6 +747,19 @@
                         <tr><td colspan="5" class="loading"><div class="spinner"></div>Chargement...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Detail Modal -->
+    <div class="modal-overlay" id="userModal" onclick="if(event.target===this)closeUserModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>👤 Détails Utilisateur</h2>
+                <button class="modal-close" onclick="closeUserModal()">×</button>
+            </div>
+            <div class="modal-body" id="userModalBody">
+                <div class="loading"><div class="spinner"></div>Chargement...</div>
             </div>
         </div>
     </div>
@@ -668,59 +864,306 @@
             }
         }
 
+        let allUsers = []; // Store for filtering
+
         async function loadUsers() {
             const tbody = document.getElementById('usersTable');
+            const filter = document.getElementById('userFilter').value;
+
             try {
-                const response = await fetch(`${API_URL}/admin/users?limit=50`, {
+                const response = await fetch(`${API_URL}/admin/users?limit=200&filter=${filter}`, {
                     headers: { 'X-Admin-Key': adminKey }
                 });
-                const users = await response.json();
+                allUsers = await response.json();
 
-                if (users.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Aucun utilisateur trouvé</td></tr>';
+                document.getElementById('userCount').textContent = `${allUsers.length} utilisateur${allUsers.length > 1 ? 's' : ''}`;
+
+                if (allUsers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Aucun utilisateur trouvé</td></tr>';
                     return;
                 }
 
-                tbody.innerHTML = users.map(user => `
-                    <tr>
-                        <td>${user.email || '-'}</td>
-                        <td><span class="badge ${user.is_pro ? 'badge-pro' : 'badge-free'}">${user.is_pro ? 'PRO' : 'FREE'}</span></td>
-                        <td>${user.plan || 'FREE'}</td>
-                        <td>${formatDate(user.created_at)}</td>
-                        <td>${formatDate(user.last_sign_in)}</td>
-                    </tr>
-                `).join('');
+                renderUsers(allUsers);
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Erreur lors du chargement</td></tr>';
+                console.error('Error loading users:', e);
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Erreur lors du chargement</td></tr>';
             }
+        }
+
+        function filterUsers() {
+            const search = document.getElementById('userSearch').value.toLowerCase();
+            const filtered = allUsers.filter(u =>
+                (u.email && u.email.toLowerCase().includes(search)) ||
+                (u.full_name && u.full_name.toLowerCase().includes(search))
+            );
+            renderUsers(filtered);
+        }
+
+        function renderUsers(users) {
+            const tbody = document.getElementById('usersTable');
+
+            tbody.innerHTML = users.map(user => `
+                <tr class="clickable" onclick="showUserDetail('${user.id}')">
+                    <td>
+                        <div style="font-weight: 500; color: var(--text-primary);">${user.email || '-'}</div>
+                        ${user.full_name ? `<div style="font-size: 12px; color: var(--text-muted);">${user.full_name}</div>` : ''}
+                        ${user.phone ? `<div style="font-size: 11px; color: var(--text-muted);">📱 ${user.phone}</div>` : ''}
+                    </td>
+                    <td>
+                        <span class="badge ${user.is_pro ? 'badge-pro pro-indicator' : 'badge-free'}">
+                            ${user.is_pro ? 'PRO' : 'FREE'}
+                        </span>
+                        ${user.email_confirmed ? '<span style="color: var(--success); font-size: 11px; margin-left: 4px;">✓ vérifié</span>' : ''}
+                    </td>
+                    <td>
+                        <div>${user.plan || 'FREE'}</div>
+                        ${user.subscription_status ? `<div style="font-size: 11px; color: ${user.subscription_status === 'active' ? 'var(--success)' : 'var(--text-muted)'};">${user.subscription_status}</div>` : ''}
+                        ${user.amount_paid ? `<div style="font-size: 11px; color: var(--accent);">${user.amount_paid}${user.currency ? ' ' + user.currency.toUpperCase() : '€'}</div>` : ''}
+                    </td>
+                    <td>
+                        <div>${formatDate(user.created_at)}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">via ${user.provider || 'email'}</div>
+                    </td>
+                    <td>${formatDate(user.last_sign_in)}</td>
+                    <td style="text-align: center;">
+                        <span style="font-weight: 600; color: ${user.sign_in_count > 5 ? 'var(--accent)' : 'var(--text-secondary)'}">
+                            ${user.sign_in_count || 0}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
         }
 
         async function loadSubscriptions() {
             const tbody = document.getElementById('subscriptionsTable');
+            const statusFilter = document.getElementById('subFilter').value;
+
             try {
-                const response = await fetch(`${API_URL}/admin/subscriptions?limit=50`, {
+                let url = `${API_URL}/admin/subscriptions?limit=100`;
+                if (statusFilter) {
+                    url += `&status=${statusFilter}`;
+                }
+
+                const response = await fetch(url, {
                     headers: { 'X-Admin-Key': adminKey }
                 });
                 const subs = await response.json();
 
+                document.getElementById('subCount').textContent = `${subs.length} abonnement${subs.length > 1 ? 's' : ''}`;
+
                 if (subs.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Aucun abonnement trouvé</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Aucun abonnement trouvé</td></tr>';
                     return;
                 }
 
+                const statusBadges = {
+                    'active': 'badge-active',
+                    'canceled': 'badge-bug',
+                    'past_due': 'badge-feature',
+                    'trialing': 'badge-new',
+                };
+
                 tbody.innerHTML = subs.map(sub => `
-                    <tr>
-                        <td style="font-family: monospace; font-size: 12px;">${sub.user_id?.substring(0, 16)}...</td>
-                        <td><span class="badge badge-pro">${sub.plan}</span></td>
-                        <td><span class="badge badge-active">${sub.status}</span></td>
+                    <tr class="clickable" onclick="showUserDetail('${sub.user_id}')">
+                        <td>
+                            <div style="font-weight: 500; color: var(--text-primary);">${sub.email || '-'}</div>
+                            ${sub.full_name ? `<div style="font-size: 12px; color: var(--text-muted);">${sub.full_name}</div>` : ''}
+                            <div style="font-size: 10px; font-family: monospace; color: var(--text-muted);">${sub.user_id?.substring(0, 12)}...</div>
+                        </td>
+                        <td>
+                            <span class="badge badge-pro">${sub.plan}</span>
+                            ${sub.interval ? `<div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">${sub.interval === 'month' ? 'Mensuel' : sub.interval === 'year' ? 'Annuel' : sub.interval}</div>` : ''}
+                        </td>
+                        <td>
+                            ${sub.amount ? `
+                                <div style="font-weight: 600; color: var(--accent);">${sub.amount} ${(sub.currency || 'eur').toUpperCase()}</div>
+                                ${sub.payment_method ? `<div style="font-size: 10px; color: var(--text-muted);">💳 ${sub.payment_method}</div>` : ''}
+                            ` : '-'}
+                        </td>
+                        <td>
+                            <span class="badge ${statusBadges[sub.status] || 'badge-new'}">${sub.status}</span>
+                            ${sub.cancel_at_period_end ? '<div style="font-size: 10px; color: var(--warning);">⚠️ Annulation prévue</div>' : ''}
+                        </td>
                         <td>${formatDate(sub.created_at)}</td>
-                        <td>${formatDate(sub.current_period_end)}</td>
+                        <td>
+                            ${formatDate(sub.current_period_end)}
+                            ${sub.current_period_end && new Date(sub.current_period_end) < new Date() ? '<div style="font-size: 10px; color: var(--error);">Expiré</div>' : ''}
+                        </td>
+                        <td>
+                            ${sub.stripe_customer_id ? `
+                                <a href="https://dashboard.stripe.com/customers/${sub.stripe_customer_id}" target="_blank"
+                                   style="font-size: 11px; color: var(--accent); text-decoration: none;"
+                                   onclick="event.stopPropagation()">
+                                    📊 Stripe
+                                </a>
+                            ` : '-'}
+                        </td>
                     </tr>
                 `).join('');
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Erreur lors du chargement</td></tr>';
+                console.error('Error loading subscriptions:', e);
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Erreur lors du chargement</td></tr>';
             }
         }
+
+        // ============ USER DETAIL MODAL ============
+
+        async function showUserDetail(userId) {
+            const modal = document.getElementById('userModal');
+            const body = document.getElementById('userModalBody');
+
+            modal.classList.add('active');
+            body.innerHTML = '<div class="loading"><div class="spinner"></div>Chargement...</div>';
+
+            try {
+                const response = await fetch(`${API_URL}/admin/user/${userId}`, {
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+
+                if (!response.ok) {
+                    throw new Error('User not found');
+                }
+
+                const user = await response.json();
+
+                body.innerHTML = `
+                    <div class="detail-section">
+                        <h4>👤 Informations Personnelles</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <div class="label">Email</div>
+                                <div class="value">${user.email || '-'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Nom complet</div>
+                                <div class="value">${user.full_name || '-'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Téléphone</div>
+                                <div class="value">${user.phone || '-'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Fournisseur</div>
+                                <div class="value">${user.provider || 'email'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Email vérifié</div>
+                                <div class="value">${user.email_confirmed ? '✅ Oui' : '❌ Non'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Nombre de connexions</div>
+                                <div class="value highlight">${user.sign_in_count || 0}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4>📅 Activité</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <div class="label">Inscription</div>
+                                <div class="value">${formatDate(user.created_at)}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Dernière connexion</div>
+                                <div class="value">${formatDate(user.last_sign_in)}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Dernière mise à jour</div>
+                                <div class="value">${formatDate(user.updated_at)}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Email confirmé le</div>
+                                <div class="value">${formatDate(user.email_confirmed_at)}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${user.subscription ? `
+                    <div class="detail-section">
+                        <h4>💳 Abonnement</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <div class="label">Plan</div>
+                                <div class="value highlight">${user.subscription.plan || '-'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Statut</div>
+                                <div class="value" style="color: ${user.subscription.status === 'active' ? 'var(--success)' : 'var(--warning)'}">
+                                    ${user.subscription.status || '-'}
+                                </div>
+                            </div>
+                            ${user.subscription.amount ? `
+                            <div class="detail-item">
+                                <div class="label">Montant</div>
+                                <div class="value highlight">${user.subscription.amount} ${(user.subscription.currency || 'EUR').toUpperCase()}</div>
+                            </div>
+                            ` : ''}
+                            ${user.subscription.interval ? `
+                            <div class="detail-item">
+                                <div class="label">Fréquence</div>
+                                <div class="value">${user.subscription.interval === 'month' ? 'Mensuel' : user.subscription.interval === 'year' ? 'Annuel' : user.subscription.interval}</div>
+                            </div>
+                            ` : ''}
+                            <div class="detail-item">
+                                <div class="label">Début abonnement</div>
+                                <div class="value">${formatDate(user.subscription.created_at)}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Fin période courante</div>
+                                <div class="value">${formatDate(user.subscription.current_period_end)}</div>
+                            </div>
+                            ${user.subscription.stripe_customer_id ? `
+                            <div class="detail-item full-width">
+                                <div class="label">Stripe Customer ID</div>
+                                <div class="value">
+                                    <a href="https://dashboard.stripe.com/customers/${user.subscription.stripe_customer_id}" target="_blank" style="color: var(--accent);">
+                                        ${user.subscription.stripe_customer_id}
+                                    </a>
+                                </div>
+                            </div>
+                            ` : ''}
+                            ${user.subscription.cancel_at_period_end ? `
+                            <div class="detail-item full-width" style="background: rgba(245, 158, 11, 0.1);">
+                                <div class="label" style="color: var(--warning);">⚠️ Annulation programmée</div>
+                                <div class="value">L'abonnement sera annulé à la fin de la période courante</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    ` : `
+                    <div class="detail-section">
+                        <h4>💳 Abonnement</h4>
+                        <div style="padding: 20px; text-align: center; color: var(--text-muted);">
+                            Cet utilisateur n'a pas d'abonnement actif
+                        </div>
+                    </div>
+                    `}
+
+                    <div class="detail-section">
+                        <h4>🔑 ID Utilisateur</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item full-width">
+                                <div class="label">User ID (Supabase)</div>
+                                <div class="value" style="font-family: monospace; font-size: 12px;">${user.id}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (e) {
+                console.error('Error loading user detail:', e);
+                body.innerHTML = '<div class="empty-state">Erreur lors du chargement des détails</div>';
+            }
+        }
+
+        function closeUserModal() {
+            document.getElementById('userModal').classList.remove('active');
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeUserModal();
+        });
 
         async function loadFeedbacks() {
             const tbody = document.getElementById('feedbacksTable');
