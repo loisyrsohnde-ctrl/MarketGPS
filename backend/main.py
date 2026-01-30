@@ -23,6 +23,10 @@ from billing_routes import router as billing_router
 from feedback_routes import router as feedback_router
 from admin_routes import router as admin_router
 from news_admin_routes import router as news_admin_router
+from real_estate_routes import router as real_estate_router
+from wealth_routes import router as wealth_router
+from concierge_routes import router as concierge_router
+from notifications_routes import router as notifications_router
 
 # Load environment variables
 load_dotenv()
@@ -268,6 +272,10 @@ app.include_router(billing_router)  # Stripe billing module v13 (ADD-ON)
 app.include_router(feedback_router)  # Feedback system (ADD-ON)
 app.include_router(admin_router)  # Admin dashboard (READ-ONLY, ADD-ON)
 app.include_router(news_admin_router)  # News scraping admin (ADD-ON)
+app.include_router(real_estate_router)  # Real Estate module (ADD-ON)
+app.include_router(wealth_router)  # Wealth Agent module (ADD-ON)
+app.include_router(concierge_router)  # AI Concierge module (ADD-ON)
+app.include_router(notifications_router)  # Notifications & Alerts (ADD-ON)
 
 
 # ============================================================================
@@ -301,6 +309,61 @@ class HealthResponse(BaseModel):
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "version": "1.0.0"}
+
+
+@app.get("/health/extended")
+async def health_check_extended():
+    """
+    Extended health check with database connectivity and counts.
+    Useful for monitoring and debugging.
+    """
+    from storage.sqlite_store import SQLiteStore
+    
+    result = {
+        "status": "healthy",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat() if 'datetime' in dir() else None,
+        "database": {"connected": False},
+        "services": {
+            "stripe": stripe_service is not None,
+            "supabase": supabase_admin is not None,
+        },
+    }
+    
+    try:
+        from datetime import datetime
+        result["timestamp"] = datetime.utcnow().isoformat()
+        
+        db = SQLiteStore()
+        with db._get_conn() as conn:
+            # Test connection
+            cursor = conn.execute("SELECT 1")
+            cursor.fetchone()
+            result["database"]["connected"] = True
+            
+            # Quick counts
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM universe WHERE active=1")
+                result["database"]["active_assets"] = cursor.fetchone()[0]
+            except:
+                pass
+            
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM scores_latest WHERE score_total IS NOT NULL")
+                result["database"]["scored_assets"] = cursor.fetchone()[0]
+            except:
+                pass
+            
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM news_articles")
+                result["database"]["news_articles"] = cursor.fetchone()[0]
+            except:
+                result["database"]["news_articles"] = 0
+                
+    except Exception as e:
+        result["database"]["error"] = str(e)
+    
+    return result
 
 
 # ============================================================================

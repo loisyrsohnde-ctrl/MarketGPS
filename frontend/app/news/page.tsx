@@ -51,9 +51,24 @@ interface NewsFeedResponse {
 
 const API_BASE = getApiBaseUrl();
 
+interface NewsStatus {
+  status: string;
+  total_articles: number;
+  last_article_at: string | null;
+  minutes_since_update: number | null;
+  articles_last_24h: number;
+  is_fresh: boolean;
+}
+
 async function fetchNewsFeed(page: number = 1): Promise<NewsFeedResponse> {
   const res = await fetch(`${API_BASE}/api/news?page=${page}&page_size=20`);
   if (!res.ok) throw new Error('Failed to fetch news');
+  return res.json();
+}
+
+async function fetchNewsStatus(): Promise<NewsStatus> {
+  const res = await fetch(`${API_BASE}/api/news/status`);
+  if (!res.ok) return { status: 'error', total_articles: 0, last_article_at: null, minutes_since_update: null, articles_last_24h: 0, is_fresh: false };
   return res.json();
 }
 
@@ -372,6 +387,41 @@ async function fetchRegions(): Promise<{ regions: Array<{ id: string; name: stri
   return res.json();
 }
 
+function FreshnessIndicator({ status }: { status: NewsStatus | undefined }) {
+  if (!status) return null;
+  
+  const minutes = status.minutes_since_update;
+  let label = '';
+  let colorClass = '';
+  
+  if (minutes === null) {
+    label = 'Chargement...';
+    colorClass = 'text-slate-500';
+  } else if (minutes < 60) {
+    label = `Mis à jour il y a ${minutes} min`;
+    colorClass = 'text-emerald-600';
+  } else if (minutes < 1440) {
+    const hours = Math.floor(minutes / 60);
+    label = `Mis à jour il y a ${hours}h`;
+    colorClass = minutes < 120 ? 'text-amber-600' : 'text-orange-600';
+  } else {
+    const days = Math.floor(minutes / 1440);
+    label = `Mis à jour il y a ${days}j`;
+    colorClass = 'text-red-600';
+  }
+  
+  return (
+    <div className={cn('flex items-center gap-2 text-xs font-medium', colorClass)}>
+      <div className={cn(
+        'w-2 h-2 rounded-full',
+        status.is_fresh ? 'bg-emerald-500 animate-pulse' : 'bg-orange-500'
+      )} />
+      {label}
+      <span className="text-slate-400">• {status.articles_last_24h} articles (24h)</span>
+    </div>
+  );
+}
+
 export default function NewsPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['news-premium'],
@@ -383,6 +433,13 @@ export default function NewsPage() {
     queryKey: ['news-regions'],
     queryFn: fetchRegions,
     staleTime: 120000, // 2 minutes cache
+  });
+  
+  const { data: newsStatus } = useQuery({
+    queryKey: ['news-status'],
+    queryFn: fetchNewsStatus,
+    staleTime: 30000, // 30 seconds cache
+    refetchInterval: 60000, // Refetch every minute
   });
   
   if (isLoading) return <LoadingState />;
@@ -409,6 +466,16 @@ export default function NewsPage() {
     <div className="min-h-screen bg-zinc-50">
       {/* Market Ticker */}
       <MarketTicker />
+      
+      {/* Freshness Indicator */}
+      <div className="bg-white border-b border-slate-200 py-2">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+          <FreshnessIndicator status={newsStatus} />
+          <span className="text-xs text-slate-400">
+            {data?.total || 0} articles au total
+          </span>
+        </div>
+      </div>
       
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

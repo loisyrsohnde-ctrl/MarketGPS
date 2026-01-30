@@ -404,3 +404,285 @@ async def list_sources(
     require_admin(admin_key)
 
     return {"sources": NEWS_SOURCES, "total": len(NEWS_SOURCES)}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RSS Pipeline Endpoints (Modern Pipeline)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.post("/pipeline/run")
+async def trigger_rss_pipeline(
+    background_tasks: BackgroundTasks,
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+    ingest_limit: Optional[int] = Query(None, description="Limit sources to ingest"),
+    publish_limit: int = Query(100, description="Limit articles to publish"),
+    sync: bool = Query(False, description="Run synchronously (wait for result)"),
+):
+    """
+    Trigger the modern RSS news pipeline.
+    
+    This is the recommended pipeline that:
+    1. Ingests from 50+ RSS sources
+    2. Processes with LLM for French rewriting
+    3. Publishes to news_articles table
+    
+    Use sync=true to wait for result, or false for background execution.
+    """
+    require_admin(admin_key)
+    
+    try:
+        # Import the pipeline
+        from pipeline.news.publish import run_full_pipeline
+        
+        if sync:
+            # Run synchronously
+            logger.info("Starting RSS pipeline (sync mode)...")
+            result = run_full_pipeline(
+                ingest_limit=ingest_limit,
+                publish_limit=publish_limit
+            )
+            return {
+                "success": True,
+                "mode": "sync",
+                "result": result,
+            }
+        else:
+            # Run in background
+            def run_pipeline_task():
+                try:
+                    result = run_full_pipeline(
+                        ingest_limit=ingest_limit,
+                        publish_limit=publish_limit
+                    )
+                    logger.info(f"Background pipeline complete: {result}")
+                except Exception as e:
+                    logger.error(f"Background pipeline failed: {e}")
+            
+            background_tasks.add_task(run_pipeline_task)
+            
+            return {
+                "success": True,
+                "mode": "background",
+                "message": "Pipeline started in background. Check /news-admin/pipeline/status for results.",
+            }
+            
+    except ImportError as e:
+        logger.error(f"Pipeline import error: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Pipeline not available: {str(e)}. Ensure feedparser is installed."
+        )
+    except Exception as e:
+        logger.error(f"Pipeline error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/pipeline/ingest")
+async def trigger_rss_ingest(
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+    limit: Optional[int] = Query(None, description="Limit sources to fetch"),
+):
+    """
+    Run only the RSS ingestion step (no LLM processing).
+    
+    Useful for testing or when you want to ingest without publishing.
+    """
+    require_admin(admin_key)
+    
+    try:
+        from pipeline.news.ingest_rss import run_ingest
+        
+        logger.info("Starting RSS ingestion...")
+        result = run_ingest(limit=limit)
+        
+        return {
+            "success": True,
+            "result": result,
+        }
+        
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=f"Ingester not available: {str(e)}")
+    except Exception as e:
+        logger.error(f"Ingest error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/pipeline/publish")
+async def trigger_publish(
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+    limit: int = Query(50, description="Limit articles to publish"),
+):
+    """
+    Run only the publish step (process pending raw items).
+    
+    Processes items already ingested and rewrites them with LLM.
+    """
+    require_admin(admin_key)
+    
+    try:
+        from pipeline.news.publish import run_publish
+        
+        logger.info("Starting publish step...")
+        result = run_publish(limit=limit)
+        
+        return {
+            "success": True,
+            "result": result,
+        }
+        
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=f"Publisher not available: {str(e)}")
+    except Exception as e:
+        logger.error(f"Publish error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/pipeline/status")
+async def get_pipeline_status(
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+):
+    """
+    Get the status of the RSS news pipeline.
+    
+    Returns:
+    - Last run timestamp
+    - Success/failure status
+    - Number of articles processed
+    - Sources status
+    """
+    require_admin(admin_key)
+    
+    import json
+    from pathlib import Path
+    
+    try:
+        result = {
+            "pipeline_type": "rss",
+            "scheduler_running": False,
+            "last_run": None,
+            "last_success": None,
+            "sources": {"total": 0, "enabled": 0},
+            "raw_items": {"pending": 0, "processed": 0},
+            "articles": {"total": 0, "today": 0},
+            "llm_provider": None,
+        }
+        
+        # Check metrics file
+        metrics_path = Path(__file__).parent.parent / "data" / "news_metrics.json"
+        if metrics_path.exists():
+            try:
+                with open(metrics_path, 'r') as f:
+                    metrics = json.load(f)
+                    result["last_run"] = metrics.get("last_run")
+                    result["last_success"] = metrics.get("last_success")
+                    result["history"] = metrics.get("history", [])[:5]
+            except:
+                pass
+        
+        # Check sources registry
+        sources_path = Path(__file__).parent.parent / "pipeline" / "news" / "sources_registry.json"
+        if sources_path.exists():
+            try:
+                with open(sources_path, 'r') as f:
+                    sources_data = json.load(f)
+                    sources = sources_data.get("sources", [])
+                    result["sources"]["total"] = len(sources)
+                    result["sources"]["enabled"] = len([s for s in sources if s.get("enabled", True)])
+            except:
+                pass
+        
+        # Check database
+        with db._get_conn() as conn:
+            # Raw items
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM news_raw_items WHERE processed = 0")
+                result["raw_items"]["pending"] = cursor.fetchone()[0]
+                
+                cursor = conn.execute("SELECT COUNT(*) FROM news_raw_items WHERE processed = 1")
+                result["raw_items"]["processed"] = cursor.fetchone()[0]
+            except:
+                pass
+            
+            # Articles
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM news_articles")
+                result["articles"]["total"] = cursor.fetchone()[0]
+                
+                cursor = conn.execute("SELECT COUNT(*) FROM news_articles WHERE date(created_at) = date('now')")
+                result["articles"]["today"] = cursor.fetchone()[0]
+            except:
+                pass
+            
+            # Sources from DB
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM news_sources WHERE enabled = 1")
+                db_enabled = cursor.fetchone()[0]
+                if db_enabled > 0:
+                    result["sources"]["enabled_in_db"] = db_enabled
+            except:
+                pass
+        
+        # Check LLM availability
+        if os.environ.get("OPENAI_API_KEY"):
+            result["llm_provider"] = "openai"
+        elif os.environ.get("GEMINI_API_KEY"):
+            result["llm_provider"] = "gemini"
+        else:
+            result["llm_provider"] = "none (fallback mode)"
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error getting pipeline status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/pipeline/sources")
+async def list_rss_sources(
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+    region: Optional[str] = Query(None, description="Filter by region: PAN, NORTH, WEST, CENTRAL, EAST, SOUTH"),
+):
+    """
+    List all configured RSS sources from the registry.
+    """
+    require_admin(admin_key)
+    
+    import json
+    from pathlib import Path
+    
+    try:
+        sources_path = Path(__file__).parent.parent / "pipeline" / "news" / "sources_registry.json"
+        
+        if not sources_path.exists():
+            return {"sources": [], "total": 0, "error": "Registry not found"}
+        
+        with open(sources_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        sources = data.get("sources", [])
+        
+        # Filter by region if specified
+        if region:
+            sources = [s for s in sources if s.get("region") == region.upper()]
+        
+        # Only enabled sources
+        enabled_sources = [s for s in sources if s.get("enabled", True)]
+        
+        # Group by region
+        by_region = {}
+        for s in enabled_sources:
+            r = s.get("region", "OTHER")
+            if r not in by_region:
+                by_region[r] = []
+            by_region[r].append(s["name"])
+        
+        return {
+            "sources": enabled_sources,
+            "total": len(enabled_sources),
+            "by_region": {k: len(v) for k, v in by_region.items()},
+            "regions": data.get("regions", {}),
+        }
+        
+    except Exception as e:
+        logger.error(f"Error listing RSS sources: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

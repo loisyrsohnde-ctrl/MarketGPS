@@ -377,6 +377,77 @@ async def get_available_tags():
     }
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# News Pipeline Status (Public - for frontend freshness indicator)
+# NOTE: This MUST be before /{slug} route to avoid conflict
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/status")
+async def get_news_status():
+    """
+    Get news feed status for freshness indicator.
+    Returns when articles were last updated.
+    
+    Frontend can use this to show "Rafraîchi il y a X minutes".
+    """
+    from datetime import datetime
+    
+    try:
+        with db._get_conn() as conn:
+            # Get latest article creation time
+            cursor = conn.execute("""
+                SELECT MAX(created_at) as last_created,
+                       MAX(published_at) as last_published,
+                       COUNT(*) as total_articles
+                FROM news_articles
+            """)
+            row = cursor.fetchone()
+            
+            last_created = row[0] if row else None
+            last_published = row[1] if row else None
+            total = row[2] if row else 0
+            
+            # Articles in last 24h
+            cursor = conn.execute("""
+                SELECT COUNT(*) FROM news_articles 
+                WHERE created_at >= datetime('now', '-24 hours')
+            """)
+            last_24h = cursor.fetchone()[0]
+            
+            # Calculate minutes since last article
+            minutes_ago = None
+            if last_created:
+                try:
+                    last_dt = datetime.fromisoformat(last_created.replace("Z", "+00:00"))
+                    delta = datetime.utcnow() - last_dt.replace(tzinfo=None)
+                    minutes_ago = int(delta.total_seconds() / 60)
+                except:
+                    pass
+            
+            return {
+                "status": "ok" if total > 0 else "empty",
+                "total_articles": total,
+                "last_article_at": last_created,
+                "last_published_at": last_published,
+                "minutes_since_update": minutes_ago,
+                "articles_last_24h": last_24h,
+                "is_fresh": minutes_ago is not None and minutes_ago < 60,
+            }
+            
+    except Exception as e:
+        logger.error(f"Error getting news status: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "total_articles": 0,
+            "is_fresh": False,
+        }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Article Detail (Dynamic route - must be AFTER static routes)
+# ═══════════════════════════════════════════════════════════════════════════════
+
 @router.get("/{slug}", response_model=NewsArticleFull)
 async def get_article_detail(
     slug: str,
@@ -437,3 +508,6 @@ async def check_article_saved(
     is_saved = db.is_article_saved_by_user(user_id, article_id)
     
     return {"article_id": article_id, "is_saved": is_saved}
+
+
+# NOTE: /status endpoint moved above /{slug} route to avoid conflict
