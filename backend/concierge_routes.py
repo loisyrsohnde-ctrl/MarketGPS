@@ -203,7 +203,8 @@ def call_gemini_ai(
     """
     Call Gemini AI with a structured prompt for investment advice.
     """
-    if not GEMINI_AVAILABLE or not GEMINI_MODEL:
+    if not GEMINI_AVAILABLE:
+        logger.warning("Gemini AI call skipped: GEMINI_AVAILABLE is False")
         return None
     
     # Build holdings context
@@ -230,22 +231,43 @@ CONTEXTE DU PORTEFEUILLE:
 
 RÈGLES:
 1. Réponds toujours en français
-2. Sois concis mais informatif (max 300 mots)
-3. Adapte tes conseils au profil {coach['name']}
-4. Utilise des données chiffrées quand possible
-5. Structure ta réponse avec des bullet points ou sections claires
-6. N'invente PAS de données spécifiques que tu ne connais pas
-7. Termine par une recommandation actionnable
+2. Commence TOUJOURS ta réponse par "Ici MarketGPS :" ou "Ici MarketGPS,"
+3. Sois concis mais informatif (max 300 mots)
+4. Adapte tes conseils au profil {coach['name']}
+5. Utilise des données chiffrées quand possible
+6. Structure ta réponse avec des bullet points ou sections claires
+7. N'invente PAS de données spécifiques que tu ne connais pas
+8. Termine par une recommandation actionnable
 
 QUESTION DE L'UTILISATEUR:
 {prompt}"""
 
+    # Try primary model first, then fallback
+    models_to_try = [GEMINI_MODEL]
+    
+    # If GEMINI_MODEL is just a GenerativeModel instance, we can't easily get another one without importing genai
+    # So let's try to import it locally if needed for fallback
     try:
-        response = GEMINI_MODEL.generate_content(system_prompt)
-        return response.text
-    except Exception as e:
-        logger.error(f"Gemini API error: {e}")
-        return None
+        import google.generativeai as genai
+        # Add fallback model if primary fails
+        models_to_try.append(genai.GenerativeModel('gemini-1.5-flash'))
+    except:
+        pass
+
+    for model in models_to_try:
+        if not model: continue
+        try:
+            logger.info(f"Calling Gemini AI with model...")
+            response = model.generate_content(system_prompt)
+            if response and response.text:
+                return response.text
+        except Exception as e:
+            logger.error(f"Gemini API error with model: {e}")
+            # Continue to next model
+            continue
+            
+    logger.error("All Gemini models failed")
+    return None
 
 
 # =============================================================================
