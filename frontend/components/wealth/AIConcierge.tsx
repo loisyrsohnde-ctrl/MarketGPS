@@ -549,7 +549,7 @@ export default function AIConcierge({
                     Bonjour {userName}, je suis votre conseiller {COACH_PROFILES[coachProfile].name.toLowerCase()}.
                   </p>
                   <p className="text-slate-500 text-xs mt-1">
-                    Comment puis-je vous aider aujourd'hui ?
+                    Comment puis-je vous aider aujourd&apos;hui ?
                   </p>
                 </div>
                 
@@ -624,7 +624,7 @@ export default function AIConcierge({
             </form>
             
             <p className="text-[10px] text-slate-500 text-center mt-2">
-              Les conseils sont à titre informatif. Consultez un professionnel pour des décisions d'investissement.
+              Les conseils sont à titre informatif. Consultez un professionnel pour des décisions d&apos;investissement.
             </p>
           </div>
         </motion.div>

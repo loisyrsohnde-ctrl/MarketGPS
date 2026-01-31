@@ -1,5 +1,8 @@
 """
 AI Strategy Service - Connects to ChatGPT for intelligent strategy suggestions
+
+Includes quota management: Users are limited to 50 requests.
+Quota can be disabled per-user via admin dashboard.
 """
 import os
 import json
@@ -7,6 +10,8 @@ import logging
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 import httpx
+
+from ai_quota_service import get_ai_quota_service, check_openai_quota
 
 logger = logging.getLogger(__name__)
 
@@ -74,15 +79,28 @@ RÈGLES:
 """
 
 
-async def get_ai_strategy_suggestion(user_description: str) -> Dict[str, Any]:
+async def get_ai_strategy_suggestion(user_description: str, user_id: str = "default") -> Dict[str, Any]:
     """
     Send user's strategy description to ChatGPT and get structured recommendations.
     Falls back to rule-based suggestions if OpenAI is not configured.
+    
+    Args:
+        user_description: User's description of desired strategy
+        user_id: User ID for quota tracking (default: "default")
+    
+    Raises:
+        Exception: If quota is exhausted or API error occurs
     """
     if not OPENAI_API_KEY or OPENAI_API_KEY.startswith("sk-proj-xxx"):
         # Fallback to rule-based strategy generation
         logger.warning("OpenAI API key not configured - using fallback strategy generation")
         return _generate_fallback_strategy(user_description)
+    
+    # Check and consume OpenAI quota
+    quota_result = check_openai_quota(user_id)
+    if not quota_result["allowed"]:
+        logger.warning(f"OpenAI quota exhausted for user {user_id}")
+        raise Exception(quota_result["message"])
     
     user_prompt = f"""L'utilisateur décrit sa stratégie d'investissement comme suit:
 

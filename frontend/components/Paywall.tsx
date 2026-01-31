@@ -11,6 +11,10 @@ import { SubscriptionRequired } from '@/components/subscription/SubscriptionGate
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.marketgps.online';
 
+// Bypass paywall in development mode
+const BYPASS_PAYWALL = process.env.NODE_ENV === 'development' || 
+  process.env.NEXT_PUBLIC_BYPASS_PAYWALL === 'true';
+
 interface SubscriptionStatus {
   user_id: string;
   plan: string;
@@ -27,9 +31,28 @@ export function Paywall({ children }: PaywallProps) {
   const { session, isLoading: authLoading, isAuthenticated } = useAuth();
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLocalhost, setIsLocalhost] = useState(false);
+
+  // Check if running on localhost (client-side only)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsLocalhost(
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1'
+      );
+    }
+  }, []);
+
+  const shouldBypassPaywall = BYPASS_PAYWALL || isLocalhost;
 
   useEffect(() => {
     const fetchSubscription = async () => {
+      // Skip if bypassing paywall
+      if (shouldBypassPaywall) {
+        setLoading(false);
+        return;
+      }
+
       if (!session?.access_token) {
         setLoading(false);
         return;
@@ -60,7 +83,12 @@ export function Paywall({ children }: PaywallProps) {
         setLoading(false);
       }
     }
-  }, [session, authLoading]);
+  }, [session, authLoading, shouldBypassPaywall]);
+
+  // Bypass paywall in development - always show content
+  if (shouldBypassPaywall) {
+    return <>{children}</>;
+  }
 
   // Show loading skeleton while checking
   if (loading || authLoading) {

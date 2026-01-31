@@ -20,6 +20,15 @@ import {
   Briefcase,
   Newspaper,
   MessageSquare,
+  Building2,
+  Wallet,
+  Zap,
+  Target,
+  Eye,
+  Bell,
+  Compass,
+  Bot,
+  Link2,
 } from 'lucide-react';
 import { FeedbackButton } from '@/components/feedback';
 
@@ -80,6 +89,17 @@ export function Sidebar({ scopeCounts, onLogout }: SidebarProps) {
         items: [
           { href: '/strategies', icon: Briefcase, label: 'Stratégies' },
           { href: '/barbell', icon: Dumbbell, label: 'Haltères' },
+        ],
+      },
+      {
+        section: 'Patrimoine',
+        items: [
+          { href: '/dashboard/wealth/connect', icon: Link2, label: 'Connecter' },
+          { href: '/dashboard/wealth/horizon', icon: Compass, label: 'Horizon' },
+          { href: '/dashboard/wealth/pulse', icon: Zap, label: 'Market Pulse' },
+          { href: '/dashboard/wealth/opportunities', icon: Target, label: 'Opportunités' },
+          { href: '/dashboard/wealth/analyze', icon: Eye, label: 'Analyser un bien' },
+          { href: '/dashboard/wealth', icon: Wallet, label: 'Mon Patrimoine' },
         ],
       },
       {

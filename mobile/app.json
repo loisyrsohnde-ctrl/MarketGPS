@@ -12,11 +12,13 @@
       "resizeMode": "contain",
       "backgroundColor": "#070A0B"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.marketgps.mobile",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "NSCameraUsageDescription": "MarketGPS needs camera access to scan QR codes",
         "NSPhotoLibraryUsageDescription": "MarketGPS needs photo library access to upload profile pictures"
@@ -29,7 +31,10 @@
       },
       "package": "com.marketgps.mobile",
       "versionCode": 1,
-      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"]
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -48,8 +53,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "your-project-id"
+        "projectId": "8ed57d7b-b988-4a77-8802-49f873480530"
       }
-    }
+    },
+    "owner": "realsohnde"
   }
 }

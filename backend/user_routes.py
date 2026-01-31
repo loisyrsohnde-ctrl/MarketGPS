@@ -998,3 +998,46 @@ async def get_my_user_id(
         "user_id": user_id,
         "is_authenticated": user_id != "anonymous" and user_id != "default_user",
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# AI Quota Status Endpoint
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.get("/ai-quota")
+async def get_ai_quota_status(
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Get the current user's AI quota status.
+    Shows remaining requests for OpenAI (ChatGPT) and Gemini.
+    
+    Returns:
+    - openai: { remaining, limit, used, limit_disabled }
+    - gemini: { remaining, limit, used, limit_disabled }
+    """
+    from ai_quota_service import get_ai_quota_service
+    
+    user_id = get_user_id_from_request(authorization, fallback_user_id="default")
+    
+    quota_service = get_ai_quota_service()
+    quotas = quota_service.get_user_quotas(user_id)
+    
+    return {
+        "user_id": user_id,
+        "openai": {
+            "remaining": quotas["openai"].get("remaining", 0),
+            "limit": quotas["openai"].get("limit", 50),
+            "used": quotas["openai"].get("used", 0),
+            "unlimited": quotas["openai"].get("limit_disabled", False),
+        },
+        "gemini": {
+            "remaining": quotas["gemini"].get("remaining", 0),
+            "limit": quotas["gemini"].get("limit", 50),
+            "used": quotas["gemini"].get("used", 0),
+            "unlimited": quotas["gemini"].get("limit_disabled", False),
+        },
+        "message": "Contactez le service client pour renouveler vos quotas IA." if (
+            quotas["openai"].get("remaining", 0) == 0 or quotas["gemini"].get("remaining", 0) == 0
+        ) else None,
+    }

@@ -14,6 +14,9 @@ import { MobileTabBar } from './MobileTabBar';
 import { AssetInspector } from '@/components/AssetInspector';
 import { Paywall } from '@/components/Paywall';
 
+// Phase 4 - AI Concierge FAB
+import ConciergeFAB from '@/components/wealth/ConciergeFAB';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // APP SHELL
 // Responsive layout shell that handles:
@@ -176,6 +179,9 @@ export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
 
       {/* Global Asset Inspector Slide-Over */}
       <AssetInspector />
+
+      {/* Phase 4 - AI Concierge Floating Action Button */}
+      <ConciergeFAB />
     </div>
   );
 }

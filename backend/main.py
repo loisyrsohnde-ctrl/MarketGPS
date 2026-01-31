@@ -8,11 +8,19 @@ import logging
 from typing import Optional
 from contextlib import asynccontextmanager
 
+# CRITICAL: Load environment variables BEFORE any other imports
+# that might depend on them (SQLite path, etc.)
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env from the backend directory (where this file is located)
+_env_file = Path(__file__).parent / ".env"
+load_dotenv(_env_file)
+
 from fastapi import FastAPI, Request, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from dotenv import load_dotenv
 
 from api_routes import router as api_router
 from user_routes import router as user_router
@@ -27,9 +35,7 @@ from real_estate_routes import router as real_estate_router
 from wealth_routes import router as wealth_router
 from concierge_routes import router as concierge_router
 from notifications_routes import router as notifications_router
-
-# Load environment variables
-load_dotenv()
+from portfolio_routes import router as portfolio_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -276,6 +282,7 @@ app.include_router(real_estate_router)  # Real Estate module (ADD-ON)
 app.include_router(wealth_router)  # Wealth Agent module (ADD-ON)
 app.include_router(concierge_router)  # AI Concierge module (ADD-ON)
 app.include_router(notifications_router)  # Notifications & Alerts (ADD-ON)
+app.include_router(portfolio_router)  # Portfolio Sync (ADD-ON) - Read-only, no trading
 
 
 # ============================================================================

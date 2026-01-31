@@ -20,7 +20,7 @@ from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Query, HTTPException, Body
+from fastapi import APIRouter, Query, HTTPException, Body, Header
 from pydantic import BaseModel, Field, validator
 
 # Add parent to path for storage imports
@@ -1225,7 +1225,10 @@ class AIStrategyResponse(BaseModel):
 
 
 @router.post("/ai-generate", response_model=AIStrategyResponse)
-async def generate_ai_strategy(request: AIStrategyRequest):
+async def generate_ai_strategy(
+    request: AIStrategyRequest,
+    authorization: Optional[str] = Header(None, alias="Authorization")
+):
     """
     Generate a strategy using AI based on user's description.
     
@@ -1233,6 +1236,8 @@ async def generate_ai_strategy(request: AIStrategyRequest):
     2. Gets structured strategy recommendations
     3. Matches assets from our universe to each block
     4. Returns complete strategy with explanation
+    
+    Note: Limited to 50 requests per user. Contact support to renew.
     """
     from ai_strategy_service import (
         get_ai_strategy_suggestion,
@@ -1240,11 +1245,24 @@ async def generate_ai_strategy(request: AIStrategyRequest):
         generate_strategy_explanation
     )
     
+    # Get user ID from authorization header
+    user_id = "default"
+    if authorization:
+        try:
+            from security import verify_supabase_token
+            parts = authorization.split()
+            if len(parts) == 2 and parts[0].lower() == "bearer":
+                payload = verify_supabase_token(parts[1])
+                if payload and payload.get("sub"):
+                    user_id = payload["sub"]
+        except Exception as e:
+            logger.debug(f"Auth token verification failed: {e}")
+    
     try:
-        logger.info(f"AI strategy request: {request.description[:100]}...")
+        logger.info(f"AI strategy request from {user_id}: {request.description[:100]}...")
         
-        # Step 1: Get AI recommendations
-        strategy_data = await get_ai_strategy_suggestion(request.description)
+        # Step 1: Get AI recommendations (includes quota check)
+        strategy_data = await get_ai_strategy_suggestion(request.description, user_id)
         
         # Step 2: Get available assets from our universe
         store = SQLiteStore()

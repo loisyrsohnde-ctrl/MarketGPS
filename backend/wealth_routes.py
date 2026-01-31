@@ -20,8 +20,10 @@ import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from fastapi import APIRouter, Query, Request, HTTPException, Body
+from fastapi import APIRouter, Query, Request, HTTPException, Body, Header
 from pydantic import BaseModel, Field
+
+from ai_quota_service import check_gemini_quota
 
 from geo_context_service import geo_context_service, GeoContext
 from opportunity_radar import (
@@ -280,6 +282,7 @@ async def get_opportunity_detail(
 @router.post("/visual-inspector")
 async def analyze_images(
     request: VisualInspectorRequest,
+    authorization: Optional[str] = Header(None, alias="Authorization")
 ) -> Dict[str, Any]:
     """
     Analyser des images d'un bien immobilier.
@@ -290,7 +293,27 @@ async def analyze_images(
     - Estimation des travaux
     - Détection surcote/sous-cote
     - Points forts et faibles
+    
+    Note: Limited to 50 Gemini requests per user. Contact support to renew.
     """
+    # Get user ID from authorization header
+    user_id = "default"
+    if authorization:
+        try:
+            from security import verify_supabase_token
+            parts = authorization.split()
+            if len(parts) == 2 and parts[0].lower() == "bearer":
+                payload = verify_supabase_token(parts[1])
+                if payload and payload.get("sub"):
+                    user_id = payload["sub"]
+        except Exception as e:
+            pass
+    
+    # Check and consume Gemini quota
+    quota_result = check_gemini_quota(user_id)
+    if not quota_result["allowed"]:
+        raise HTTPException(status_code=429, detail=quota_result["message"])
+    
     analysis = await visual_inspector_service.analyze_images(
         image_urls=request.image_urls,
         country=request.country,

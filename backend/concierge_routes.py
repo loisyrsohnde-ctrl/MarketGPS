@@ -3,7 +3,7 @@ MarketGPS - AI Concierge Routes
 ================================
 
 Provides AI-powered investment advice and portfolio analysis.
-Uses ProphetIA scoring combined with LLM for natural language responses.
+Uses ProphetIA scoring combined with Google Gemini for natural language responses.
 
 Endpoints:
 - POST /api/concierge/analyze   - Analyze portfolio with AI
@@ -22,11 +22,39 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from enum import Enum
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, HTTPException, Depends, Query, Body, Header
 from pydantic import BaseModel, Field
+
+from ai_quota_service import check_gemini_quota
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Gemini AI Integration
+GEMINI_AVAILABLE = False
+GEMINI_MODEL = None
+
+def _init_gemini():
+    """Initialize Gemini AI model."""
+    global GEMINI_AVAILABLE, GEMINI_MODEL
+    try:
+        import google.generativeai as genai
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            genai.configure(api_key=api_key)
+            # Use gemini-2.0-flash - fast and capable
+            GEMINI_MODEL = genai.GenerativeModel('gemini-2.0-flash')
+            GEMINI_AVAILABLE = True
+            logger.info("✅ Gemini AI (gemini-2.0-flash) initialized successfully")
+        else:
+            logger.warning("⚠️ GEMINI_API_KEY not set - using template fallback")
+    except ImportError as e:
+        logger.warning(f"⚠️ Gemini import failed: {e}")
+    except Exception as e:
+        logger.error(f"❌ Gemini initialization error: {e}")
+
+# Initialize Gemini on module load
+_init_gemini()
 
 router = APIRouter(prefix="/api/concierge", tags=["AI Concierge"])
 
@@ -161,6 +189,66 @@ QUICK_PROMPTS: List[QuickPrompt] = [
 
 
 # =============================================================================
+# Gemini AI Integration
+# =============================================================================
+
+def call_gemini_ai(
+    prompt: str,
+    coach: Dict,
+    profile: CoachProfile,
+    portfolio_value: float,
+    portfolio_score: int,
+    holdings: Optional[List[Dict]] = None,
+) -> str:
+    """
+    Call Gemini AI with a structured prompt for investment advice.
+    """
+    if not GEMINI_AVAILABLE or not GEMINI_MODEL:
+        return None
+    
+    # Build holdings context
+    holdings_text = ""
+    if holdings:
+        holdings_text = "\n".join([
+            f"- {h.get('name', h.get('ticker', 'Inconnu'))}: {h.get('value', 0)}€ ({h.get('allocation', 0)}%)"
+            for h in holdings[:10]
+        ])
+    else:
+        holdings_text = "Données détaillées non disponibles"
+    
+    system_prompt = f"""Tu es ProphetIA, un conseiller en investissement IA pour MarketGPS.
+Tu adoptes le profil "{coach['name']}" avec les caractéristiques suivantes:
+- Focus: {coach['focus']}
+- Biais d'allocation: {coach['allocation_bias']}
+- Tolérance au risque: {coach['risk_tolerance']}
+
+CONTEXTE DU PORTEFEUILLE:
+- Valeur totale: {portfolio_value:,.0f}€
+- Score ProphetIA: {portfolio_score}/100
+- Positions:
+{holdings_text}
+
+RÈGLES:
+1. Réponds toujours en français
+2. Sois concis mais informatif (max 300 mots)
+3. Adapte tes conseils au profil {coach['name']}
+4. Utilise des données chiffrées quand possible
+5. Structure ta réponse avec des bullet points ou sections claires
+6. N'invente PAS de données spécifiques que tu ne connais pas
+7. Termine par une recommandation actionnable
+
+QUESTION DE L'UTILISATEUR:
+{prompt}"""
+
+    try:
+        response = GEMINI_MODEL.generate_content(system_prompt)
+        return response.text
+    except Exception as e:
+        logger.error(f"Gemini API error: {e}")
+        return None
+
+
+# =============================================================================
 # Analysis Engine
 # =============================================================================
 
@@ -174,18 +262,36 @@ def generate_portfolio_analysis(
     """
     Generate AI analysis based on prompt and portfolio data.
     
-    In production, this would:
-    1. Fetch real portfolio data from database
-    2. Calculate metrics using ProphetIA
-    3. Generate response using LLM (OpenAI/Gemini)
-    
-    For now, returns structured demo responses.
+    Uses Google Gemini for intelligent responses, with fallback to templates.
     """
     coach = COACH_PERSONALITIES[profile]
     score = portfolio_score or 72
     value = portfolio_value or 250000
     
-    # Detect prompt type
+    # Try Gemini AI first
+    if GEMINI_AVAILABLE:
+        ai_response = call_gemini_ai(
+            prompt=prompt,
+            coach=coach,
+            profile=profile,
+            portfolio_value=value,
+            portfolio_score=score,
+            holdings=holdings,
+        )
+        if ai_response:
+            logger.info("✅ Gemini AI response generated successfully")
+            return {
+                "content": ai_response,
+                "source": "gemini",
+                "metrics": _get_default_metrics(score),
+                "actions": [
+                    {"label": "Voir le détail", "action": "view_portfolio", "type": "secondary"},
+                    {"label": "Appliquer", "action": "apply_suggestions", "type": "primary"},
+                ],
+            }
+    
+    # Fallback to template-based responses
+    logger.info("⚠️ Using template fallback (Gemini unavailable)")
     prompt_lower = prompt.lower()
     
     if "analyse" in prompt_lower or "diagnostic" in prompt_lower:
@@ -200,6 +306,16 @@ def generate_portfolio_analysis(
         return _generate_rebalance(coach, score, value, profile)
     else:
         return _generate_generic(coach, score, value, profile, prompt)
+
+
+def _get_default_metrics(score: int) -> List[Dict]:
+    """Return default metrics for AI responses."""
+    return [
+        {"label": "Score Global", "value": str(score), "icon": "BarChart3"},
+        {"label": "Rendement YTD", "value": "+12.4%", "change": 12.4, "icon": "TrendingUp"},
+        {"label": "Volatilité", "value": "14.2%", "icon": "AlertTriangle"},
+        {"label": "Sharpe Ratio", "value": "1.24", "icon": "Target"},
+    ]
 
 
 def _generate_diagnostic(coach: Dict, score: int, value: float, profile: CoachProfile) -> Dict:
@@ -405,13 +521,37 @@ async def get_quick_prompts():
 
 
 @router.post("/analyze", response_model=AnalysisResponse)
-async def analyze_portfolio(request: AnalysisRequest):
+async def analyze_portfolio(
+    request: AnalysisRequest,
+    authorization: Optional[str] = Header(None, alias="Authorization")
+):
     """
     Analyze portfolio and generate AI response.
     
     Uses ProphetIA scoring combined with coach personality
     to generate personalized investment advice.
+    
+    Note: Limited to 50 Gemini requests per user. Contact support to renew.
     """
+    # Get user ID from authorization header
+    user_id = "default"
+    if authorization:
+        try:
+            from security import verify_supabase_token
+            parts = authorization.split()
+            if len(parts) == 2 and parts[0].lower() == "bearer":
+                payload = verify_supabase_token(parts[1])
+                if payload and payload.get("sub"):
+                    user_id = payload["sub"]
+        except Exception as e:
+            logger.debug(f"Auth token verification failed: {e}")
+    
+    # Check and consume Gemini quota
+    quota_result = check_gemini_quota(user_id)
+    if not quota_result["allowed"]:
+        logger.warning(f"Gemini quota exhausted for user {user_id}")
+        raise HTTPException(status_code=429, detail=quota_result["message"])
+    
     try:
         result = generate_portfolio_analysis(
             prompt=request.prompt,

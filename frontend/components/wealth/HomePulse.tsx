@@ -351,7 +351,7 @@ export default function HomePulse({
               <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-6 text-center">
                 <Target size={24} className="mx-auto text-slate-500 mb-2" />
                 <p className="text-sm text-slate-400">
-                  Aucun signal fort aujourd'hui
+                  Aucun signal fort aujourd&apos;hui
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
                   Configurez vos critères pour recevoir des alertes

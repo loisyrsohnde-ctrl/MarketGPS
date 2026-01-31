@@ -315,7 +315,7 @@ export default function VisualInspectorResult({
         <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-5">
           <h3 className="font-medium mb-4 flex items-center gap-2 text-orange-400">
             <ThumbsDown size={18} />
-            Points d'attention
+            Points d&apos;attention
           </h3>
           <ul className="space-y-2">
             {analysis.weaknesses.map((w, i) => (

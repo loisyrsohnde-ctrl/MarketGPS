@@ -136,7 +136,7 @@ function CapitalStep({
         </div>
         <h2 className="text-2xl font-semibold mb-2">Quel est votre capital disponible ?</h2>
         <p className="text-slate-400">
-          Apport personnel pour l'investissement
+          Apport personnel pour l&apos;investissement
         </p>
       </div>
 
@@ -403,6 +403,7 @@ export default function OnboardingWizard({
               onSelectGoal={setSelectedGoal}
               onSubmit={handleSubmit}
               isLoading={isLoading}
+              onNext={handleSubmit}
               onBack={() => setStep(1)}
               isLast
             />

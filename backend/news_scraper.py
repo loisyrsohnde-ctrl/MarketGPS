@@ -188,11 +188,41 @@ class AfricanNewsScraper:
                 )
             """)
 
-            # Create indexes
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_news_status ON news_articles(status)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_news_interactions ON news_articles(total_interactions DESC)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_news_published ON news_articles(published_to_app)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_news_scraped ON news_articles(scraped_at DESC)")
+            # Add missing columns if they don't exist (migration)
+            migration_columns = [
+                ("scraped_at", "TEXT"),
+                ("likes", "INTEGER DEFAULT 0"),
+                ("comments", "INTEGER DEFAULT 0"),
+                ("shares", "INTEGER DEFAULT 0"),
+                ("views", "INTEGER DEFAULT 0"),
+                ("total_interactions", "INTEGER DEFAULT 0"),
+                ("keywords", "TEXT"),
+                ("relevance_score", "REAL DEFAULT 0.0"),
+                ("status", "TEXT DEFAULT 'pending'"),
+                ("published_to_app", "INTEGER DEFAULT 0"),
+                ("published_to_app_at", "TEXT"),
+                ("admin_notes", "TEXT"),
+            ]
+            
+            for col_name, col_type in migration_columns:
+                try:
+                    conn.execute(f"ALTER TABLE news_articles ADD COLUMN {col_name} {col_type}")
+                except:
+                    pass  # Column already exists
+
+            # Create indexes (wrapped in try/except for missing columns)
+            index_statements = [
+                "CREATE INDEX IF NOT EXISTS idx_news_status ON news_articles(status)",
+                "CREATE INDEX IF NOT EXISTS idx_news_interactions ON news_articles(total_interactions DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_news_published ON news_articles(published_to_app)",
+                "CREATE INDEX IF NOT EXISTS idx_news_scraped ON news_articles(scraped_at DESC)",
+            ]
+            
+            for stmt in index_statements:
+                try:
+                    conn.execute(stmt)
+                except:
+                    pass  # Index may fail if column doesn't exist
 
             conn.commit()
 

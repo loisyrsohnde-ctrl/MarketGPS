@@ -30,13 +30,36 @@ interface SubscriptionGateProps {
   fallback?: React.ReactNode; // Custom fallback content
 }
 
+// Check if we should bypass paywall (development or env override)
+const BYPASS_PAYWALL = process.env.NODE_ENV === 'development' || 
+  process.env.NEXT_PUBLIC_BYPASS_PAYWALL === 'true';
+
 export function SubscriptionGate({ children, feature, fallback }: SubscriptionGateProps) {
   const { session, isLoading: authLoading } = useAuth();
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLocalhost, setIsLocalhost] = useState(false);
+
+  // Check if running on localhost (client-side only)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsLocalhost(
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1'
+      );
+    }
+  }, []);
+
+  const shouldBypassPaywall = BYPASS_PAYWALL || isLocalhost;
 
   useEffect(() => {
     const fetchSubscription = async () => {
+      // Skip subscription check if bypassing paywall
+      if (shouldBypassPaywall) {
+        setLoading(false);
+        return;
+      }
+
       if (!session?.access_token) {
         setLoading(false);
         return;
@@ -63,7 +86,12 @@ export function SubscriptionGate({ children, feature, fallback }: SubscriptionGa
     if (!authLoading) {
       fetchSubscription();
     }
-  }, [session, authLoading]);
+  }, [session, authLoading, shouldBypassPaywall]);
+
+  // Bypass paywall in development - always show content
+  if (shouldBypassPaywall) {
+    return <>{children}</>;
+  }
 
   // Loading state
   if (loading || authLoading) {
