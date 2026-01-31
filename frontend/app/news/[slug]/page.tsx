@@ -84,6 +84,31 @@ const COUNTRY_FLAGS: Record<string, string> = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Helper Components
+// ═══════════════════════════════════════════════════════════════════════════
+
+function SimpleMarkdown({ text }: { text: string }) {
+  if (!text) return null;
+  
+  // Split by newlines first to handle paragraphs if needed, 
+  // but here we are inside a pre-wrap div so we just need to handle bold
+  
+  // Split by ** markers
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+          return <strong key={i} className="text-text-primary font-bold">{part.slice(2, -2)}</strong>;
+        }
+        return part;
+      })}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Page
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -303,7 +328,7 @@ export default function ArticlePage() {
             {article.tldr.map((point, i) => (
               <li key={i} className="flex gap-2 text-sm text-text-secondary">
                 <span className="text-accent font-bold">•</span>
-                {point}
+                <SimpleMarkdown text={point} />
               </li>
             ))}
           </ul>
@@ -317,7 +342,7 @@ export default function ArticlePage() {
             className="text-text-secondary leading-relaxed space-y-4"
             style={{ whiteSpace: 'pre-wrap' }}
           >
-            {article.content_md}
+            <SimpleMarkdown text={article.content_md} />
           </div>
         </article>
       )}
@@ -330,8 +355,8 @@ export default function ArticlePage() {
             <> — Publié le {new Date(article.published_at).toLocaleDateString('fr-FR')}</>
           )}
         </p>
-        <p className="mt-2 text-xs">
-          Contenu reformulé par MarketGPS. Pour l&apos;article original, consultez la source.
+        <p className="mt-2 text-xs font-medium text-accent/80">
+          ✨ Analyse propulsée par MarketGPS, votre copilote pour l&apos;investissement intelligent en Afrique.
         </p>
       </GlassCard>
     </div>
