@@ -49,8 +49,19 @@ export function Sidebar({ scopeCounts, onLogout, isAuthenticated = true }: Sideb
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
+  // Type definition for nav items
+  type NavItem = {
+    href: string;
+    icon: any;
+    label: string;
+    badge?: string;
+  };
+
   // If not authenticated, show simplified menu
-  const navItems = !isAuthenticated ? [
+  const navItems: Array<{
+    section: string;
+    items: Array<NavItem>;
+  }> = !isAuthenticated ? [
     {
       section: 'Navigation',
       items: [
@@ -74,12 +85,7 @@ export function Sidebar({ scopeCounts, onLogout, isAuthenticated = true }: Sideb
   // Full menu structure for authenticated users
   const fullNavItems: Array<{
     section: string;
-    items: Array<{
-      href: string;
-      icon: any;
-      label: string;
-      badge?: string;
-    }>;
+    items: Array<NavItem>;
   }> = [
       {
         section: 'Navigation',
