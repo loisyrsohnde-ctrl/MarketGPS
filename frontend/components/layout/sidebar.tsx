@@ -42,13 +42,37 @@ interface SidebarProps {
     AFRICA: number;
   };
   onLogout?: () => void;
+  isAuthenticated?: boolean;
 }
 
-export function Sidebar({ scopeCounts, onLogout }: SidebarProps) {
+export function Sidebar({ scopeCounts, onLogout, isAuthenticated = true }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
-  const navItems: Array<{
+  // If not authenticated, show simplified menu
+  const navItems = !isAuthenticated ? [
+    {
+      section: 'Navigation',
+      items: [
+        { href: '/news', icon: Newspaper, label: 'Actualités' },
+      ],
+    }
+  ] : [
+      {
+        section: 'Navigation',
+        items: [
+          { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+          { href: '/dashboard/explorer', icon: Search, label: 'Explorer' },
+          { href: '/watchlist', icon: Star, label: 'Liste de suivi' },
+          { href: '/dashboard/explorer', icon: TrendingUp, label: 'Marchés' },
+          { href: '/news', icon: Newspaper, label: 'Actualités' },
+        ],
+      },
+      // ... rest of items ...
+  ];
+
+  // Full menu structure for authenticated users
+  const fullNavItems: Array<{
     section: string;
     items: Array<{
       href: string;
@@ -111,6 +135,8 @@ export function Sidebar({ scopeCounts, onLogout }: SidebarProps) {
       },
     ];
 
+  const itemsToRender = isAuthenticated ? fullNavItems : navItems;
+
   return (
     <aside
       className={cn(
@@ -147,7 +173,7 @@ export function Sidebar({ scopeCounts, onLogout }: SidebarProps) {
            NAVIGATION
            ───────────────────────────────────────────────────────────────── */}
         <nav className="flex-1 overflow-y-auto py-4 scrollbar-hide">
-          {navItems.map((section) => (
+          {itemsToRender.map((section) => (
             <div key={section.section} className="mb-6">
               {/* Section label */}
               <AnimatePresence>
@@ -222,7 +248,7 @@ export function Sidebar({ scopeCounts, onLogout }: SidebarProps) {
           <FeedbackButton collapsed={collapsed} />
 
           {/* Logout button */}
-          {onLogout && (
+          {isAuthenticated && onLogout && (
             <button
               onClick={onLogout}
               className={cn(
@@ -245,6 +271,32 @@ export function Sidebar({ scopeCounts, onLogout }: SidebarProps) {
                 )}
               </AnimatePresence>
             </button>
+          )}
+
+          {/* Login button (if not authenticated) */}
+          {!isAuthenticated && (
+            <Link
+              href="/login"
+              className={cn(
+                'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl',
+                'text-accent hover:bg-surface hover:text-accent-light',
+                'transition-all duration-200'
+              )}
+            >
+              <LogOut className={cn('w-5 h-5 rotate-180', collapsed && 'mx-auto')} />
+              <AnimatePresence>
+                {!collapsed && (
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="text-sm font-medium"
+                  >
+                    Connexion
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </Link>
           )}
 
           {/* Collapse toggle */}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { usePathname } from 'next/navigation';
 import { SubscriptionRequired } from '@/components/subscription/SubscriptionGate';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -29,9 +30,13 @@ interface PaywallProps {
 
 export function Paywall({ children }: PaywallProps) {
   const { session, isLoading: authLoading, isAuthenticated } = useAuth();
+  const pathname = usePathname();
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLocalhost, setIsLocalhost] = useState(false);
+
+  // Allow public access to news routes
+  const isPublicRoute = pathname?.startsWith('/news');
 
   // Check if running on localhost (client-side only)
   useEffect(() => {
@@ -43,7 +48,7 @@ export function Paywall({ children }: PaywallProps) {
     }
   }, []);
 
-  const shouldBypassPaywall = BYPASS_PAYWALL || isLocalhost;
+  const shouldBypassPaywall = BYPASS_PAYWALL || isLocalhost || isPublicRoute;
 
   useEffect(() => {
     const fetchSubscription = async () => {

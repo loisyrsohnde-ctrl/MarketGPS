@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { supabase, signOut, getSession } from '@/lib/supabase';
 import { getApiBaseUrl } from '@/lib/config';
@@ -32,6 +32,7 @@ interface AppShellProps {
 
 export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [user, setUser] = useState<{
     email: string;
@@ -40,6 +41,9 @@ export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
   } | null>(null);
   const [scopeCounts, setScopeCounts] = useState({ US_EU: 0, AFRICA: 0 });
   const [isLoading, setIsLoading] = useState(true);
+
+  // Check if current route is public (e.g. news)
+  const isPublicRoute = pathname?.startsWith('/news');
 
   // Fetch scope counts on mount
   useEffect(() => {
@@ -69,12 +73,14 @@ export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
             display_name: session.user.user_metadata?.display_name,
             avatar_url: session.user.user_metadata?.avatar_url,
           });
-        } else {
+        } else if (!isPublicRoute) {
           router.push('/login');
         }
       } catch (error) {
         console.error('Auth error:', error);
-        router.push('/login');
+        if (!isPublicRoute) {
+          router.push('/login');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -87,7 +93,10 @@ export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
-        router.push('/login');
+        setUser(null);
+        if (!isPublicRoute) {
+          router.push('/login');
+        }
       } else if (session?.user) {
         setUser({
           email: session.user.email || '',
@@ -100,7 +109,7 @@ export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [router, isPublicRoute]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -137,7 +146,11 @@ export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
 
       {/* Desktop Sidebar - hidden on mobile */}
       <div className="hidden md:block">
-        <Sidebar scopeCounts={scopeCounts} onLogout={handleLogout} />
+        <Sidebar 
+          scopeCounts={scopeCounts} 
+          onLogout={handleLogout} 
+          isAuthenticated={!!user}
+        />
       </div>
 
       {/* Desktop Topbar - hidden on mobile */}
