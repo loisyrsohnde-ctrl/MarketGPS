@@ -259,27 +259,31 @@ function ExplorerPageContent() {
                 leftIcon={<Search className="w-4 h-4" />}
               />
             </div>
+          </div>
 
-          <div className="h-6 w-px bg-glass-border" />
+          <div className="flex items-center gap-3">
+            <div className="h-6 w-px bg-glass-border hidden sm:block" />
 
-          {/* Market scope */}
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-text-muted" />
-            <div className="flex gap-2">
-              {marketFilters.map((f) => (
-                <Pill
-                  key={f.value}
-                  active={marketScope === f.value}
-                  onClick={() => {
-                    setMarketScope(f.value);
-                    setAfricaRegion(null); // Reset Africa region when switching scope
-                    setCurrentPage(1);
-                  }}
-                  icon={<span>{f.icon}</span>}
-                >
-                  {f.label}
-                </Pill>
-              ))}
+            {/* Market scope */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              <Filter className="w-4 h-4 text-text-muted flex-shrink-0" />
+              <div className="flex gap-2">
+                {marketFilters.map((f) => (
+                  <Pill
+                    key={f.value}
+                    active={marketScope === f.value}
+                    onClick={() => {
+                      setMarketScope(f.value);
+                      setAfricaRegion(null); // Reset Africa region when switching scope
+                      setCurrentPage(1);
+                    }}
+                    icon={<span>{f.icon}</span>}
+                    className="flex-shrink-0"
+                  >
+                    {f.label}
+                  </Pill>
+                ))}
+              </div>
             </div>
           </div>
 
