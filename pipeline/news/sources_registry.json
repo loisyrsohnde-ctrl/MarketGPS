@@ -1,7 +1,7 @@
 {
-  "version": "2.0",
-  "description": "MarketGPS Africa News Sources - 50 sources with strict regional classification",
-  "last_updated": "2026-01-24",
+  "version": "2.1",
+  "description": "MarketGPS Africa News Sources - 52 sources with strict regional classification",
+  "last_updated": "2026-02-01",
   "regions": {
     "PAN": "Panafricain (continent-wide)",
     "NORTH": "Afrique du Nord (Maghreb + Égypte)",
@@ -664,6 +664,30 @@
       "language": "en",
       "tags": ["business", "entrepreneurship", "success"],
       "trust_score": 0.85,
+      "enabled": true
+    },
+    {
+      "name": "Africa Intelligence",
+      "url": "https://www.africaintelligence.com",
+      "rss_url": "https://www.africaintelligence.com/rss",
+      "type": "rss",
+      "country": null,
+      "region": "PAN",
+      "language": "en",
+      "tags": ["business", "politics", "intelligence", "investigation"],
+      "trust_score": 0.95,
+      "enabled": true
+    },
+    {
+      "name": "Africa Tech Business",
+      "url": "https://africatechbusiness.com",
+      "rss_url": "https://africatechbusiness.com/feed/",
+      "type": "rss",
+      "country": null,
+      "region": "PAN",
+      "language": "en",
+      "tags": ["tech", "startup", "business", "innovation"],
+      "trust_score": 0.8,
       "enabled": true
     }
   ]

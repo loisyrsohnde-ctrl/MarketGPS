@@ -42,7 +42,10 @@ class NewsArticleSummary(BaseModel):
     published_at: Optional[str]
     category: Optional[str] = None
     sentiment: Optional[str] = None
-    
+    engagement_score: Optional[float] = None
+    is_breaking_news: Optional[bool] = None
+    importance_level: Optional[str] = None
+
     @classmethod
     def from_db(cls, row: dict) -> "NewsArticleSummary":
         """Create from database row."""
@@ -52,14 +55,14 @@ class NewsArticleSummary(BaseModel):
                 tldr = json.loads(row["tldr_json"])
             except:
                 pass
-        
+
         tags = None
         if row.get("tags_json"):
             try:
                 tags = json.loads(row["tags_json"])
             except:
                 pass
-        
+
         return cls(
             id=row["id"],
             slug=row["slug"],
@@ -72,7 +75,10 @@ class NewsArticleSummary(BaseModel):
             source_name=row.get("source_name", "Unknown"),
             published_at=row.get("published_at"),
             category=row.get("category"),
-            sentiment=row.get("sentiment")
+            sentiment=row.get("sentiment"),
+            engagement_score=row.get("engagement_score"),
+            is_breaking_news=bool(row.get("is_breaking_news")),
+            importance_level=row.get("importance_level")
         )
 
 
@@ -170,15 +176,19 @@ async def get_news_feed(
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     q: Optional[str] = Query(None, description="Search query"),
     country: Optional[str] = Query(None, description="Filter by country code (NG, ZA, KE, etc.)"),
-    tag: Optional[str] = Query(None, description="Filter by tag (fintech, startup, vc, etc.)")
+    tag: Optional[str] = Query(None, description="Filter by tag (fintech, startup, vc, etc.)"),
+    region: Optional[str] = Query(None, description="Filter by region (PAN, WEST, CENTRAL, EAST, NORTH, SOUTH)"),
+    sort_by: Optional[str] = Query("date", description="Sort by: date or relevance")
 ):
     """
     Get paginated news feed.
-    
+
     Supports filtering by:
     - Search query (title, excerpt, content)
     - Country code
     - Tag
+    - Region (PAN, WEST, CENTRAL, EAST, NORTH, SOUTH)
+    - Sort by date or relevance (engagement_score)
     """
     try:
         result = db.get_news_articles(
@@ -186,11 +196,13 @@ async def get_news_feed(
             page_size=page_size,
             query=q,
             country=country,
-            tag=tag
+            tag=tag,
+            region=region,
+            sort_by=sort_by
         )
-        
+
         articles = [NewsArticleSummary.from_db(row) for row in result["data"]]
-        
+
         return NewsPaginatedResponse(
             data=articles,
             total=result["total"],
@@ -442,6 +454,59 @@ async def get_news_status():
             "total_articles": 0,
             "is_fresh": False,
         }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Breaking News Endpoints
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/breaking")
+async def get_breaking_news(
+    limit: int = Query(5, ge=1, le=20, description="Maximum number of breaking news"),
+    max_age_hours: int = Query(6, ge=1, le=48, description="Maximum age in hours")
+):
+    """
+    Get recent breaking news articles.
+    Used for the breaking news banner and alerts.
+    """
+    from backend.news_notifications import get_notification_service
+
+    try:
+        service = get_notification_service()
+        articles = service.get_breaking_news(limit=limit, max_age_hours=max_age_hours)
+
+        return {
+            "data": articles,
+            "count": len(articles),
+            "has_breaking": len(articles) > 0
+        }
+    except Exception as e:
+        logger.error(f"Error fetching breaking news: {e}")
+        return {"data": [], "count": 0, "has_breaking": False}
+
+
+@router.get("/important")
+async def get_important_news(
+    limit: int = Query(10, ge=1, le=50, description="Maximum number of articles"),
+    max_age_hours: int = Query(24, ge=1, le=168, description="Maximum age in hours")
+):
+    """
+    Get high importance news articles.
+    Used for featured/trending sections.
+    """
+    from backend.news_notifications import get_notification_service
+
+    try:
+        service = get_notification_service()
+        articles = service.get_high_importance_news(limit=limit, max_age_hours=max_age_hours)
+
+        return {
+            "data": articles,
+            "count": len(articles)
+        }
+    except Exception as e:
+        logger.error(f"Error fetching important news: {e}")
+        return {"data": [], "count": 0}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

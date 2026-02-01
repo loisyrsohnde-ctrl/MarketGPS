@@ -14,9 +14,11 @@ import {
   Loader2,
   AlertCircle,
   Newspaper,
+  Archive,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getApiBaseUrl } from '@/lib/config';
+import BreakingNewsBanner from '@/components/news/BreakingNewsBanner';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -466,7 +468,10 @@ export default function NewsPage() {
     <div className="min-h-screen bg-zinc-50">
       {/* Market Ticker */}
       <MarketTicker />
-      
+
+      {/* Breaking News Banner */}
+      <BreakingNewsBanner />
+
       {/* Freshness Indicator */}
       <div className="bg-white border-b border-slate-200 py-2">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
@@ -591,15 +596,22 @@ export default function NewsPage() {
           </div>
         </section>
         
-        {/* View All Link */}
-        <div className="text-center pb-12">
+        {/* View All Links */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pb-12">
+          <Link
+            href="/news/archives"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 text-white font-semibold rounded hover:bg-slate-800 transition-colors"
+          >
+            <Newspaper className="w-4 h-4" />
+            Voir toutes les actualités
+            <ArrowRight className="w-4 h-4" />
+          </Link>
           <Link
             href="/news/saved"
             className="inline-flex items-center gap-2 text-blue-700 font-semibold hover:text-blue-800 transition-colors"
           >
             <Bookmark className="w-4 h-4" />
-            Voir mes articles sauvegardés
-            <ArrowRight className="w-4 h-4" />
+            Mes articles sauvegardés
           </Link>
         </div>
       </main>

@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from core.config import get_logger
 from storage.sqlite_store import SQLiteStore
 from pipeline.news.image_fetcher import fetch_article_image
+from pipeline.news.scoring import score_article, load_sources_registry
 
 logger = get_logger(__name__)
 
@@ -46,6 +47,7 @@ class NewsPublisher:
         self.store = store or SQLiteStore()
         self.store._ensure_news_tables()
         self._init_llm()
+        self.sources_registry = load_sources_registry()
     
     def _init_llm(self):
         """Initialize LLM for translation/rewriting."""
@@ -334,7 +336,25 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
             
             # Generate slug
             slug = self._generate_slug(rewritten.get("title_fr", "article"))
-            
+
+            # Calculate engagement score
+            scoring_result = score_article(
+                title=rewritten.get("title_fr", raw_payload.get("title", "")),
+                content=rewritten.get("content_md", ""),
+                excerpt=rewritten.get("excerpt_fr", ""),
+                source_name=raw_item.get("source_name", "Unknown"),
+                published_at=raw_item.get("published_at"),
+                image_url=image_url,
+                tags=tags,
+                save_count=0,  # New article, no saves yet
+                view_count=0,  # New article, no views yet
+                sources_registry=self.sources_registry
+            )
+
+            # Log breaking news detection
+            if scoring_result.get("is_breaking_news"):
+                logger.info(f"🔴 BREAKING NEWS detected: {rewritten.get('title_fr', '')[:60]}...")
+
             # Prepare article
             article = {
                 "slug": slug,
@@ -354,7 +374,11 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
                 "status": "published",
                 "category": category,
                 "sentiment": sentiment,
-                "is_ai_processed": is_ai_processed
+                "is_ai_processed": is_ai_processed,
+                # New scoring fields
+                "engagement_score": scoring_result.get("engagement_score", 0.0),
+                "is_breaking_news": 1 if scoring_result.get("is_breaking_news") else 0,
+                "importance_level": scoring_result.get("importance_level", "normal")
             }
             
             # Insert article

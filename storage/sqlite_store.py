@@ -391,7 +391,34 @@ class SQLiteStore:
             if "is_ai_processed" not in column_names:
                 logger.info("Adding is_ai_processed column to news_articles...")
                 conn.execute("ALTER TABLE news_articles ADD COLUMN is_ai_processed INTEGER DEFAULT 0")
-            
+
+            # Ensure engagement scoring columns exist
+            if "engagement_score" not in column_names:
+                logger.info("Adding engagement_score column to news_articles...")
+                conn.execute("ALTER TABLE news_articles ADD COLUMN engagement_score REAL DEFAULT 0.0")
+
+            if "save_count" not in column_names:
+                logger.info("Adding save_count column to news_articles...")
+                conn.execute("ALTER TABLE news_articles ADD COLUMN save_count INTEGER DEFAULT 0")
+
+            if "is_breaking_news" not in column_names:
+                logger.info("Adding is_breaking_news column to news_articles...")
+                conn.execute("ALTER TABLE news_articles ADD COLUMN is_breaking_news INTEGER DEFAULT 0")
+
+            if "importance_level" not in column_names:
+                logger.info("Adding importance_level column to news_articles...")
+                conn.execute("ALTER TABLE news_articles ADD COLUMN importance_level TEXT DEFAULT 'normal'")
+
+            # Create index for engagement-based queries if not exists
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_news_engagement ON news_articles(engagement_score DESC)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_news_breaking ON news_articles(is_breaking_news, published_at DESC)")
+
+            # Load and execute engagement migration for notification tables
+            engagement_migration = Path(__file__).parent / "migrations" / "add_news_engagement.sql"
+            if engagement_migration.exists():
+                with open(engagement_migration, "r") as f:
+                    conn.executescript(f.read())
+
             # Ensure news_sources has region column
             source_columns = conn.execute("PRAGMA table_info(news_sources)").fetchall()
             source_column_names = [c[1] for c in source_columns]
@@ -2370,6 +2397,16 @@ class SQLiteStore:
         'CM', 'CI', 'SN', 'BJ', 'TG', 'GA', 'CG', 'ML', 'BF', 'NE', 'TD', 'GN', 'RW', 'CD'
     ]
     
+    # Region to country mapping for news filtering
+    REGION_TO_COUNTRIES = {
+        "PAN": [],  # Pan-African - no specific country filter
+        "WEST": ["NG", "GH", "SN", "CI", "BF", "ML", "NE", "TG", "BJ", "GN"],
+        "CENTRAL": ["CM", "GA", "CG", "TD", "CF", "GQ", "CD"],
+        "EAST": ["KE", "TZ", "UG", "RW", "ET", "SS"],
+        "NORTH": ["MA", "DZ", "TN", "EG", "LY"],
+        "SOUTH": ["ZA", "AO", "MZ", "ZW", "NA", "BW", "ZM", "MW"]
+    }
+
     def get_news_articles(
         self,
         page: int = 1,
@@ -2377,27 +2414,40 @@ class SQLiteStore:
         query: Optional[str] = None,
         country: Optional[str] = None,
         tag: Optional[str] = None,
+        region: Optional[str] = None,
+        sort_by: Optional[str] = "date",
         status: str = "published",
         prioritize_francophone: bool = True
     ) -> Dict:
         """
         Get paginated news articles with filtering.
-        
+
         Args:
+            region: Filter by region (PAN, WEST, CENTRAL, EAST, NORTH, SOUTH)
+            sort_by: Sort by 'date' (default) or 'relevance' (engagement_score)
             prioritize_francophone: If True (default), francophone countries appear first
-        
+
         Returns:
             Dict with {data, total, page, page_size, total_pages}
         """
         conditions = ["status = ?"]
         params = [status]
-        
+
         if query:
             conditions.append("(title LIKE ? OR excerpt LIKE ? OR content_md LIKE ?)")
             pattern = f"%{query}%"
             params.extend([pattern, pattern, pattern])
-        
-        if country:
+
+        # Handle region filter - convert to country list
+        if region and region.upper() in self.REGION_TO_COUNTRIES:
+            region_countries = self.REGION_TO_COUNTRIES[region.upper()]
+            if region_countries:  # If specific countries for this region
+                placeholders = ','.join(['?' for _ in region_countries])
+                conditions.append(f"country IN ({placeholders})")
+                params.extend(region_countries)
+            # For PAN (pan-african), no country filter needed
+
+        elif country:
             # Support comma-separated countries for region filtering
             countries = [c.strip() for c in country.split(',') if c.strip()]
             if len(countries) == 1:
@@ -2407,45 +2457,53 @@ class SQLiteStore:
                 placeholders = ','.join(['?' for _ in countries])
                 conditions.append(f"country IN ({placeholders})")
                 params.extend(countries)
-        
+
         if tag:
             conditions.append("tags_json LIKE ?")
             params.append(f'%"{tag}"%')
-        
+
         where_clause = " AND ".join(conditions)
-        
+
         # Count total
         count_sql = f"SELECT COUNT(*) FROM news_articles WHERE {where_clause}"
-        
-        # Build ORDER BY clause - prioritize francophone countries if no specific country filter
-        if prioritize_francophone and not country:
-            # Create CASE statement for priority sorting
-            # Francophone countries get priority 0, others get priority 1
+
+        # Build ORDER BY clause based on sort_by
+        if sort_by == "relevance":
+            # Sort by engagement score first, then by freshness
+            order_clause = """
+                ORDER BY
+                    is_breaking_news DESC,
+                    engagement_score DESC,
+                    published_at DESC
+            """
+        elif prioritize_francophone and not country and not region:
+            # Default with francophone priority
             franco_countries = ','.join([f"'{c}'" for c in self.FRANCOPHONE_PRIORITY_COUNTRIES])
             order_clause = f"""
-                ORDER BY 
+                ORDER BY
+                    is_breaking_news DESC,
                     CASE WHEN country IN ({franco_countries}) THEN 0 ELSE 1 END,
                     published_at DESC
             """
         else:
-            order_clause = "ORDER BY published_at DESC"
-        
-        # Get paginated data
+            order_clause = "ORDER BY is_breaking_news DESC, published_at DESC"
+
+        # Get paginated data with new scoring fields
         offset = (page - 1) * page_size
         data_sql = f"""
-            SELECT id, slug, title, excerpt, tldr_json, tags_json, country, 
+            SELECT id, slug, title, excerpt, tldr_json, tags_json, country,
                    image_url, source_name, source_url, published_at, created_at, view_count,
-                   category, sentiment
+                   category, sentiment, engagement_score, is_breaking_news, importance_level
             FROM news_articles
             WHERE {where_clause}
             {order_clause}
             LIMIT ? OFFSET ?
         """
-        
+
         with self._get_connection() as conn:
             total = conn.execute(count_sql, params).fetchone()[0]
             rows = conn.execute(data_sql, params + [page_size, offset]).fetchall()
-            
+
             return {
                 "data": [dict(row) for row in rows],
                 "total": total,
@@ -2543,12 +2601,13 @@ class SQLiteStore:
         sql = """
             INSERT INTO news_articles (
                 slug, raw_item_id, title, excerpt, content_md, tldr_json,
-                tags_json, country, language, image_url, source_name, 
+                tags_json, country, language, image_url, source_name,
                 source_url, canonical_url, published_at, status,
-                category, sentiment, is_ai_processed
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                category, sentiment, is_ai_processed,
+                engagement_score, is_breaking_news, importance_level
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
-        
+
         try:
             with self._get_connection() as conn:
                 cursor = conn.execute(sql, (
@@ -2569,7 +2628,10 @@ class SQLiteStore:
                     article.get("status", "published"),
                     article.get("category"),
                     article.get("sentiment", "neutral"),
-                    1 if article.get("is_ai_processed") else 0
+                    1 if article.get("is_ai_processed") else 0,
+                    article.get("engagement_score", 0.0),
+                    1 if article.get("is_breaking_news") else 0,
+                    article.get("importance_level", "normal")
                 ))
                 return cursor.lastrowid
         except Exception as e:
