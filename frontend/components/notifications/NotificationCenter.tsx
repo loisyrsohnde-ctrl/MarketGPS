@@ -334,7 +334,7 @@ export default function NotificationCenter({
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const handleRead = useCallback((id: string) => {
-    setLocalReadIds(prev => new Set([...prev, id]));
+    setLocalReadIds(prev => new Set([...Array.from(prev), id]));
     // Also call API to persist
     fetch(`${API_BASE}/api/notifications/read`, {
       method: 'POST',
@@ -344,7 +344,7 @@ export default function NotificationCenter({
   }, []);
 
   const handleDismiss = useCallback((id: string) => {
-    setLocalDismissedIds(prev => new Set([...prev, id]));
+    setLocalDismissedIds(prev => new Set([...Array.from(prev), id]));
     // Also call API to persist
     fetch(`${API_BASE}/api/notifications/dismiss`, {
       method: 'POST',
@@ -390,7 +390,7 @@ export default function NotificationCenter({
 
   const handleMarkAllRead = () => {
     const allIds = notifications.map(n => n.id);
-    setLocalReadIds(prev => new Set([...prev, ...allIds]));
+    setLocalReadIds(prev => new Set([...Array.from(prev), ...allIds]));
     // Call API
     fetch(`${API_BASE}/api/notifications/read-all`, {
       method: 'POST',
@@ -399,7 +399,7 @@ export default function NotificationCenter({
 
   const handleClearAll = () => {
     const allIds = notifications.map(n => n.id);
-    setLocalDismissedIds(prev => new Set([...prev, ...allIds]));
+    setLocalDismissedIds(prev => new Set([...Array.from(prev), ...allIds]));
     // Call API
     fetch(`${API_BASE}/api/notifications/dismiss`, {
       method: 'POST',
