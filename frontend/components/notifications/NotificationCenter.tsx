@@ -335,7 +335,7 @@ export default function NotificationCenter({
 
   const handleRead = useCallback((id: string) => {
     setLocalReadIds(prev => new Set([...Array.from(prev), id]));
-    // Also call API to persist
+    // Persist to API
     fetch(`${API_BASE}/api/notifications/read`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
