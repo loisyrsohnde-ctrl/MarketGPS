@@ -39,7 +39,7 @@ export default function TabsLayout() {
 
     // ONLY restrict if: authenticated AND not Pro AND on a pro-only tab
     // Non-authenticated users can browse freely to find the login button
-    if (isAuthenticated && !isPro && proOnlyTabs.includes(currentTab)) {
+    if (isAuthenticated && !isPro && currentTab && proOnlyTabs.includes(currentTab)) {
       // Use setTimeout to ensure navigation happens after the navigator is mounted
       const timer = setTimeout(() => {
         router.replace('/(tabs)/news');

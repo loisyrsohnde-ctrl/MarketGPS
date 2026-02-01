@@ -125,6 +125,17 @@ export function NewsCard({ article, variant = 'default', onPress }: NewsCardProp
       )}
       <View style={styles.content}>
         <View style={styles.tagContainer}>
+          {/* Breaking News / Important badge */}
+          {article.is_breaking_news && (
+            <View style={styles.breakingTag}>
+              <Text style={styles.breakingTagText}>🔴 ALERTE INFO</Text>
+            </View>
+          )}
+          {!article.is_breaking_news && article.importance_level === 'high' && (
+            <View style={styles.importantTag}>
+              <Text style={styles.importantTagText}>⚡ Important</Text>
+            </View>
+          )}
           {article.category && (
             <View style={styles.tag}>
               <Text style={styles.tagText}>{article.category}</Text>
@@ -185,6 +196,31 @@ const styles = StyleSheet.create({
   countryTag: {
     backgroundColor: '#8B5CF620',
   },
+  breakingTag: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  breakingTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  importantTag: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  importantTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+  },
   tagText: {
     fontSize: 11,
     fontWeight: '600',
@@ -240,8 +276,7 @@ const styles = StyleSheet.create({
     right: 0,
     padding: 20,
     paddingTop: 60,
-    background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
   },
   featuredTitle: {
     fontSize: 20,

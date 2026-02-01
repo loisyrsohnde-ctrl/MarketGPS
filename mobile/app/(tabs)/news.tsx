@@ -1,5 +1,6 @@
 /**
  * MarketGPS Mobile - News Screen
+ * Avec Alerte Info, filtres par région et tri par pertinence
  */
 
 import React, { useState } from 'react';
@@ -14,8 +15,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
 import { api, NewsArticle } from '@/lib/api';
-import { NewsCard, LoadingSpinner, EmptyState } from '@/components/ui';
+import { NewsCard, LoadingSpinner, EmptyState, AlerteInfoBanner } from '@/components/ui';
 
 // Pays francophones prioritaires
 const FRANCOPHONE_COUNTRIES = [
@@ -49,20 +51,26 @@ const OTHER_COUNTRIES = [
 
 // Zones économiques régionales
 const ECONOMIC_ZONES = [
-  { id: 'all', name: 'Tout', countries: [] as string[] },
-  { id: 'CEMAC', name: 'CEMAC', countries: ['CM', 'GA', 'CG', 'TD', 'CF', 'GQ'] },
-  { id: 'UEMOA', name: 'UEMOA', countries: ['SN', 'CI', 'BJ', 'TG', 'ML', 'BF', 'NE', 'GN'] },
-  { id: 'MAGHREB', name: 'Maghreb', countries: ['MA', 'DZ', 'TN', 'LY'] },
-  { id: 'EAC', name: 'Afrique Est', countries: ['KE', 'TZ', 'UG', 'RW', 'ET'] },
-  { id: 'SADC', name: 'Afrique Sud', countries: ['ZA', 'AO', 'MZ', 'ZW', 'NA', 'BW'] },
-  { id: 'WEST', name: 'Afrique Ouest', countries: ['NG', 'GH'] },
+  { id: 'all', name: 'Tout', emoji: '🌍', countries: [] as string[] },
+  { id: 'CEMAC', name: 'CEMAC', emoji: '🇨🇲', countries: ['CM', 'GA', 'CG', 'TD', 'CF', 'GQ'] },
+  { id: 'UEMOA', name: 'UEMOA', emoji: '🇸🇳', countries: ['SN', 'CI', 'BJ', 'TG', 'ML', 'BF', 'NE', 'GN'] },
+  { id: 'MAGHREB', name: 'Maghreb', emoji: '🇲🇦', countries: ['MA', 'DZ', 'TN', 'LY'] },
+  { id: 'EAC', name: 'Afrique Est', emoji: '🇰🇪', countries: ['KE', 'TZ', 'UG', 'RW', 'ET'] },
+  { id: 'SADC', name: 'Afrique Sud', emoji: '🇿🇦', countries: ['ZA', 'AO', 'MZ', 'ZW', 'NA', 'BW'] },
+  { id: 'WEST', name: 'Afrique Ouest', emoji: '🇳🇬', countries: ['NG', 'GH'] },
 ];
 
-// Liste complète des pays (francophones d'abord)
+// Liste complète des pays (francophones d'abord) avec emojis drapeaux
+const COUNTRY_EMOJIS: Record<string, string> = {
+  CM: '🇨🇲', CI: '🇨🇮', SN: '🇸🇳', BJ: '🇧🇯', TG: '🇹🇬', GA: '🇬🇦', CG: '🇨🇬',
+  ML: '🇲🇱', BF: '🇧🇫', NE: '🇳🇪', TD: '🇹🇩', GN: '🇬🇳', RW: '🇷🇼', CD: '🇨🇩',
+  NG: '🇳🇬', ZA: '🇿🇦', KE: '🇰🇪', GH: '🇬🇭', EG: '🇪🇬', MA: '🇲🇦', TN: '🇹🇳', DZ: '🇩🇿',
+};
+
 const REGIONS = [
-  { id: 'all', name: 'Tout' },
-  ...FRANCOPHONE_COUNTRIES.map(c => ({ id: c.id, name: c.name })),
-  ...OTHER_COUNTRIES.map(c => ({ id: c.id, name: c.name })),
+  { id: 'all', name: 'Tout', emoji: '🌍' },
+  ...FRANCOPHONE_COUNTRIES.map(c => ({ id: c.id, name: c.name, emoji: COUNTRY_EMOJIS[c.id] || '🏳️' })),
+  ...OTHER_COUNTRIES.map(c => ({ id: c.id, name: c.name, emoji: COUNTRY_EMOJIS[c.id] || '🏳️' })),
 ];
 
 const TAGS = [
@@ -74,11 +82,19 @@ const TAGS = [
   { id: 'crypto', label: 'Crypto' },
 ];
 
+// Tri options
+const SORT_OPTIONS = [
+  { id: 'date', label: 'Récent' },
+  { id: 'relevance', label: 'Pertinent' },
+];
+
 export default function NewsScreen() {
   const [selectedZone, setSelectedZone] = useState('all');
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState('all');
+  const [sortBy, setSortBy] = useState<'date' | 'relevance'>('date');
   const [page, setPage] = useState(1);
+  const [showAlerteInfo, setShowAlerteInfo] = useState(true);
   
   // Get countries for selected zone
   const getZoneCountries = (): string[] => {
@@ -133,6 +149,45 @@ export default function NewsScreen() {
   
   const renderHeader = () => (
     <>
+      {/* Alerte Info Banner */}
+      {showAlerteInfo && (
+        <AlerteInfoBanner onDismiss={() => setShowAlerteInfo(false)} />
+      )}
+
+      {/* Sort Options */}
+      <View style={styles.sortContainer}>
+        <Text style={styles.sortLabel}>Trier par :</Text>
+        <View style={styles.sortButtons}>
+          {SORT_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.id}
+              style={[
+                styles.sortButton,
+                sortBy === option.id && styles.sortButtonActive,
+              ]}
+              onPress={() => {
+                setSortBy(option.id as 'date' | 'relevance');
+                setPage(1);
+              }}
+            >
+              <Ionicons
+                name={option.id === 'date' ? 'time-outline' : 'trending-up-outline'}
+                size={14}
+                color={sortBy === option.id ? '#19D38C' : '#64748B'}
+              />
+              <Text
+                style={[
+                  styles.sortButtonText,
+                  sortBy === option.id && styles.sortButtonTextActive,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
       {/* Zone économique Filter (CEMAC, UEMOA, Maghreb, etc.) */}
       <ScrollView
         horizontal
@@ -365,5 +420,42 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 40,
+  },
+  sortContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  sortLabel: {
+    fontSize: 13,
+    color: '#64748B',
+  },
+  sortButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  sortButtonActive: {
+    backgroundColor: '#19D38C15',
+    borderWidth: 1,
+    borderColor: '#19D38C50',
+  },
+  sortButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  sortButtonTextActive: {
+    color: '#19D38C',
   },
 });

@@ -74,6 +74,40 @@ export interface NewsArticle {
   published_at?: string;
   category?: string;
   sentiment?: 'positive' | 'negative' | 'neutral';
+  // Scoring fields
+  engagement_score?: number;
+  is_breaking_news?: boolean;
+  importance_level?: 'high' | 'medium' | 'low';
+}
+
+export interface BreakingNewsResponse {
+  data: NewsArticle[];
+  count: number;
+  has_breaking: boolean;
+}
+
+export interface AppNotification {
+  id: string;
+  type: 'score_drop' | 'score_surge' | 'rebalance' | 'news_impact' | 'morning_brief' | 'opportunity' | 'alert' | 'system' | 'breaking_news';
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  dismissed: boolean;
+  data?: {
+    article_id?: number;
+    slug?: string;
+    source?: string;
+    country?: string;
+    category?: string;
+    ticker?: string;
+  };
+  actions?: Array<{
+    label: string;
+    action: string;
+    primary?: boolean;
+  }>;
 }
 
 export interface StrategyTemplate {
@@ -300,9 +334,24 @@ class APIClient {
   async getNewsArticle(slug: string): Promise<NewsArticle> {
     return this.fetch(`/api/news/${slug}`);
   }
-  
+
   async getNewsRegions(): Promise<{ regions: Array<{ id: string; name: string; count: number }> }> {
     return this.fetch('/api/news/regions');
+  }
+
+  async getBreakingNews(params: {
+    limit?: number;
+    max_age_hours?: number;
+  } = {}): Promise<BreakingNewsResponse> {
+    const searchParams = new URLSearchParams();
+    if (params.limit) searchParams.append('limit', params.limit.toString());
+    if (params.max_age_hours) searchParams.append('max_age_hours', params.max_age_hours.toString());
+    const query = searchParams.toString();
+    return this.fetch(`/api/news/breaking${query ? `?${query}` : ''}`);
+  }
+
+  async getImportantNews(limit = 10): Promise<PaginatedResponse<NewsArticle>> {
+    return this.fetch(`/api/news/important?limit=${limit}`);
   }
   
   // ─────────────────────────────────────────────────────────────────────────
@@ -453,6 +502,40 @@ class APIClient {
   
   async getUnreadNotificationsCount(): Promise<{ count: number }> {
     return this.fetch('/users/notifications/unread-count');
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // App Notifications (includes breaking news)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async getAppNotifications(params: {
+    limit?: number;
+    unread_only?: boolean;
+  } = {}): Promise<{
+    success: boolean;
+    notifications: AppNotification[];
+    total: number;
+    unread_count: number;
+  }> {
+    const searchParams = new URLSearchParams();
+    if (params.limit) searchParams.append('limit', params.limit.toString());
+    if (params.unread_only) searchParams.append('unread_only', 'true');
+    const query = searchParams.toString();
+    return this.fetch(`/api/notifications${query ? `?${query}` : ''}`);
+  }
+
+  async markNotificationRead(notificationIds: string[]): Promise<{ success: boolean }> {
+    return this.fetch('/api/notifications/read', {
+      method: 'POST',
+      body: JSON.stringify(notificationIds),
+    });
+  }
+
+  async dismissNotification(notificationIds: string[]): Promise<{ success: boolean }> {
+    return this.fetch('/api/notifications/dismiss', {
+      method: 'POST',
+      body: JSON.stringify(notificationIds),
+    });
   }
 }
 

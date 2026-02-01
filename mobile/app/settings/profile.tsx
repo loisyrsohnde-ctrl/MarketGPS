@@ -127,7 +127,7 @@ export default function ProfileScreen() {
             <Button
               title="Enregistrer"
               onPress={() => updateMutation.mutate({ displayName })}
-              loading={updateMutation.isLoading}
+              loading={updateMutation.isPending}
               fullWidth
             />
             <Button
