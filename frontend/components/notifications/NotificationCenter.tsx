@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Bell,
   BellRing,
@@ -22,12 +23,13 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
+import { getApiBaseUrl } from '@/lib/config';
 
 // =============================================================================
 // Types
 // =============================================================================
 
-type NotificationType = 
+type NotificationType =
   | 'score_drop'      // Score dropped below threshold
   | 'score_surge'     // Score increased significantly
   | 'rebalance'       // Portfolio needs rebalancing
@@ -35,7 +37,8 @@ type NotificationType =
   | 'morning_brief'   // Daily morning summary
   | 'opportunity'     // New opportunity detected
   | 'alert'           // General alert
-  | 'system';         // System notification
+  | 'system'          // System notification
+  | 'breaking_news';  // Breaking news alerts
 
 type NotificationPriority = 'critical' | 'high' | 'medium' | 'low';
 
@@ -65,50 +68,55 @@ interface NotificationCenterProps {
 // Configuration
 // =============================================================================
 
-const TYPE_CONFIG: Record<NotificationType, { 
-  icon: React.ElementType; 
-  color: string; 
+const TYPE_CONFIG: Record<NotificationType, {
+  icon: React.ElementType;
+  color: string;
   label: string;
 }> = {
-  score_drop: { 
-    icon: TrendingDown, 
-    color: 'text-red-400 bg-red-500/10', 
-    label: 'Alerte Score' 
+  score_drop: {
+    icon: TrendingDown,
+    color: 'text-red-400 bg-red-500/10',
+    label: 'Alerte Score'
   },
-  score_surge: { 
-    icon: TrendingUp, 
-    color: 'text-emerald-400 bg-emerald-500/10', 
-    label: 'Score en hausse' 
+  score_surge: {
+    icon: TrendingUp,
+    color: 'text-emerald-400 bg-emerald-500/10',
+    label: 'Score en hausse'
   },
-  rebalance: { 
-    icon: RefreshCw, 
-    color: 'text-amber-400 bg-amber-500/10', 
-    label: 'Rééquilibrage' 
+  rebalance: {
+    icon: RefreshCw,
+    color: 'text-amber-400 bg-amber-500/10',
+    label: 'Rééquilibrage'
   },
-  news_impact: { 
-    icon: Newspaper, 
-    color: 'text-blue-400 bg-blue-500/10', 
-    label: 'Actualité' 
+  news_impact: {
+    icon: Newspaper,
+    color: 'text-blue-400 bg-blue-500/10',
+    label: 'Actualité'
   },
-  morning_brief: { 
-    icon: Sun, 
-    color: 'text-orange-400 bg-orange-500/10', 
-    label: 'Brief Matinal' 
+  morning_brief: {
+    icon: Sun,
+    color: 'text-orange-400 bg-orange-500/10',
+    label: 'Brief Matinal'
   },
-  opportunity: { 
-    icon: TrendingUp, 
-    color: 'text-purple-400 bg-purple-500/10', 
-    label: 'Opportunité' 
+  opportunity: {
+    icon: TrendingUp,
+    color: 'text-purple-400 bg-purple-500/10',
+    label: 'Opportunité'
   },
-  alert: { 
-    icon: AlertTriangle, 
-    color: 'text-amber-400 bg-amber-500/10', 
-    label: 'Alerte' 
+  alert: {
+    icon: AlertTriangle,
+    color: 'text-amber-400 bg-amber-500/10',
+    label: 'Alerte'
   },
-  system: { 
-    icon: Bell, 
-    color: 'text-slate-400 bg-slate-500/10', 
-    label: 'Système' 
+  system: {
+    icon: Bell,
+    color: 'text-slate-400 bg-slate-500/10',
+    label: 'Système'
+  },
+  breaking_news: {
+    icon: AlertTriangle,
+    color: 'text-red-500 bg-red-500/20',
+    label: '🔴 Alerte Info'
   },
 };
 
@@ -120,81 +128,28 @@ const PRIORITY_STYLES: Record<NotificationPriority, string> = {
 };
 
 // =============================================================================
-// Demo Data
+// API
 // =============================================================================
 
-function generateDemoNotifications(): Notification[] {
-  const now = Date.now();
-  
-  return [
-    {
-      id: '1',
-      type: 'morning_brief',
-      priority: 'medium',
-      title: 'Brief Matinal — 30 Janvier',
-      message: 'Marchés en hausse de 0.8%. Votre portefeuille surperforme le S&P 500. 2 opportunités détectées.',
-      timestamp: new Date(now - 3600000).toISOString(),
-      read: false,
-      dismissed: false,
-      actions: [
-        { label: 'Voir le brief', action: 'view_brief', primary: true },
-      ],
-    },
-    {
-      id: '2',
-      type: 'score_drop',
-      priority: 'high',
-      title: 'AAPL : Score en baisse (-8 pts)',
-      message: 'Le score ProphetIA d\'Apple est passé de 82 à 74 suite aux résultats trimestriels.',
-      timestamp: new Date(now - 7200000).toISOString(),
-      read: false,
-      dismissed: false,
-      data: { ticker: 'AAPL', oldScore: 82, newScore: 74 },
-      actions: [
-        { label: 'Analyser', action: 'analyze_asset', primary: true },
-        { label: 'Ignorer', action: 'dismiss' },
-      ],
-    },
-    {
-      id: '3',
-      type: 'rebalance',
-      priority: 'medium',
-      title: 'Rééquilibrage suggéré',
-      message: 'Votre allocation actions dépasse la cible de 5%. Considérez un arbitrage vers les obligations.',
-      timestamp: new Date(now - 86400000).toISOString(),
-      read: true,
-      dismissed: false,
-      actions: [
-        { label: 'Voir détails', action: 'view_rebalance', primary: true },
-      ],
-    },
-    {
-      id: '4',
-      type: 'news_impact',
-      priority: 'medium',
-      title: 'BCE : Impact sur votre portefeuille',
-      message: 'La décision de la BCE sur les taux pourrait impacter vos positions obligataires (+0.3% estimé).',
-      timestamp: new Date(now - 172800000).toISOString(),
-      read: true,
-      dismissed: false,
-      data: { impact: 0.3, sector: 'bonds' },
-    },
-    {
-      id: '5',
-      type: 'opportunity',
-      priority: 'low',
-      title: 'Nouvelle opportunité : MSFT',
-      message: 'Microsoft atteint un score de 84 avec un signal d\'accumulation institutionnelle.',
-      timestamp: new Date(now - 259200000).toISOString(),
-      read: true,
-      dismissed: false,
-      data: { ticker: 'MSFT', score: 84 },
-      actions: [
-        { label: 'Voir', action: 'view_opportunity' },
-        { label: 'Ajouter watchlist', action: 'add_watchlist', primary: true },
-      ],
-    },
-  ];
+const API_BASE = getApiBaseUrl();
+
+interface NotificationsResponse {
+  success: boolean;
+  notifications: Notification[];
+  total: number;
+  unread_count: number;
+}
+
+async function fetchNotifications(): Promise<Notification[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/notifications?limit=50`);
+    if (!res.ok) return [];
+    const data: NotificationsResponse = await res.json();
+    return data.notifications || [];
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    return [];
+  }
 }
 
 // =============================================================================
@@ -347,14 +302,26 @@ export default function NotificationCenter({
   onNavigate,
 }: NotificationCenterProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [localReadIds, setLocalReadIds] = useState<Set<string>>(new Set());
+  const [localDismissedIds, setLocalDismissedIds] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // Load notifications
-  useEffect(() => {
-    setNotifications(generateDemoNotifications());
-  }, []);
+  // Fetch notifications from API
+  const { data: apiNotifications = [] } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: fetchNotifications,
+    staleTime: 30000, // 30 seconds
+    refetchInterval: 60000, // Refetch every minute
+    refetchOnWindowFocus: true,
+  });
+
+  // Merge API notifications with local state for read/dismissed
+  const notifications = apiNotifications.map(n => ({
+    ...n,
+    read: n.read || localReadIds.has(n.id),
+    dismissed: n.dismissed || localDismissedIds.has(n.id),
+  }));
 
   // Count unread
   const unreadCount = notifications.filter(n => !n.read && !n.dismissed).length;
@@ -367,27 +334,45 @@ export default function NotificationCenter({
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const handleRead = useCallback((id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
+    setLocalReadIds(prev => new Set([...prev, id]));
+    // Also call API to persist
+    fetch(`${API_BASE}/api/notifications/read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([id]),
+    }).catch(console.error);
   }, []);
 
   const handleDismiss = useCallback((id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, dismissed: true } : n)
-    );
+    setLocalDismissedIds(prev => new Set([...prev, id]));
+    // Also call API to persist
+    fetch(`${API_BASE}/api/notifications/dismiss`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([id]),
+    }).catch(console.error);
   }, []);
 
   const handleAction = useCallback((notificationId: string, action: string) => {
     handleRead(notificationId);
-    
+
     if (action === 'dismiss') {
       handleDismiss(notificationId);
       return;
     }
-    
+
     onAction?.(notificationId, action);
-    
+
+    // Handle breaking news navigation
+    if (action === 'view_news') {
+      const notification = notifications.find(n => n.id === notificationId);
+      if (notification?.data?.slug) {
+        onNavigate?.(`/news/${notification.data.slug}`);
+        setIsOpen(false);
+      }
+      return;
+    }
+
     // Navigation based on action
     const navMap: Record<string, string> = {
       'view_brief': '/dashboard/wealth/horizon',
@@ -396,19 +381,31 @@ export default function NotificationCenter({
       'view_opportunity': '/opportunities',
       'add_watchlist': '/watchlist',
     };
-    
+
     if (navMap[action]) {
       onNavigate?.(navMap[action]);
       setIsOpen(false);
     }
-  }, [handleRead, handleDismiss, onAction, onNavigate]);
+  }, [handleRead, handleDismiss, onAction, onNavigate, notifications]);
 
   const handleMarkAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    const allIds = notifications.map(n => n.id);
+    setLocalReadIds(prev => new Set([...prev, ...allIds]));
+    // Call API
+    fetch(`${API_BASE}/api/notifications/read-all`, {
+      method: 'POST',
+    }).catch(console.error);
   };
 
   const handleClearAll = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, dismissed: true })));
+    const allIds = notifications.map(n => n.id);
+    setLocalDismissedIds(prev => new Set([...prev, ...allIds]));
+    // Call API
+    fetch(`${API_BASE}/api/notifications/dismiss`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(allIds),
+    }).catch(console.error);
   };
 
   return (

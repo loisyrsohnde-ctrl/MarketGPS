@@ -132,7 +132,7 @@ export default function BreakingNewsBanner({
                 <span className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full animate-ping" />
               </div>
               <span className="hidden sm:inline font-bold text-sm uppercase tracking-wider">
-                Breaking
+                Alerte Info
               </span>
             </div>
 
@@ -216,7 +216,7 @@ export function BreakingNewsBadge({ className }: { className?: string }) {
           <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-600 rounded-full animate-pulse" />
         </div>
         <span className="text-sm font-medium text-red-700">
-          {data.count} breaking news
+          {data.count} alerte{data.count > 1 ? 's' : ''} info
         </span>
       </div>
     </Link>

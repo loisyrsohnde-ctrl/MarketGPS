@@ -153,7 +153,7 @@ function ArchiveCard({ article }: { article: NewsArticle }) {
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               {isBreaking && (
                 <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm bg-red-600 text-white animate-pulse">
-                  🔴 Breaking
+                  🔴 Alerte Info
                 </span>
               )}
               {isHighImportance && !isBreaking && (

@@ -213,12 +213,12 @@ class NewsNotificationService:
             from_email = os.environ.get("RESEND_FROM_EMAIL", "alerts@marketgps.africa")
 
             # Build email content
-            subject = f"🔴 BREAKING: {article['title'][:60]}..."
+            subject = f"🔴 ALERTE INFO: {article['title'][:60]}..."
 
             html_content = f"""
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="background: #dc2626; color: white; padding: 12px 20px; border-radius: 4px 4px 0 0;">
-                    <span style="font-weight: bold; font-size: 14px;">🔴 BREAKING NEWS</span>
+                    <span style="font-weight: bold; font-size: 14px;">🔴 ALERTE INFO</span>
                 </div>
 
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-top: none; padding: 24px; border-radius: 0 0 4px 4px;">

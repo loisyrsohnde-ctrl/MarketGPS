@@ -49,6 +49,7 @@ class NotificationType(str, Enum):
     OPPORTUNITY = "opportunity"
     ALERT = "alert"
     SYSTEM = "system"
+    BREAKING_NEWS = "breaking_news"  # Breaking news alerts
 
 
 class NotificationPriority(str, Enum):
@@ -370,6 +371,65 @@ def generate_demo_notifications(user_id: str = "default") -> List[Notification]:
 
 
 # =============================================================================
+# Breaking News Notifications
+# =============================================================================
+
+def get_breaking_news_notifications(max_age_hours: int = 24) -> List[Notification]:
+    """
+    Fetch breaking news from database and convert to notifications.
+    """
+    from storage.sqlite_store import SQLiteStore
+
+    notifications = []
+    store = SQLiteStore()
+
+    try:
+        cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
+        cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+        with store._get_connection() as conn:
+            # Get breaking news articles
+            rows = conn.execute("""
+                SELECT id, slug, title, excerpt, source_name, published_at,
+                       engagement_score, importance_level, category, country
+                FROM news_articles
+                WHERE (is_breaking_news = 1 OR importance_level = 'high')
+                  AND status = 'published'
+                  AND published_at >= ?
+                ORDER BY is_breaking_news DESC, published_at DESC
+                LIMIT 10
+            """, (cutoff_str,)).fetchall()
+
+            for row in rows:
+                row_dict = dict(row)
+                is_breaking = row_dict.get("importance_level") == "breaking" or row_dict.get("is_breaking_news")
+
+                notifications.append(Notification(
+                    id=f"news_{row_dict['id']}",
+                    type=NotificationType.BREAKING_NEWS if is_breaking else NotificationType.NEWS_IMPACT,
+                    priority=NotificationPriority.CRITICAL if is_breaking else NotificationPriority.HIGH,
+                    title=f"{'🔴 ALERTE INFO: ' if is_breaking else '⚡ '}{row_dict['title'][:60]}{'...' if len(row_dict['title']) > 60 else ''}",
+                    message=row_dict.get('excerpt') or row_dict['title'],
+                    timestamp=row_dict.get('published_at') or datetime.utcnow().isoformat(),
+                    data={
+                        "article_id": row_dict['id'],
+                        "slug": row_dict['slug'],
+                        "source": row_dict.get('source_name'),
+                        "country": row_dict.get('country'),
+                        "category": row_dict.get('category'),
+                    },
+                    actions=[
+                        NotificationAction(label="Lire", action="view_news", primary=True),
+                        NotificationAction(label="Ignorer", action="dismiss"),
+                    ],
+                ))
+    except Exception as e:
+        logger.error(f"Error fetching breaking news for notifications: {e}")
+
+    return notifications
+
+
+# =============================================================================
 # API Endpoints
 # =============================================================================
 
@@ -383,16 +443,25 @@ async def get_notifications(
     """
     Get user notifications.
     Returns notifications sorted by timestamp (newest first).
+    Includes breaking news from the news module.
     """
+    # Get demo notifications (portfolio alerts, etc.)
     notifications = generate_demo_notifications(user_id)
-    
+
+    # Add breaking news notifications
+    breaking_news = get_breaking_news_notifications(max_age_hours=24)
+    notifications.extend(breaking_news)
+
+    # Sort by timestamp (newest first)
+    notifications.sort(key=lambda n: n.timestamp, reverse=True)
+
     if unread_only:
         notifications = [n for n in notifications if not n.read]
-    
+
     # Apply pagination
     total = len(notifications)
     notifications = notifications[offset:offset + limit]
-    
+
     return {
         "success": True,
         "notifications": [n.dict() for n in notifications],
