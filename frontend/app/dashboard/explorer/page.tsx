@@ -260,30 +260,83 @@ function ExplorerPageContent() {
               />
             </div>
 
-            {/* Market scope pills */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Filter className="w-4 h-4 text-text-muted hidden sm:block" />
-              <div className="flex gap-1 sm:gap-2">
-                {marketFilters.map((f) => (
-                  <Pill
-                    key={f.value}
-                    active={marketScope === f.value}
-                    onClick={() => {
-                      setMarketScope(f.value);
-                      setAfricaRegion(null);
-                      setCurrentPage(1);
-                    }}
-                    icon={<span className="text-sm">{f.icon}</span>}
-                  >
-                    <span className="hidden sm:inline">{f.label}</span>
-                  </Pill>
-                ))}
-              </div>
+          <div className="h-6 w-px bg-glass-border" />
+
+          {/* Market scope */}
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-text-muted" />
+            <div className="flex gap-2">
+              {marketFilters.map((f) => (
+                <Pill
+                  key={f.value}
+                  active={marketScope === f.value}
+                  onClick={() => {
+                    setMarketScope(f.value);
+                    setAfricaRegion(null); // Reset Africa region when switching scope
+                    setCurrentPage(1);
+                  }}
+                  icon={<span>{f.icon}</span>}
+                >
+                  {f.label}
+                </Pill>
+              ))}
             </div>
           </div>
 
-          {/* Row 2: Type filters (horizontal scroll on mobile) */}
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
+          {/* Africa region filter - only shown when Africa is selected */}
+          {marketScope === 'AFRICA' && (
+            <>
+              <div className="h-6 w-px bg-glass-border" />
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-text-muted font-medium">Région:</span>
+                <div className="flex flex-wrap gap-1">
+                  {africaRegions.map((region) => (
+                    <Pill
+                      key={region.value || 'all'}
+                      active={africaRegion === region.value}
+                      onClick={() => {
+                        setAfricaRegion(region.value);
+                        setCurrentPage(1);
+                      }}
+                      icon={<span className="text-xs">{region.icon}</span>}
+                    >
+                      <span className="text-xs">{region.label}</span>
+                    </Pill>
+                  ))}
+                </div>
+              </div>
+              {/* Individual country shortcuts */}
+              <div className="w-full flex flex-wrap items-center gap-2 mt-2">
+                <span className="text-xs text-text-muted font-medium">Pays:</span>
+                <div className="flex flex-wrap gap-1">
+                  {africaCountries.map((country) => (
+                    <button
+                      key={country.value}
+                      onClick={() => {
+                        setAfricaRegion(country.value);
+                        setCurrentPage(1);
+                      }}
+                      className={cn(
+                        "px-2 py-0.5 rounded text-xs transition-all",
+                        africaRegion === country.value
+                          ? "bg-accent text-white"
+                          : "bg-glass-subtle text-text-secondary hover:bg-glass-border hover:text-text-primary"
+                      )}
+                      title={country.label}
+                    >
+                      <span className="mr-1">{country.icon}</span>
+                      {country.exchange}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="h-6 w-px bg-glass-border" />
+
+          {/* Type filter */}
+          <div className="flex flex-wrap gap-2">
             {typeFilters.map((f) => (
               <Pill
                 key={f.value || 'all'}

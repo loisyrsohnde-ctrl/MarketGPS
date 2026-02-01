@@ -20,7 +20,7 @@ import time
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from core.models import AssetType, Score, StateLabel
+from core.models import AssetType, Score
 from core.config import get_logger, get_config
 from storage.sqlite_store import SQLiteStore
 from storage.parquet_store import ParquetStore
@@ -82,8 +82,6 @@ class AlternativeAssetScorer:
             return None
         
         try:
-            import pandas as pd
-            
             end_date = date.today()
             start_date = end_date - timedelta(days=days)
             
@@ -94,32 +92,18 @@ class AlternativeAssetScorer:
                 progress=False
             )
             
-            # Handle empty DataFrame
-            if data is None or len(data) == 0:
-                logger.warning(f"No data for {asset_id}")
-                return None
-            
-            if len(data) < 20:
+            if data.empty or len(data) < 20:
                 logger.warning(f"Insufficient data for {asset_id}: {len(data)} bars")
                 return None
             
-            # Handle MultiIndex columns (newer yfinance returns MultiIndex)
-            if isinstance(data.columns, pd.MultiIndex):
-                # Flatten MultiIndex: ('Close', 'BTC-USD') -> 'Close'
-                data.columns = data.columns.get_level_values(0)
-            
-            # Get close prices as Series
-            close = data['Close'].squeeze()  # Ensure it's a Series, not DataFrame
-            
-            # Ensure close is a Series
-            if isinstance(close, pd.DataFrame):
-                close = close.iloc[:, 0]
+            # Calculate metrics
+            close = data['Close']
             
             # Returns
             returns = close.pct_change().dropna()
             
             # Volatility (annualized)
-            vol_annual = float(returns.std() * (252 ** 0.5) * 100)
+            vol_annual = returns.std() * (252 ** 0.5) * 100
             
             # RSI (14-day)
             delta = close.diff()
@@ -127,13 +111,13 @@ class AlternativeAssetScorer:
             loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
             rs = gain / loss
             rsi = 100 - (100 / (1 + rs))
-            current_rsi = float(rsi.iloc[-1]) if len(rsi) > 0 and pd.notna(rsi.iloc[-1]) else 50.0
+            current_rsi = float(rsi.iloc[-1]) if not rsi.empty else 50
             
             # Z-score (current price vs 50-day mean)
             sma50 = close.rolling(50).mean()
             std50 = close.rolling(50).std()
             zscore = (close - sma50) / std50
-            current_zscore = float(zscore.iloc[-1]) if len(zscore) > 0 and pd.notna(zscore.iloc[-1]) else 0.0
+            current_zscore = float(zscore.iloc[-1]) if not zscore.empty else 0
             
             # Max Drawdown
             rolling_max = close.cummax()
@@ -141,11 +125,7 @@ class AlternativeAssetScorer:
             max_dd = float(abs(drawdown.min()) * 100)
             
             # SMA200
-            if len(close) >= 200:
-                sma200_val = close.rolling(200).mean().iloc[-1]
-            else:
-                sma200_val = close.mean()
-            sma200 = float(sma200_val) if pd.notna(sma200_val) else float(close.iloc[-1])
+            sma200 = float(close.rolling(200).mean().iloc[-1]) if len(close) >= 200 else float(close.mean())
             
             # Last price
             last_price = float(close.iloc[-1])
@@ -248,7 +228,7 @@ class AlternativeAssetScorer:
             max_drawdown=metrics["max_drawdown"],
             sma200=metrics["sma200"],
             last_price=metrics["last_price"],
-            state_label=StateLabel.EQUILIBRE,
+            state_label="Équilibre",
             fundamentals_available=False,
         )
         

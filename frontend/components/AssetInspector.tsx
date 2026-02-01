@@ -499,8 +499,8 @@ export function AssetInspector() {
                     </div>
 
                     <div className="flex items-center justify-center py-4">
-                      <ScoreGauge
-                        score={asset.score_total ?? null}
+                      <ScoreGauge 
+                        score={asset.score_total || 0} 
                         size="xl"
                         showLabel
                       />
