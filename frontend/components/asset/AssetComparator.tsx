@@ -145,6 +145,8 @@ export function AssetComparator({
       const value = asset[metric.key];
       if (value === null || value === undefined) return max;
       if (max === null || max === undefined) return value;
+      // Only compare numbers
+      if (typeof value !== 'number' || typeof max !== 'number') return max;
       if (metric.highlight === 'lowest') return Math.min(max, value);
       return Math.max(max, value);
     }, null);
