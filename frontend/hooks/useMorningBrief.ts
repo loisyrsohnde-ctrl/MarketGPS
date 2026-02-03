@@ -147,7 +147,7 @@ export function useMorningBrief(): UseMorningBriefResponse {
       // Construct complete morning brief data
       const briefData: MorningBriefData = {
         greeting: {
-          firstName: userProfile?.display_name?.split(' ')[0] || 'User',
+          firstName: userProfile?.displayName?.split(' ')[0] || 'User',
           timeOfDay: getTimeOfDay(),
         },
         portfolio,
