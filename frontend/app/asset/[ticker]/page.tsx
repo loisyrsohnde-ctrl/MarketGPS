@@ -132,14 +132,6 @@ export default function AssetDetailPage() {
     }
   }, [chartPeriod, ticker, refetchChart]);
 
-  // Setup keyboard shortcuts
-  useKeyboardShortcuts({
-    toggleWatchlist: handleWatchlistToggle,
-    openAlert: () => setIsAlertModalOpen(true),
-    openComparator: () => setIsComparatorOpen(true),
-    openAIChat: () => console.log('Open AI chat'),
-  });
-
   // Check if asset is in watchlist
   const { data: watchlistStatus } = useQuery({
     queryKey: ['watchlist-check', ticker, userId],
@@ -184,6 +176,14 @@ export default function AssetDetailPage() {
   const handleWatchlistToggle = () => {
     watchlistMutation.mutate(!isWatchlisted);
   };
+
+  // Setup keyboard shortcuts (must be after handleWatchlistToggle declaration)
+  useKeyboardShortcuts({
+    toggleWatchlist: handleWatchlistToggle,
+    openAlert: () => setIsAlertModalOpen(true),
+    openComparator: () => setIsComparatorOpen(true),
+    openAIChat: () => console.log('Open AI chat'),
+  });
 
   // Use asset data or default
   const displayAsset = asset || { ...defaultAsset, ticker };
