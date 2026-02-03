@@ -143,8 +143,8 @@ export function AssetComparator({
   const getHighestValue = (metric: ComparableMetric): any => {
     return selectedAssets.reduce((max, asset) => {
       const value = asset[metric.key];
-      if (value === null) return max;
-      if (max === null) return value;
+      if (value === null || value === undefined) return max;
+      if (max === null || max === undefined) return value;
       if (metric.highlight === 'lowest') return Math.min(max, value);
       return Math.max(max, value);
     }, null);
