@@ -14,7 +14,7 @@ import {
   Award,
 } from 'lucide-react';
 
-interface BacktestMetricsProps {
+export interface BacktestMetricsProps {
   result: BacktestResult;
 }
 

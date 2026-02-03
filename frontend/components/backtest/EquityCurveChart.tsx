@@ -18,7 +18,7 @@ import {
 } from 'recharts';
 import { BacktestResult, EquityCurvePoint, DrawdownPoint } from '@/types/backtest';
 
-interface EquityCurveChartProps {
+export interface EquityCurveChartProps {
   result: BacktestResult;
   showDrawdown?: boolean;
 }
