@@ -52,7 +52,7 @@ const DEFAULT_MORNING_BRIEF: MorningBriefData = {
 
 export function useMorningBrief(): UseMorningBriefResponse {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { user: userProfile, isLoading: profileLoading } = useUserProfile();
+  const { profile: userProfile, loading: profileLoading } = useUserProfile();
   const [data, setData] = useState<MorningBriefData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
