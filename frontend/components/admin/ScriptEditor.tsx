@@ -209,7 +209,7 @@ export function ScriptEditor({
           </button>
         )}
 
-        {script.status === 'approved' && script.status !== 'published' && (
+        {script.status === 'approved' && (
           <button
             onClick={handlePublish}
             disabled={isPublishing}
