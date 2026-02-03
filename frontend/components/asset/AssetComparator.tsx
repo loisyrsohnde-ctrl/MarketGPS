@@ -77,6 +77,12 @@ const comparableMetrics: ComparableMetric[] = [
     highlight: 'highest',
   },
   {
+    key: 'volatility',
+    label: 'Volatilité',
+    format: (v) => (v !== null ? `${v.toFixed(1)}%` : 'N/A'),
+    highlight: 'lowest',
+  },
+  {
     key: 'vol_annual',
     label: 'Vol. Annuelle',
     format: (v) => (v !== null ? `${v.toFixed(1)}%` : 'N/A'),
@@ -141,12 +147,15 @@ export function AssetComparator({
   };
 
   const getHighestValue = (metric: ComparableMetric): any => {
-    return selectedAssets.reduce<any>((max, asset) => {
-      const value = asset[metric.key];
-      if (value === null || value === undefined) return max;
-      if (max === null || max === undefined) return value;
-      if (metric.highlight === 'lowest') return Math.min(max, value);
-      return Math.max(max, value);
+    return selectedAssets.reduce((max: number | null, asset) => {
+      const val = asset[metric.key];
+      // Skip non-numeric values for comparison
+      if (val === null || val === undefined || typeof val !== 'number') return max;
+      
+      if (max === null) return val;
+      
+      if (metric.highlight === 'lowest') return Math.min(max, val);
+      return Math.max(max, val);
     }, null);
   };
 
