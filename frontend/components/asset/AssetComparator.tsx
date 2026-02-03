@@ -77,12 +77,6 @@ const comparableMetrics: ComparableMetric[] = [
     highlight: 'highest',
   },
   {
-    key: 'volatility',
-    label: 'Volatilité',
-    format: (v) => (v !== null ? `${v.toFixed(1)}%` : 'N/A'),
-    highlight: 'lowest',
-  },
-  {
     key: 'vol_annual',
     label: 'Vol. Annuelle',
     format: (v) => (v !== null ? `${v.toFixed(1)}%` : 'N/A'),
