@@ -109,7 +109,6 @@ async def suggest_barbell_portfolio(
     try:
         # Import store here to avoid circular imports
         import sys
-        sys.path.insert(0, '..')
         from storage.sqlite_store import SQLiteStore
 
         store = SQLiteStore()
@@ -264,7 +263,6 @@ async def get_core_candidates(
     """
     try:
         import sys
-        sys.path.insert(0, '..')
         from storage.sqlite_store import SQLiteStore
 
         store = SQLiteStore()
@@ -324,7 +322,6 @@ async def get_satellite_candidates(
     """
     try:
         import sys
-        sys.path.insert(0, '..')
         from storage.sqlite_store import SQLiteStore
 
         store = SQLiteStore()
@@ -424,7 +421,6 @@ async def get_core_candidates_v2(
     """
     try:
         import sys
-        sys.path.insert(0, '..')
         from storage.sqlite_store import SQLiteStore
 
         store = SQLiteStore()
@@ -537,7 +533,6 @@ async def get_satellite_candidates_v2(
     """
     try:
         import sys
-        sys.path.insert(0, '..')
         from storage.sqlite_store import SQLiteStore
 
         store = SQLiteStore()
@@ -740,7 +735,6 @@ async def list_portfolios(
     """List user's saved barbell portfolios."""
     try:
         import sys
-        sys.path.insert(0, '..')
         from storage.sqlite_store import SQLiteStore
         
         store = SQLiteStore()
@@ -803,7 +797,6 @@ async def create_portfolio(
     """Create a new barbell portfolio."""
     try:
         import sys
-        sys.path.insert(0, '..')
         from storage.sqlite_store import SQLiteStore
         import uuid
         
@@ -884,7 +877,6 @@ async def get_portfolio(portfolio_id: str):
     """Get a specific portfolio with its items."""
     try:
         import sys
-        sys.path.insert(0, '..')
         from storage.sqlite_store import SQLiteStore
         
         store = SQLiteStore()
@@ -925,7 +917,6 @@ async def update_portfolio(portfolio_id: str, update: PortfolioUpdate):
     """Update an existing portfolio."""
     try:
         import sys
-        sys.path.insert(0, '..')
         from storage.sqlite_store import SQLiteStore
         
         store = SQLiteStore()
@@ -1007,7 +998,6 @@ async def delete_portfolio(portfolio_id: str):
     """Soft delete a portfolio."""
     try:
         import sys
-        sys.path.insert(0, '..')
         from storage.sqlite_store import SQLiteStore
         
         store = SQLiteStore()

@@ -10,10 +10,8 @@ import numpy as np
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch, MagicMock
 
-import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from adhoc_scoring import (
     AdHocScoringService,

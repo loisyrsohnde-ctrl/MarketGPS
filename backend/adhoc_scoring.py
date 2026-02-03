@@ -6,12 +6,14 @@ Uses the same scoring algorithms as the batch pipeline.
 """
 
 import os
-import sys
 from datetime import datetime, date
 from typing import Optional, Dict, Any, List, Tuple
 from dataclasses import dataclass
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from core.config import get_config, get_logger
 from core.models import Asset, AssetType, Score, GatingStatus

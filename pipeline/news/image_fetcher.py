@@ -72,11 +72,12 @@ class ImageFetcher:
             # Skip some problematic domains or formats
             if any(x in url.lower() for x in ['.svg', 'base64', 'data:image']):
                 return False
-                
+
             response = self.session.head(url, timeout=3, allow_redirects=True)
             content_type = response.headers.get("Content-Type", "")
             return response.status_code == 200 and "image" in content_type
-        except:
+        except (requests.RequestException, TimeoutError) as e:
+            logger.debug(f"Image URL validation failed for '{url}': {e}")
             return False
 
     def fetch_image_url(

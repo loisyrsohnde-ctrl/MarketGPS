@@ -2,14 +2,16 @@
 """
 Diagnostic: Pourquoi le patch ne change pas le classement?
 """
-import sys
 from pathlib import Path
 
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
 
 import sqlite3
 import json
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
+
 from storage.sqlite_store import SQLiteStore
 from storage.parquet_store import ParquetStore
 from pipeline.rotation import RotationJob

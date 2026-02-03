@@ -197,6 +197,39 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         )}
         
+        {/* Portfolio Section */}
+        {isAuthenticated && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Mon Portefeuille</Text>
+            <Card padding="none">
+              <SettingsItem
+                icon="pie-chart-outline"
+                title="Vue d'ensemble"
+                subtitle="Performance et allocation"
+                onPress={() => router.push('/portfolio' as any)}
+              />
+              <SettingsItem
+                icon="wallet-outline"
+                title="Comptes"
+                subtitle="Gérez vos comptes de courtage"
+                onPress={() => router.push('/portfolio/accounts' as any)}
+              />
+              <SettingsItem
+                icon="briefcase-outline"
+                title="Positions"
+                subtitle="Toutes vos positions"
+                onPress={() => router.push('/portfolio/positions' as any)}
+              />
+              <SettingsItem
+                icon="download-outline"
+                title="Importer"
+                subtitle="Import CSV de positions"
+                onPress={() => router.push('/portfolio/import' as any)}
+              />
+            </Card>
+          </View>
+        )}
+
         {/* Trading Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Trading</Text>
@@ -248,6 +281,13 @@ export default function SettingsScreen() {
               <SettingsItem
                 icon="notifications-outline"
                 title="Notifications"
+                subtitle="Voir toutes les notifications"
+                onPress={() => router.push('/notifications' as any)}
+              />
+              <SettingsItem
+                icon="settings-outline"
+                title="Paramètres notifications"
+                subtitle="Gérer les préférences"
                 onPress={() => router.push('/settings/notifications')}
               />
               <SettingsItem

@@ -700,6 +700,7 @@
                 <h3>📰 Actualités Économiques Africaines</h3>
                 <div style="display: flex; gap: 8px;">
                     <button class="btn btn-primary" onclick="triggerScraping()">🔄 Lancer Scraping</button>
+                    <button class="btn" style="background: var(--warning); color: #000;" onclick="updateInteractions()">⚡ Calculer Interactions</button>
                     <select id="newsFilter" onchange="loadNews()" style="padding: 8px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);">
                         <option value="all">Tous</option>
                         <option value="trending">🔥 Trending (100+)</option>
@@ -1402,6 +1403,43 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = '🔄 Lancer Scraping';
+            }
+        }
+
+        async function updateInteractions() {
+            if (!confirm('Calculer les interactions estimées pour tous les articles ?\n\nCette opération va estimer les likes, commentaires et partages basés sur la source, catégorie et pays.\n\nCela peut prendre plusieurs minutes pour ~2500 articles.')) return;
+
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '⏳ Calcul en cours...';
+
+            try {
+                const response = await fetch(`${API_URL}/news-admin/update-interactions`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.mode === 'background') {
+                        alert('Mise à jour lancée en arrière-plan !\n\nLes interactions seront calculées progressivement.\nRafraîchissez la page dans quelques minutes.');
+                    } else {
+                        alert(`Mise à jour terminée !\n\n` +
+                            `Articles mis à jour: ${data.result?.updated || 0}\n` +
+                            `Erreurs: ${data.result?.errors || 0}`
+                        );
+                    }
+                    loadNews();
+                    loadNewsStats();
+                } else {
+                    alert('Erreur: ' + (data.detail || 'Échec de la mise à jour'));
+                }
+            } catch (e) {
+                alert('Erreur de connexion au serveur: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '⚡ Calculer Interactions';
             }
         }
 

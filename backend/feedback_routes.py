@@ -10,7 +10,6 @@ Features:
 """
 
 import os
-import sys
 import uuid
 import logging
 from datetime import datetime
@@ -18,8 +17,10 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel, EmailStr
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from storage.sqlite_store import SQLiteStore
 from email_service import send_email, EMAIL_ENABLED, RESEND_API_KEY, EMAIL_FROM
@@ -298,8 +299,8 @@ def _get_user_id_optional(authorization: Optional[str] = Header(None)) -> Option
         payload = verify_supabase_token(parts[1])
         if payload:
             return payload.get("sub") or payload.get("user_id")
-    except:
-        pass
+    except (ValueError, TypeError, KeyError) as e:
+        logger.debug(f"Error extracting user ID from token: {e}")
 
     return None
 

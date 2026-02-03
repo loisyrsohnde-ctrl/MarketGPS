@@ -6,12 +6,12 @@ Script pour appliquer le patch quality/liquidity aux scores existants.
 1. Relancer le gating pour US_EU (recalcule les métriques d'investabilité)
 2. Relancer la rotation pour US_EU (recalcule les scores avec ajustements)
 """
-import sys
 from pathlib import Path
 
-# Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from pipeline.gating import GatingJob
 from pipeline.rotation import RotationJob

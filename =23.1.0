@@ -1,0 +1,13 @@
+Defaulting to user installation because normal site-packages is not writeable
+Collecting passlib[argon2]>=1.7.4
+  Downloading passlib-1.7.4-py2.py3-none-any.whl (525 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 525.6/525.6 KB 1.1 MB/s eta 0:00:00
+Collecting argon2-cffi
+  Downloading argon2_cffi-25.1.0-py3-none-any.whl (14 kB)
+Collecting argon2-cffi-bindings
+  Downloading argon2_cffi_bindings-25.1.0-cp39-abi3-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl (81 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 81.2/81.2 KB 7.8 MB/s eta 0:00:00
+Requirement already satisfied: cffi>=1.0.1 in /usr/local/lib/python3.10/dist-packages (from argon2-cffi-bindings->argon2-cffi) (2.0.0)
+Requirement already satisfied: pycparser in /usr/local/lib/python3.10/dist-packages (from cffi>=1.0.1->argon2-cffi-bindings->argon2-cffi) (3.0)
+Installing collected packages: passlib, argon2-cffi-bindings, argon2-cffi
+Successfully installed argon2-cffi-25.1.0 argon2-cffi-bindings-25.1.0 passlib-1.7.4

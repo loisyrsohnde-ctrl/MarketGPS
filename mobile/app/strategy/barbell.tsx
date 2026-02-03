@@ -1,5 +1,6 @@
 /**
  * MarketGPS Mobile - Barbell Strategy Screen
+ * Avec sauvegarde de portfolios
  */
 
 import React, { useState } from 'react';
@@ -10,11 +11,15 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  Alert,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { Stack, useRouter } from 'expo-router';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { api } from '@/lib/api';
 import { Card, AssetCard, LoadingSpinner, EmptyState, Button } from '@/components/ui';
 import { MARKET_SCOPES, type MarketScope } from '@/lib/config';
@@ -26,8 +31,54 @@ const RISK_PROFILES = [
 ];
 
 export default function BarbellScreen() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [marketScope, setMarketScope] = useState<MarketScope>('US_EU');
   const [riskProfile, setRiskProfile] = useState('moderate');
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [portfolioName, setPortfolioName] = useState('');
+
+  // Save portfolio mutation
+  const saveMutation = useMutation({
+    mutationFn: (data: Parameters<typeof api.saveBarbellPortfolio>[0]) =>
+      api.saveBarbellPortfolio(data),
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.invalidateQueries({ queryKey: ['barbell', 'portfolios'] });
+      setShowSaveModal(false);
+      setPortfolioName('');
+      Alert.alert('Succès', 'Portfolio sauvegardé !');
+    },
+    onError: (error) => {
+      Alert.alert('Erreur', 'Impossible de sauvegarder le portfolio');
+    },
+  });
+
+  const handleSavePortfolio = () => {
+    if (!portfolioName.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer un nom pour le portfolio');
+      return;
+    }
+    if (!suggestion) return;
+
+    const coreAssets = (suggestion.core || []).slice(0, 5).map((asset: any, index: number) => ({
+      ticker: asset.symbol,
+      weight: Math.floor((parseInt(selectedRisk?.ratio.split('/')[0] || '75') / 5)),
+    }));
+
+    const satelliteAssets = (suggestion.satellite || []).slice(0, 5).map((asset: any, index: number) => ({
+      ticker: asset.symbol,
+      weight: Math.floor((parseInt(selectedRisk?.ratio.split('/')[1] || '25') / 5)),
+    }));
+
+    saveMutation.mutate({
+      name: portfolioName.trim(),
+      risk_profile: riskProfile,
+      market_scope: marketScope,
+      core_assets: coreAssets,
+      satellite_assets: satelliteAssets,
+    });
+  };
   
   // Fetch barbell suggestion
   const { data: suggestion, isLoading, refetch, isRefetching } = useQuery({
@@ -233,7 +284,82 @@ export default function BarbellScreen() {
               onAction={() => refetch()}
             />
           )}
+
+          {/* Action Buttons */}
+          {suggestion && (
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={styles.savedPortfoliosButton}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/strategy/barbell-saved');
+                }}
+              >
+                <Ionicons name="folder-outline" size={20} color="#19D38C" />
+                <Text style={styles.savedPortfoliosText}>Mes Portfolios</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setShowSaveModal(true);
+                }}
+              >
+                <Ionicons name="save-outline" size={20} color="#0A0F1C" />
+                <Text style={styles.saveButtonText}>Sauvegarder</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
+
+        {/* Save Modal */}
+        <Modal
+          visible={showSaveModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowSaveModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Sauvegarder le Portfolio</Text>
+              <Text style={styles.modalSubtitle}>
+                Donnez un nom à votre portfolio Barbell
+              </Text>
+              <TextInput
+                style={styles.modalInput}
+                value={portfolioName}
+                onChangeText={setPortfolioName}
+                placeholder="Ex: Mon Portfolio Agressif"
+                placeholderTextColor="#64748B"
+                autoFocus
+              />
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={styles.modalCancelButton}
+                  onPress={() => {
+                    setShowSaveModal(false);
+                    setPortfolioName('');
+                  }}
+                >
+                  <Text style={styles.modalCancelText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalSaveButton,
+                    saveMutation.isPending && styles.modalSaveButtonDisabled,
+                  ]}
+                  onPress={handleSavePortfolio}
+                  disabled={saveMutation.isPending}
+                >
+                  <Text style={styles.modalSaveText}>
+                    {saveMutation.isPending ? 'Sauvegarde...' : 'Sauvegarder'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </>
   );
@@ -416,5 +542,112 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#8B5CF6',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+    marginBottom: 20,
+  },
+  savedPortfoliosButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#19D38C20',
+    borderRadius: 12,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#19D38C',
+  },
+  savedPortfoliosText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#19D38C',
+  },
+  saveButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#19D38C',
+    borderRadius: 12,
+    paddingVertical: 14,
+  },
+  saveButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0A0F1C',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#F1F5F9',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#94A3B8',
+    marginBottom: 20,
+  },
+  modalInput: {
+    backgroundColor: '#0A0F1C',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#334155',
+  },
+  modalCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  modalSaveButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#19D38C',
+  },
+  modalSaveButtonDisabled: {
+    opacity: 0.6,
+  },
+  modalSaveText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0A0F1C',
   },
 });

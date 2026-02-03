@@ -9,7 +9,6 @@ Sources: 30+ African news sites covering economy, finance, startups, fintech, te
 """
 
 import os
-import sys
 import re
 import json
 import logging
@@ -23,8 +22,10 @@ import asyncio
 import httpx
 from bs4 import BeautifulSoup
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from storage.sqlite_store import SQLiteStore
 
@@ -207,8 +208,8 @@ class AfricanNewsScraper:
             for col_name, col_type in migration_columns:
                 try:
                     conn.execute(f"ALTER TABLE news_articles ADD COLUMN {col_name} {col_type}")
-                except:
-                    pass  # Column already exists
+                except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                    logger.debug(f"Column {col_name} already exists or migration failed: {e}")
 
             # Create indexes (wrapped in try/except for missing columns)
             index_statements = [
@@ -221,8 +222,8 @@ class AfricanNewsScraper:
             for stmt in index_statements:
                 try:
                     conn.execute(stmt)
-                except:
-                    pass  # Index may fail if column doesn't exist
+                except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                    logger.debug(f"Index creation failed (column may not exist): {e}")
 
             conn.commit()
 

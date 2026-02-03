@@ -3,9 +3,7 @@ import pytest
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
-import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class TestRotationSet:

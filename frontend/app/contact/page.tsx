@@ -215,49 +215,52 @@ export default function ContactPage() {
 
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-text-secondary mb-2">
-                        Nom complet *
+                      <label htmlFor="contact-name" className="block text-sm font-medium text-text-secondary mb-2">
+                        Nom complet <span className="text-score-red" aria-label="requis">*</span>
                       </label>
                       <input
                         type="text"
-                        id="name"
+                        id="contact-name"
                         name="name"
                         required
+                        aria-required="true"
                         value={formData.name}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 bg-surface border border-glass-border rounded-xl text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent transition-colors"
+                        className="w-full px-4 py-3 bg-surface border border-glass-border rounded-xl text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent-dim transition-colors"
                         placeholder="John Doe"
                       />
                     </div>
 
                     <div>
-                      <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-2">
-                        Email *
+                      <label htmlFor="contact-email" className="block text-sm font-medium text-text-secondary mb-2">
+                        Email <span className="text-score-red" aria-label="requis">*</span>
                       </label>
                       <input
                         type="email"
-                        id="email"
+                        id="contact-email"
                         name="email"
                         required
+                        aria-required="true"
                         value={formData.email}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 bg-surface border border-glass-border rounded-xl text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent transition-colors"
+                        className="w-full px-4 py-3 bg-surface border border-glass-border rounded-xl text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent-dim transition-colors"
                         placeholder="john@example.com"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label htmlFor="subject" className="block text-sm font-medium text-text-secondary mb-2">
-                      Sujet *
+                    <label htmlFor="contact-subject" className="block text-sm font-medium text-text-secondary mb-2">
+                      Sujet <span className="text-score-red" aria-label="requis">*</span>
                     </label>
                     <select
-                      id="subject"
+                      id="contact-subject"
                       name="subject"
                       required
+                      aria-required="true"
                       value={formData.subject}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 bg-surface border border-glass-border rounded-xl text-text-primary focus:outline-none focus:border-accent transition-colors appearance-none cursor-pointer"
+                      className="w-full px-4 py-3 bg-surface border border-glass-border rounded-xl text-text-primary focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent-dim transition-colors appearance-none cursor-pointer"
                     >
                       <option value="" disabled>Sélectionnez un sujet</option>
                       {SUBJECT_OPTIONS.map(opt => (
@@ -269,17 +272,18 @@ export default function ContactPage() {
                   </div>
 
                   <div>
-                    <label htmlFor="message" className="block text-sm font-medium text-text-secondary mb-2">
-                      Message *
+                    <label htmlFor="contact-message" className="block text-sm font-medium text-text-secondary mb-2">
+                      Message <span className="text-score-red" aria-label="requis">*</span>
                     </label>
                     <textarea
-                      id="message"
+                      id="contact-message"
                       name="message"
                       required
+                      aria-required="true"
                       rows={6}
                       value={formData.message}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 bg-surface border border-glass-border rounded-xl text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent transition-colors resize-none"
+                      className="w-full px-4 py-3 bg-surface border border-glass-border rounded-xl text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent-dim transition-colors resize-none"
                       placeholder="Décrivez votre demande en détail..."
                     />
                   </div>
@@ -313,14 +317,14 @@ export default function ContactPage() {
           <p className="text-sm text-text-muted">
             © 2024 MarketGPS. Tous droits réservés.
           </p>
-          <div className="flex gap-6 text-sm text-text-muted">
-            <Link href="/legal/privacy" className="hover:text-text-primary transition-colors">
+          <nav className="flex gap-6 text-sm text-text-muted">
+            <Link href="/legal/privacy" className="hover:text-text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-accent-dim rounded px-2 py-1">
               Confidentialité
             </Link>
-            <Link href="/legal/terms" className="hover:text-text-primary transition-colors">
+            <Link href="/legal/terms" className="hover:text-text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-accent-dim rounded px-2 py-1">
               CGU
             </Link>
-          </div>
+          </nav>
         </div>
       </footer>
     </div>

@@ -58,6 +58,8 @@ export interface ButtonProps
   loading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  iconOnly?: boolean;
+  ariaLabel?: string;
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -70,6 +72,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       loading = false,
       leftIcon,
       rightIcon,
+      iconOnly = false,
+      ariaLabel,
       disabled,
       children,
       ...props
@@ -77,21 +81,23 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const Comp = asChild ? Slot : 'button';
-    
+
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         disabled={disabled || loading}
+        aria-label={iconOnly || !children ? ariaLabel : undefined}
+        aria-busy={loading}
         {...props}
       >
         {loading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
         ) : (
-          leftIcon
+          leftIcon && <span aria-hidden="true">{leftIcon}</span>
         )}
-        {children}
-        {!loading && rightIcon}
+        {children && <span>{children}</span>}
+        {!loading && rightIcon && <span aria-hidden="true">{rightIcon}</span>}
       </Comp>
     );
   }

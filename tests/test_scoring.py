@@ -4,9 +4,11 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from core.scoring_specs import normalize, normalize_rsi, ScoringSpecs
 from pipeline.features import Features, FeatureComputer

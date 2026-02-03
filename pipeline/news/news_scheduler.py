@@ -79,37 +79,37 @@ class NewsSchedulerLock:
             try:
                 fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
                 self.lock_file.close()
-            except:
-                pass
+            except (IOError, OSError) as e:
+                logger.debug(f"Error unlocking file: {e}")
             finally:
                 self.lock_file = None
-                
+
             # Remove lock file
             try:
                 self.lock_path.unlink()
-            except:
-                pass
+            except (IOError, OSError, FileNotFoundError) as e:
+                logger.debug(f"Error removing lock file: {e}")
 
 
 def update_metrics(result: dict, success: bool = True):
     """Update metrics file with last run info."""
     try:
         METRICS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Load existing metrics
         metrics = {}
         if METRICS_FILE.exists():
             try:
                 with open(METRICS_FILE, 'r') as f:
                     metrics = json.load(f)
-            except:
-                pass
-        
+            except (IOError, OSError, json.JSONDecodeError) as e:
+                logger.warning(f"Failed to load existing metrics, starting fresh: {e}")
+
         # Update
         metrics["last_run"] = datetime.now().isoformat()
         metrics["last_success"] = success
         metrics["last_result"] = result
-        
+
         # Track history (last 10 runs)
         history = metrics.get("history", [])
         history.insert(0, {
@@ -119,13 +119,15 @@ def update_metrics(result: dict, success: bool = True):
             "items_ingested": result.get("ingest", {}).get("items_new", 0)
         })
         metrics["history"] = history[:10]
-        
+
         # Save
         with open(METRICS_FILE, 'w') as f:
             json.dump(metrics, f, indent=2)
-            
+
+    except (IOError, OSError) as e:
+        logger.warning(f"Failed to write metrics file: {e}")
     except Exception as e:
-        logger.warning(f"Failed to update metrics: {e}")
+        logger.warning(f"Unexpected error updating metrics: {e}")
 
 
 def run_news_pipeline():

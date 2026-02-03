@@ -18,7 +18,6 @@ Usage:
 """
 
 import os
-import sys
 import json
 import logging
 import asyncio
@@ -26,11 +25,9 @@ import argparse
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from dotenv import load_dotenv
-load_dotenv()
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from storage.sqlite_store import SQLiteStore
 from news_scraper import AfricanNewsScraper
@@ -77,7 +74,8 @@ def save_results(results: dict):
             try:
                 with open(RESULTS_FILE, 'r') as f:
                     history = json.load(f)
-            except:
+            except (IOError, json.JSONDecodeError) as e:
+                logger.warning(f"Error reading results file: {e}")
                 history = []
 
         # Add new result
@@ -162,8 +160,8 @@ def get_scraping_history(limit: int = 10) -> list:
             with open(RESULTS_FILE, 'r') as f:
                 history = json.load(f)
                 return history[:limit]
-    except:
-        pass
+    except (IOError, json.JSONDecodeError) as e:
+        logger.error(f"Error reading scraping history: {e}")
     return []
 
 

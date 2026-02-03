@@ -39,15 +39,16 @@ Usage:
     python scripts/run_optimized_pipeline.py --full  # Both scopes, full rebuild
 """
 import os
-import sys
 import time
 import argparse
 from datetime import datetime
 from pathlib import Path
 from typing import Dict
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from core.config import get_logger
 

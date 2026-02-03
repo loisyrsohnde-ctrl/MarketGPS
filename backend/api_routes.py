@@ -4,7 +4,6 @@ Exposes SQLite data to the Next.js frontend.
 """
 
 import os
-import sys
 from datetime import datetime, timedelta
 from typing import Optional, List
 from pathlib import Path as FilePath
@@ -12,8 +11,10 @@ from fastapi import APIRouter, Query, HTTPException, Depends, Header
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
-# Add parent directory to path to import from storage
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from storage.sqlite_store import SQLiteStore
 from security import get_user_id_from_request

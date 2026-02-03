@@ -18,12 +18,13 @@ Usage:
     python scripts/prepare_universe.py --reset  # Reset all to active
 """
 import os
-import sys
 import argparse
 from pathlib import Path
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from core.config import get_config, get_logger
 from storage.sqlite_store import SQLiteStore

@@ -4,12 +4,14 @@ Run with: pytest tests/test_strategies_endpoints.py -v
 """
 
 import pytest
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fastapi.testclient import TestClient
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
+
 from backend.main import app
 
 

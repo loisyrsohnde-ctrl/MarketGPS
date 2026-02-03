@@ -4,19 +4,20 @@ Manages user profile, security, and notification preferences.
 Persists all changes to the database.
 """
 
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
+
 from storage.sqlite_store import SQLiteStore
 import os
-import sys
-import hashlib
 import json
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Header
 from security import get_user_id_from_request
 from pydantic import BaseModel
+from password_security import hash_password, verify_password, migrate_hash_if_needed
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # Initialize SQLite store
@@ -90,11 +91,6 @@ def _get_user_id_from_header(authorization: Optional[str] = Header(None)) -> str
     return get_user_id_from_request(authorization, fallback_user_id="default_user")
 
 
-def _hash_password(password: str) -> str:
-    """Hash password using SHA256"""
-    return hashlib.sha256(password.encode()).hexdigest()
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # Profile Endpoints
 # ═══════════════════════════════════════════════════════════════════════════
@@ -135,10 +131,10 @@ async def get_profile(user_id: Optional[str] = Depends(_get_user_id_from_header)
 
                 # Also create security record
                 conn.execute(
-                    """INSERT OR IGNORE INTO user_security 
+                    """INSERT OR IGNORE INTO user_security
                        (user_id, password_hash, created_at, updated_at)
                        VALUES (?, ?, ?, ?)""",
-                    (user_id, _hash_password("password"), now, now)
+                    (user_id, hash_password("password"), now, now)
                 )
 
                 # Create preferences
@@ -442,7 +438,7 @@ async def change_password(
 
             if not row:
                 # Create security record if doesn't exist
-                new_hash = _hash_password(request.newPassword)
+                new_hash = hash_password(request.newPassword)
                 conn.execute(
                     """INSERT INTO user_security (user_id, password_hash, created_at, updated_at)
                        VALUES (?, ?, ?, ?)""",
@@ -452,16 +448,16 @@ async def change_password(
                 conn.commit()
                 return {"success": True}
 
-            # Verify current password
-            current_hash = _hash_password(request.currentPassword)
-            if current_hash != row[0]:
+            # Verify current password (supports both new Argon2 and legacy hashes)
+            is_valid, needs_rehash = verify_password(request.currentPassword, row[0])
+            if not is_valid:
                 raise HTTPException(
                     status_code=401,
                     detail="Current password is incorrect"
                 )
 
-            # Hash and update new password
-            new_hash = _hash_password(request.newPassword)
+            # Hash new password (always uses Argon2)
+            new_hash = hash_password(request.newPassword)
             conn.execute(
                 "UPDATE user_security SET password_hash = ?, updated_at = ? WHERE user_id = ?",
                 (new_hash, datetime.now().isoformat(), user_id)
@@ -523,8 +519,8 @@ async def delete_account(
             row = cursor.fetchone()
 
             if row:
-                password_hash = _hash_password(request.password)
-                if password_hash != row[0]:
+                is_valid, _ = verify_password(request.password, row[0])
+                if not is_valid:
                     raise HTTPException(
                         status_code=401,
                         detail="Password is incorrect"
@@ -594,7 +590,8 @@ def _format_time_ago(created_at: str) -> str:
             return f"Il y a {minutes} min"
         else:
             return "À l'instant"
-    except:
+    except (ValueError, TypeError) as e:
+        logger.warning(f"Error formatting time ago: {e}")
         return "Récemment"
 
 

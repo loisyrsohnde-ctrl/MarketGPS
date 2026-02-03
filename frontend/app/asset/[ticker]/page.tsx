@@ -11,6 +11,10 @@ import { ScoreBadge } from '@/components/ui/badge';
 import { AssetLogo } from '@/components/cards/asset-card';
 import { ScoreGauge, PillarBar, KpiBar } from '@/components/charts/score-gauge';
 import { PriceChart } from '@/components/charts/price-chart';
+import { QuickActions } from '@/components/asset/QuickActions';
+import { CreateAlertModal } from '@/components/alerts/CreateAlertModal';
+import { AssetComparator } from '@/components/asset/AssetComparator';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import type { Asset, ChartPeriod } from '@/types';
@@ -66,6 +70,8 @@ export default function AssetDetailPage() {
   const [chartPeriod, setChartPeriod] = useState<ExtendedChartPeriod>('1y');
   const [chartStyle, setChartStyle] = useState<ChartStyle>('line');
   const [userId] = useState('default'); // In production, get from auth
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+  const [isComparatorOpen, setIsComparatorOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch asset details
@@ -125,6 +131,14 @@ export default function AssetDetailPage() {
       refetchChart();
     }
   }, [chartPeriod, ticker, refetchChart]);
+
+  // Setup keyboard shortcuts
+  useKeyboardShortcuts({
+    toggleWatchlist: handleWatchlistToggle,
+    openAlert: () => setIsAlertModalOpen(true),
+    openComparator: () => setIsComparatorOpen(true),
+    openAIChat: () => console.log('Open AI chat'),
+  });
 
   // Check if asset is in watchlist
   const { data: watchlistStatus } = useQuery({
@@ -399,6 +413,25 @@ export default function AssetDetailPage() {
           </div>
         </div>
       </GlassCardAccent>
+
+      {/* Quick Actions */}
+      <GlassCard>
+        <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+          <Zap className="w-5 h-5 text-accent" />
+          Actions rapides
+        </h2>
+        <QuickActions
+          asset={displayAsset}
+          onOpenAlert={() => setIsAlertModalOpen(true)}
+          onOpenComparator={() => setIsComparatorOpen(true)}
+          onOpenAIChat={() => {
+            // TODO: Open AI chat modal
+            console.log('Open AI chat for:', displayAsset.ticker);
+          }}
+          userId={userId}
+          variant="horizontal"
+        />
+      </GlassCard>
 
       {/* Score section */}
       <div className="grid md:grid-cols-2 gap-6">
@@ -738,11 +771,32 @@ export default function AssetDetailPage() {
       {/* Disclaimer */}
       <div className="p-4 rounded-xl bg-surface/50 border border-glass-border">
         <p className="text-xs text-text-dim text-center">
-          ⚠️ Les informations fournies sont à titre informatif uniquement et ne constituent pas 
+          ⚠️ Les informations fournies sont à titre informatif uniquement et ne constituent pas
           des conseils en investissement. Les performances passées ne garantissent pas les résultats futurs.
           Investir comporte des risques de perte en capital.
         </p>
       </div>
+
+      {/* Modals */}
+      <CreateAlertModal
+        isOpen={isAlertModalOpen}
+        onClose={() => setIsAlertModalOpen(false)}
+        asset={displayAsset}
+        onCreateAlert={async (config) => {
+          // TODO: Implement alert creation API call
+          console.log('Create alert:', config);
+        }}
+      />
+
+      <AssetComparator
+        isOpen={isComparatorOpen}
+        onClose={() => setIsComparatorOpen(false)}
+        initialAsset={displayAsset}
+        assets={[]} // TODO: Pass available assets for comparison
+        onCompare={(selectedAssets) => {
+          console.log('Compare assets:', selectedAssets.map(a => a.ticker));
+        }}
+      />
     </div>
   );
 }

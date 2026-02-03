@@ -15,7 +15,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { api, NewsArticle } from '@/lib/api';
 import { NewsCard, LoadingSpinner, EmptyState, AlerteInfoBanner } from '@/components/ui';
 
@@ -89,6 +91,7 @@ const SORT_OPTIONS = [
 ];
 
 export default function NewsScreen() {
+  const router = useRouter();
   const [selectedZone, setSelectedZone] = useState('all');
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState('all');
@@ -282,8 +285,19 @@ export default function NewsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Actualités</Text>
-        <Text style={styles.subtitle}>Fintech & Startups Afrique</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.title}>Actualités</Text>
+          <Text style={styles.subtitle}>Fintech & Startups Afrique</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.savedButton}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/news/saved');
+          }}
+        >
+          <Ionicons name="bookmark" size={20} color="#19D38C" />
+        </TouchableOpacity>
       </View>
       
       {isLoading ? (
@@ -322,8 +336,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A0F1C',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
+  },
+  headerLeft: {
+    flex: 1,
   },
   title: {
     fontSize: 28,
@@ -334,6 +354,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748B',
     marginTop: 4,
+  },
+  savedButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#19D38C20',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterScrollView: {
     marginBottom: 12,

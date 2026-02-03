@@ -4,14 +4,15 @@ Downloads ALL stocks, ETFs, and bonds from EODHD for US, EU, and Africa markets.
 NO LIMITS - fetches everything your EODHD plan allows.
 """
 import os
-import sys
 import requests
 import time
 from pathlib import Path
 from typing import List, Dict, Optional
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from core.config import get_config, get_logger
 from storage.sqlite_store import SQLiteStore

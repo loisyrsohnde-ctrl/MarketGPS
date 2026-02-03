@@ -53,15 +53,15 @@ class NewsArticleSummary(BaseModel):
         if row.get("tldr_json"):
             try:
                 tldr = json.loads(row["tldr_json"])
-            except:
-                pass
+            except json.JSONDecodeError as e:
+                logger.warning(f"Error parsing tldr JSON: {e}")
 
         tags = None
         if row.get("tags_json"):
             try:
                 tags = json.loads(row["tags_json"])
-            except:
-                pass
+            except json.JSONDecodeError as e:
+                logger.warning(f"Error parsing tags JSON: {e}")
 
         return cls(
             id=row["id"],
@@ -108,15 +108,15 @@ class NewsArticleFull(BaseModel):
         if row.get("tldr_json"):
             try:
                 tldr = json.loads(row["tldr_json"])
-            except:
-                pass
+            except json.JSONDecodeError as e:
+                logger.warning(f"Error parsing tldr JSON: {e}")
         
         tags = None
         if row.get("tags_json"):
             try:
                 tags = json.loads(row["tags_json"])
-            except:
-                pass
+            except json.JSONDecodeError as e:
+                logger.warning(f"Error parsing tags JSON: {e}")
         
         return cls(
             id=row["id"],
@@ -258,8 +258,8 @@ async def get_news_health():
         try:
             with open(metrics_file, 'r') as f:
                 metrics = json.load(f)
-        except:
-            pass
+        except (IOError, json.JSONDecodeError) as e:
+            logger.warning(f"Error reading metrics file: {e}")
     
     # Get article counts from DB
     try:
@@ -270,10 +270,11 @@ async def get_news_health():
         now = datetime.now()
         articles_24h = sum(
             1 for a in recent_articles.get("data", [])
-            if a.get("published_at") and 
+            if a.get("published_at") and
             (now - datetime.fromisoformat(a["published_at"].replace('Z', ''))).total_seconds() < 86400
         )
-    except:
+    except (ValueError, TypeError, KeyError) as e:
+        logger.error(f"Error calculating 24h articles: {e}")
         total_articles = 0
         articles_24h = 0
     
@@ -287,8 +288,8 @@ async def get_news_health():
             last_run_dt = datetime.fromisoformat(last_run)
             minutes_since_last_run = int((datetime.now() - last_run_dt).total_seconds() / 60)
             is_healthy = minutes_since_last_run < 45  # Allow some slack
-        except:
-            pass
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Error parsing last run time: {e}")
     
     return {
         "status": "healthy" if is_healthy else "degraded",
@@ -433,8 +434,8 @@ async def get_news_status():
                     last_dt = datetime.fromisoformat(last_created.replace("Z", "+00:00"))
                     delta = datetime.utcnow() - last_dt.replace(tzinfo=None)
                     minutes_ago = int(delta.total_seconds() / 60)
-                except:
-                    pass
+                except (ValueError, TypeError) as e:
+                    logger.debug(f"Error calculating minutes ago: {e}")
             
             return {
                 "status": "ok" if total > 0 else "empty",

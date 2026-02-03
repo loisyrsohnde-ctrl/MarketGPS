@@ -126,8 +126,10 @@ export default function SignupPage() {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="mb-6 p-4 rounded-xl bg-score-red/10 border border-score-red/30 flex items-center gap-3"
+                    role="alert"
+                    aria-live="assertive"
                   >
-                    <AlertCircle className="w-5 h-5 text-score-red flex-shrink-0" />
+                    <AlertCircle className="w-5 h-5 text-score-red flex-shrink-0" aria-hidden="true" />
                     <p className="text-sm text-score-red">{error}</p>
                   </motion.div>
                 )}
@@ -135,10 +137,11 @@ export default function SignupPage() {
                 <form onSubmit={handleSubmit} className="space-y-5">
                   {/* Email */}
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-text-secondary">
+                    <label htmlFor="signup-email" className="block text-sm font-medium text-text-secondary">
                       Adresse email
                     </label>
                     <Input
+                      id="signup-email"
                       type="email"
                       placeholder="vous@exemple.com"
                       value={email}
@@ -146,15 +149,17 @@ export default function SignupPage() {
                       leftIcon={<Mail className="w-5 h-5" />}
                       required
                       autoComplete="email"
+                      ariaLabel="Adresse email"
                     />
                   </div>
 
                   {/* Password */}
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-text-secondary">
+                    <label htmlFor="signup-password" className="block text-sm font-medium text-text-secondary">
                       Mot de passe
                     </label>
                     <Input
+                      id="signup-password"
                       type="password"
                       placeholder="Minimum 8 caractères"
                       value={password}
@@ -162,15 +167,21 @@ export default function SignupPage() {
                       leftIcon={<Lock className="w-5 h-5" />}
                       required
                       autoComplete="new-password"
+                      ariaLabel="Mot de passe"
+                      ariaDescribedBy="password-hint"
                     />
+                    <p id="password-hint" className="text-xs text-text-muted">
+                      Le mot de passe doit contenir au moins 8 caractères
+                    </p>
                   </div>
 
                   {/* Confirm Password */}
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-text-secondary">
+                    <label htmlFor="signup-confirm" className="block text-sm font-medium text-text-secondary">
                       Confirmer le mot de passe
                     </label>
                     <Input
+                      id="signup-confirm"
                       type="password"
                       placeholder="••••••••"
                       value={confirmPassword}
@@ -179,6 +190,8 @@ export default function SignupPage() {
                       required
                       autoComplete="new-password"
                       error={confirmPassword !== '' && password !== confirmPassword}
+                      errorMessage={confirmPassword !== '' && password !== confirmPassword ? 'Les mots de passe ne correspondent pas' : undefined}
+                      ariaLabel="Confirmer le mot de passe"
                     />
                   </div>
 

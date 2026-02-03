@@ -6,14 +6,15 @@ Tests:
 - Requêtes explorer (retourne aussi actifs sans score)
 """
 import os
-import sys
 import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from core.models import Score, GatingStatus, StateLabel, ScoreBreakdown
 from storage.sqlite_store import SQLiteStore
@@ -441,7 +442,6 @@ class TestAfricaUniverse(unittest.TestCase):
             ])
         
         # Import using import_universe_from_csv function
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         from pipeline.jobs import import_universe_from_csv
         
         result = import_universe_from_csv(self.store, csv_path, "AFRICA")

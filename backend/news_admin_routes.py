@@ -10,7 +10,6 @@ Endpoints admin pour gérer le scraping d'actualités économiques africaines:
 """
 
 import os
-import sys
 import logging
 import asyncio
 from datetime import datetime
@@ -18,8 +17,10 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Header, Query, BackgroundTasks
 from pydantic import BaseModel
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from storage.sqlite_store import SQLiteStore
 from news_scraper import AfricanNewsScraper, NEWS_SOURCES
@@ -576,8 +577,8 @@ async def get_pipeline_status(
                     result["last_run"] = metrics.get("last_run")
                     result["last_success"] = metrics.get("last_success")
                     result["history"] = metrics.get("history", [])[:5]
-            except:
-                pass
+            except (IOError, json.JSONDecodeError) as e:
+                logger.error(f"Error reading metrics file: {e}")
         
         # Check sources registry
         sources_path = Path(__file__).parent.parent / "pipeline" / "news" / "sources_registry.json"
@@ -588,8 +589,8 @@ async def get_pipeline_status(
                     sources = sources_data.get("sources", [])
                     result["sources"]["total"] = len(sources)
                     result["sources"]["enabled"] = len([s for s in sources if s.get("enabled", True)])
-            except:
-                pass
+            except (IOError, json.JSONDecodeError) as e:
+                logger.error(f"Error reading sources registry: {e}")
         
         # Check database
         with db._get_conn() as conn:
@@ -600,8 +601,8 @@ async def get_pipeline_status(
                 
                 cursor = conn.execute("SELECT COUNT(*) FROM news_raw_items WHERE processed = 1")
                 result["raw_items"]["processed"] = cursor.fetchone()[0]
-            except:
-                pass
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.error(f"Error querying raw items: {e}")
             
             # Articles
             try:
@@ -610,8 +611,8 @@ async def get_pipeline_status(
                 
                 cursor = conn.execute("SELECT COUNT(*) FROM news_articles WHERE date(created_at) = date('now')")
                 result["articles"]["today"] = cursor.fetchone()[0]
-            except:
-                pass
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.error(f"Error querying articles: {e}")
             
             # Sources from DB
             try:
@@ -619,8 +620,8 @@ async def get_pipeline_status(
                 db_enabled = cursor.fetchone()[0]
                 if db_enabled > 0:
                     result["sources"]["enabled_in_db"] = db_enabled
-            except:
-                pass
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.error(f"Error querying enabled sources in DB: {e}")
         
         # Check LLM availability
         if os.environ.get("OPENAI_API_KEY"):
@@ -685,4 +686,127 @@ async def list_rss_sources(
         
     except Exception as e:
         logger.error(f"Error listing RSS sources: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/update-interactions")
+async def update_article_interactions(
+    background_tasks: BackgroundTasks,
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+    limit: Optional[int] = Query(None, description="Limit number of articles to update"),
+    sync: bool = Query(False, description="Run synchronously (wait for result)"),
+):
+    """
+    Update all articles with estimated interactions.
+
+    This endpoint triggers the InteractionsFetcher to estimate likes, comments,
+    shares for all articles based on source reputation, category, country, etc.
+    """
+    require_admin(admin_key)
+
+    try:
+        from datetime import datetime
+        from pipeline.news.interactions_fetcher import InteractionsFetcher
+
+        def update_interactions_task():
+            """Background task to update interactions."""
+            fetcher = InteractionsFetcher()
+            updated = 0
+            errors = 0
+
+            with db._get_conn() as conn:
+                # Ensure columns exist
+                try:
+                    conn.execute("ALTER TABLE news_articles ADD COLUMN likes INTEGER DEFAULT 0")
+                except Exception:
+                    pass
+                try:
+                    conn.execute("ALTER TABLE news_articles ADD COLUMN comments INTEGER DEFAULT 0")
+                except Exception:
+                    pass
+                try:
+                    conn.execute("ALTER TABLE news_articles ADD COLUMN shares INTEGER DEFAULT 0")
+                except Exception:
+                    pass
+
+                # Get articles
+                query = """
+                    SELECT id, title, source_name, source_url, published_at,
+                           category, country, language
+                    FROM news_articles
+                    ORDER BY published_at DESC
+                """
+                if limit:
+                    query += f" LIMIT {limit}"
+
+                articles = conn.execute(query).fetchall()
+                columns = ['id', 'title', 'source_name', 'source_url', 'published_at',
+                          'category', 'country', 'language']
+
+                for row in articles:
+                    article = dict(zip(columns, row))
+                    try:
+                        # Parse published_at
+                        pub_at = article.get('published_at')
+                        if isinstance(pub_at, str):
+                            try:
+                                pub_dt = datetime.fromisoformat(pub_at.replace("Z", "+00:00"))
+                            except Exception:
+                                pub_dt = datetime.utcnow()
+                        else:
+                            pub_dt = datetime.utcnow()
+
+                        # Get interactions
+                        metrics = fetcher.get_interactions(
+                            url=article.get('source_url') or '',
+                            source_name=article.get('source_name') or 'Unknown',
+                            title=article.get('title') or '',
+                            published_at=pub_dt,
+                            category=article.get('category') or 'default',
+                            country=article.get('country') or 'default',
+                            language=article.get('language') or 'en'
+                        )
+
+                        # Update article
+                        conn.execute("""
+                            UPDATE news_articles
+                            SET total_interactions = ?,
+                                likes = ?,
+                                comments = ?,
+                                shares = ?
+                            WHERE id = ?
+                        """, (
+                            metrics.total_interactions,
+                            metrics.likes,
+                            metrics.comments,
+                            metrics.shares,
+                            article['id']
+                        ))
+                        updated += 1
+
+                        if updated % 100 == 0:
+                            logger.info(f"Updated {updated} articles...")
+
+                    except Exception as e:
+                        logger.error(f"Error updating article {article['id']}: {e}")
+                        errors += 1
+
+                conn.commit()
+
+            logger.info(f"Interactions update complete: {updated} updated, {errors} errors")
+            return {"updated": updated, "errors": errors}
+
+        if sync:
+            result = update_interactions_task()
+            return {"success": True, "mode": "sync", "result": result}
+        else:
+            background_tasks.add_task(update_interactions_task)
+            return {
+                "success": True,
+                "mode": "background",
+                "message": f"Updating interactions for {'all' if not limit else limit} articles in background..."
+            }
+
+    except Exception as e:
+        logger.error(f"Error updating interactions: {e}")
         raise HTTPException(status_code=500, detail=str(e))

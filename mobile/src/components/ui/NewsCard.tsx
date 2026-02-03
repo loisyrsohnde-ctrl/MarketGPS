@@ -1,24 +1,66 @@
 /**
  * MarketGPS Mobile - News Card Component
+ * Avec bouton de sauvegarde
  */
 
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { NewsArticle } from '@/lib/api';
+import { NewsArticle, api } from '@/lib/api';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface NewsCardProps {
   article: NewsArticle;
   variant?: 'default' | 'compact' | 'featured';
   onPress?: () => void;
+  showSaveButton?: boolean;
+  onSaveToggle?: (articleId: number, isSaved: boolean) => void;
 }
 
-export function NewsCard({ article, variant = 'default', onPress }: NewsCardProps) {
+export function NewsCard({ article, variant = 'default', onPress, showSaveButton = true, onSaveToggle }: NewsCardProps) {
   const router = useRouter();
-  
+  const queryClient = useQueryClient();
+  const [isSaved, setIsSaved] = useState(article.is_saved || false);
+
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: () => api.saveArticle(article.id),
+    onSuccess: () => {
+      setIsSaved(true);
+      queryClient.invalidateQueries({ queryKey: ['saved-articles'] });
+      onSaveToggle?.(article.id, true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    onError: () => {
+      Alert.alert('Erreur', 'Impossible de sauvegarder l\'article');
+    },
+  });
+
+  // Unsave mutation
+  const unsaveMutation = useMutation({
+    mutationFn: () => api.unsaveArticle(article.id),
+    onSuccess: () => {
+      setIsSaved(false);
+      queryClient.invalidateQueries({ queryKey: ['saved-articles'] });
+      onSaveToggle?.(article.id, false);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    },
+    onError: () => {
+      Alert.alert('Erreur', 'Impossible de retirer l\'article');
+    },
+  });
+
+  const handleSaveToggle = () => {
+    if (isSaved) {
+      unsaveMutation.mutate();
+    } else {
+      saveMutation.mutate();
+    }
+  };
+
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (onPress) {
@@ -27,6 +69,8 @@ export function NewsCard({ article, variant = 'default', onPress }: NewsCardProp
       router.push(`/news/${article.slug}`);
     }
   };
+
+  const isSaving = saveMutation.isPending || unsaveMutation.isPending;
   
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
@@ -161,6 +205,22 @@ export function NewsCard({ article, variant = 'default', onPress }: NewsCardProp
           <Text style={styles.metaDot}>•</Text>
           <Ionicons name="time-outline" size={12} color="#64748B" />
           <Text style={styles.metaText}>{formatDate(article.published_at)}</Text>
+
+          {/* Save Button */}
+          {showSaveButton && (
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSaveToggle}
+              disabled={isSaving}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                size={18}
+                color={isSaved ? '#19D38C' : '#64748B'}
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -257,7 +317,11 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginHorizontal: 4,
   },
-  
+  saveButton: {
+    marginLeft: 'auto',
+    padding: 4,
+  },
+
   // Featured variant
   featuredContainer: {
     height: 280,

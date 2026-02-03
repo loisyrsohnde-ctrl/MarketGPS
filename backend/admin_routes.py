@@ -12,7 +12,6 @@ Il se connecte aux sources de données existantes sans les affecter.
 """
 
 import os
-import sys
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
@@ -20,8 +19,10 @@ from fastapi import APIRouter, HTTPException, Header, Query
 from pydantic import BaseModel
 import httpx
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from storage.sqlite_store import SQLiteStore
 
@@ -193,8 +194,8 @@ async def get_dashboard_stats(
                         new_users_today += 1
                     if created_dt.replace(tzinfo=None) >= week_ago:
                         new_users_week += 1
-                except:
-                    pass
+                except (ValueError, TypeError) as e:
+                    logger.debug(f"Error parsing user creation date: {e}")
 
         # Get subscription stats from local DB
         pro_users = 0
@@ -208,8 +209,8 @@ async def get_dashboard_stats(
                 )
                 active_subscriptions = cursor.fetchone()[0] or 0
                 pro_users = active_subscriptions
-            except:
-                pass
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.error(f"Error querying subscriptions table: {e}")
 
             # Check user_entitlements table
             try:
@@ -219,8 +220,8 @@ async def get_dashboard_stats(
                 entitlement_pros = cursor.fetchone()[0] or 0
                 if entitlement_pros > pro_users:
                     pro_users = entitlement_pros
-            except:
-                pass
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.error(f"Error querying user_entitlements table: {e}")
 
             # Feedback stats
             total_feedbacks = 0
@@ -233,8 +234,8 @@ async def get_dashboard_stats(
                     "SELECT COUNT(*) FROM feedback WHERE date(created_at) = date('now')"
                 )
                 feedbacks_today = cursor.fetchone()[0] or 0
-            except:
-                pass
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.error(f"Error querying feedback count: {e}")
 
         free_users = total_users - pro_users if total_users > pro_users else 0
 
@@ -305,8 +306,8 @@ async def list_users(
                             "status": row[2],
                             "subscription_started": row[3],
                         }
-            except:
-                pass
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.error(f"Error fetching user_entitlements: {e}")
 
         # Combine data
         users = []
@@ -464,8 +465,8 @@ async def list_subscriptions(
                             created_at=row[3],
                             current_period_end=row[4],
                         ))
-                except:
-                    pass
+                except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                    logger.error(f"Error processing subscription row: {e}")
 
             # Also check user_entitlements if subscriptions is empty
             if not subscriptions:
@@ -485,8 +486,8 @@ async def list_subscriptions(
                             status=row[2] or "unknown",
                             created_at=row[3],
                         ))
-                except:
-                    pass
+                except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                    logger.error(f"Error processing user_entitlements row: {e}")
 
         return subscriptions
 
@@ -599,8 +600,8 @@ async def get_user_detail(
                         "cancel_at_period_end": bool(row[10]) if len(row) > 10 else False,
                         "payment_method": row[11] if len(row) > 11 else None,
                     }
-            except:
-                pass
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.error(f"Error processing subscription data: {e}")
 
             # Check entitlements if no subscription
             if not subscription_data:
@@ -616,8 +617,8 @@ async def get_user_detail(
                             "status": row[1],
                             "created_at": row[2],
                         }
-                except:
-                    pass
+                except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                    logger.error(f"Error querying entitlements: {e}")
 
         # Extract user metadata
         user_metadata = user.get("user_metadata", {}) or {}
@@ -698,8 +699,8 @@ async def get_user_activity(
                     date_str = created_dt.strftime("%Y-%m-%d")
                     if date_str in daily_signups:
                         daily_signups[date_str] += 1
-                except:
-                    pass
+                except (ValueError, TypeError) as e:
+                    logger.debug(f"Error processing signup date: {e}")
 
         # Get daily feedback counts
         daily_feedbacks = {}
@@ -715,8 +716,8 @@ async def get_user_activity(
                 for row in cursor.fetchall():
                     if row[0] in daily_feedbacks:
                         daily_feedbacks[row[0]] = row[1]
-            except:
-                pass
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.error(f"Error querying daily feedback counts: {e}")
 
         return {
             "period_days": days,
@@ -1002,9 +1003,9 @@ async def get_news_pipeline_status(
                     result["last_result"] = metrics.get("last_result")
                     result["history"] = metrics.get("history", [])[:5]
                     result["scheduler_configured"] = True
-            except:
-                pass
-        
+            except (IOError, json.JSONDecodeError) as e:
+                logger.error(f"Error reading metrics file: {e}")
+
         # Check legacy history file (from backend/news_scheduler.py)
         if not result["scheduler_configured"] and history_file.exists():
             try:
@@ -1015,9 +1016,9 @@ async def get_news_pipeline_status(
                         result["last_result"] = history[0]
                         result["history"] = history[:5]
                         result["scheduler_configured"] = True
-            except:
-                pass
-        
+            except (IOError, json.JSONDecodeError) as e:
+                logger.error(f"Error reading history file: {e}")
+
         # Check sources registry
         sources_file = Path(__file__).parent.parent / "pipeline" / "news" / "sources_registry.json"
         if sources_file.exists():
@@ -1026,9 +1027,9 @@ async def get_news_pipeline_status(
                     sources_data = json.load(f)
                     enabled_sources = [s for s in sources_data.get("sources", []) if s.get("enabled", True)]
                     result["sources_configured"] = len(enabled_sources)
-            except:
-                pass
-        
+            except (IOError, json.JSONDecodeError) as e:
+                logger.error(f"Error reading sources registry: {e}")
+
         # Calculate time since last run
         if result["last_run"]:
             try:
@@ -1036,9 +1037,9 @@ async def get_news_pipeline_status(
                 delta = datetime.utcnow() - last_run_dt.replace(tzinfo=None)
                 result["minutes_since_last_run"] = int(delta.total_seconds() / 60)
                 result["is_stale"] = delta.total_seconds() > 3600  # >1 hour = stale
-            except:
-                pass
-        
+            except (ValueError, TypeError) as e:
+                logger.error(f"Error calculating time since last run: {e}")
+
         return result
         
     except Exception as e:

@@ -21,14 +21,15 @@ Usage:
 """
 
 import os
-import sys
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Literal
 from enum import Enum
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from storage.sqlite_store import SQLiteStore
 

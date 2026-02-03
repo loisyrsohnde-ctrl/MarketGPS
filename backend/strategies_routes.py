@@ -12,7 +12,6 @@ SCOPE: US_EU only (Africa support can be added later)
 """
 
 import os
-import sys
 import json
 import hashlib
 import logging
@@ -23,8 +22,10 @@ from pathlib import Path
 from fastapi import APIRouter, Query, HTTPException, Body, Header
 from pydantic import BaseModel, Field, validator
 
-# Add parent to path for storage imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from storage.sqlite_store import SQLiteStore
 
@@ -556,7 +557,8 @@ async def list_templates(
                 template = dict(row)
                 try:
                     template['structure'] = json.loads(template.get('structure_json', '{}'))
-                except:
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Error parsing strategy structure JSON: {e}")
                     template['structure'] = {}
                 templates.append(StrategyTemplate(**template))
             
@@ -585,9 +587,10 @@ async def get_template(slug: str):
             template = dict(row)
             try:
                 template['structure'] = json.loads(template.get('structure_json', '{}'))
-            except:
+            except json.JSONDecodeError as e:
+                logger.warning(f"Error parsing template structure JSON: {e}")
                 template['structure'] = {}
-            
+
             return StrategyTemplate(**template)
             
     except HTTPException:

@@ -17,14 +17,15 @@ The --dry-run flag shows what would be added without making changes.
 """
 
 import os
-import sys
 import argparse
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from core.config import get_config, get_logger
 from core.models import Asset, AssetType

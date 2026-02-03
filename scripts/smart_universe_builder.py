@@ -16,14 +16,15 @@ Usage:
     python scripts/smart_universe_builder.py --scope AFRICA --tier1-limit 500
 """
 import os
-import sys
 import argparse
 from datetime import date, datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from core.config import get_config, get_logger
 from core.models import Asset, AssetType

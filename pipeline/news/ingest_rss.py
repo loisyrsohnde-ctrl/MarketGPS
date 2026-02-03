@@ -83,14 +83,15 @@ class RSSIngester:
                 try:
                     dt = datetime(*getattr(entry, field)[:6])
                     return dt.isoformat()
-                except:
+                except (TypeError, ValueError, IndexError) as e:
+                    logger.debug(f"Failed to parse date from field '{field}': {e}")
                     pass
-        
+
         # Try string dates
         for field in ['published', 'updated', 'created']:
             if hasattr(entry, field) and getattr(entry, field):
                 return str(getattr(entry, field))
-        
+
         return None
     
     def _fetch_feed(self, source: Dict) -> Dict:

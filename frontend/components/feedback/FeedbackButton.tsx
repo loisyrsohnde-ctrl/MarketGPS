@@ -27,11 +27,12 @@ export function FeedbackButton({ collapsed, userEmail, userId, className }: Feed
         className={cn(
           'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl',
           'text-text-secondary hover:bg-accent/10 hover:text-accent',
-          'transition-all duration-200',
+          'transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-accent-dim',
           className
         )}
+        aria-label={collapsed ? 'Ouvrir formulaire de feedback' : undefined}
       >
-        <MessageSquare className={cn('w-5 h-5', collapsed && 'mx-auto')} />
+        <MessageSquare className={cn('w-5 h-5', collapsed && 'mx-auto')} aria-hidden="true" />
         <AnimatePresence>
           {!collapsed && (
             <motion.span
@@ -85,11 +86,12 @@ export function FloatingFeedbackButton({
         className={cn(
           'fixed z-40 flex items-center gap-2 px-4 py-3 rounded-full',
           'bg-accent text-bg-primary font-medium shadow-glow',
-          'hover:bg-accent-light transition-colors',
+          'hover:bg-accent-light transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-primary focus:ring-accent',
           position === 'bottom-right' ? 'right-6 bottom-6' : 'left-6 bottom-6'
         )}
+        aria-label="Ouvrir formulaire de feedback"
       >
-        <MessageSquare className="w-5 h-5" />
+        <MessageSquare className="w-5 h-5" aria-hidden="true" />
         <AnimatePresence>
           {isHovered && (
             <motion.span
@@ -97,6 +99,7 @@ export function FloatingFeedbackButton({
               animate={{ opacity: 1, width: 'auto' }}
               exit={{ opacity: 0, width: 0 }}
               className="text-sm whitespace-nowrap overflow-hidden"
+              aria-hidden="true"
             >
               Feedback
             </motion.span>

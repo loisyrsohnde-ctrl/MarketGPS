@@ -20,6 +20,7 @@ from core.config import get_logger
 from storage.sqlite_store import SQLiteStore
 from pipeline.news.image_fetcher import fetch_article_image
 from pipeline.news.scoring import score_article, load_sources_registry
+from pipeline.news.interactions_fetcher import get_interactions_fetcher, InteractionMetrics
 
 logger = get_logger(__name__)
 
@@ -337,7 +338,21 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
             # Generate slug
             slug = self._generate_slug(rewritten.get("title_fr", "article"))
 
-            # Calculate engagement score
+            # Fetch/estimate interactions for the article
+            interactions_fetcher = get_interactions_fetcher()
+            interactions = interactions_fetcher.get_interactions(
+                url=raw_item.get("url", ""),
+                source_name=raw_item.get("source_name", "Unknown"),
+                title=rewritten.get("title_fr", raw_payload.get("title", "")),
+                published_at=raw_item.get("published_at", datetime.utcnow()),
+                category=category,
+                country=country,
+                language="fr"
+            )
+
+            logger.info(f"📊 Interactions for article: {interactions.total_interactions} (virality: {interactions.virality_score}x)")
+
+            # Calculate engagement score using fetched interactions
             scoring_result = score_article(
                 title=rewritten.get("title_fr", raw_payload.get("title", "")),
                 content=rewritten.get("content_md", ""),
@@ -346,8 +361,8 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
                 published_at=raw_item.get("published_at"),
                 image_url=image_url,
                 tags=tags,
-                save_count=0,  # New article, no saves yet
-                view_count=0,  # New article, no views yet
+                save_count=interactions.estimated_shares,  # Use estimated shares as saves
+                view_count=interactions.estimated_views,   # Use estimated views
                 sources_registry=self.sources_registry
             )
 

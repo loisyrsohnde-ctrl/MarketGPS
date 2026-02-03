@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Rotation rapide pour appliquer le patch."""
-import sys
 from pathlib import Path
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from pipeline.rotation import RotationJob
 from storage.parquet_store import ParquetStore

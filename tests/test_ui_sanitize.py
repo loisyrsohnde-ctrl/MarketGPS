@@ -1,9 +1,11 @@
 """Tests for UI text sanitization and compliance."""
 import pytest
 
-import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from core.compliance import ComplianceOfficer, sanitize_text
 

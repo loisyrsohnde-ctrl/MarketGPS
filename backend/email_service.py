@@ -457,8 +457,8 @@ def send_subscription_confirmed_email(
         try:
             dt = datetime.fromtimestamp(period_end_timestamp)
             period_end = dt.strftime("%d/%m/%Y")
-        except:
-            pass
+        except (ValueError, OSError, TypeError) as e:
+            logger.warning(f"Error formatting period end date: {e}")
 
     template = get_subscription_confirmed_template(
         user_email=user_email,
@@ -488,8 +488,8 @@ def send_subscription_canceled_email(
         try:
             dt = datetime.fromtimestamp(access_until_timestamp)
             access_until = dt.strftime("%d/%m/%Y")
-        except:
-            pass
+        except (ValueError, OSError, TypeError) as e:
+            logger.warning(f"Error formatting access until date: {e}")
 
     template = get_subscription_canceled_template(
         user_email=user_email,

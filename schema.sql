@@ -3,6 +3,8 @@
 -- New: User authentication, profiles, subscriptions
 
 -- Drop existing tables for clean migration
+DROP TABLE IF EXISTS alerts;
+DROP TABLE IF EXISTS alert_rules;
 DROP TABLE IF EXISTS provider_logs;
 DROP TABLE IF EXISTS user_interest;
 DROP TABLE IF EXISTS scores_history;
@@ -488,6 +490,52 @@ CREATE TABLE IF NOT EXISTS gating_status_staging (
 
 CREATE INDEX IF NOT EXISTS idx_gating_staging_run ON gating_status_staging(run_id);
 CREATE INDEX IF NOT EXISTS idx_gating_staging_scope ON gating_status_staging(market_scope, asset_id);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- ALERT RULES: User-defined alert rules (NEW - v13)
+-- ═══════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS alert_rules (
+    id TEXT PRIMARY KEY,                       -- UUID
+    user_id TEXT NOT NULL REFERENCES users(user_id),
+    alert_type TEXT NOT NULL,                  -- score_change, score_threshold, price_alert, etc.
+    asset_id TEXT,                             -- NULL for global rules
+    condition_json TEXT NOT NULL,              -- JSON: {field, operator, value, value_high?}
+    channels_json TEXT DEFAULT '["in_app"]',   -- JSON: ["email", "push", "in_app"]
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_alert_rules_user ON alert_rules(user_id);
+CREATE INDEX IF NOT EXISTS idx_alert_rules_user_active ON alert_rules(user_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_alert_rules_asset ON alert_rules(asset_id);
+CREATE INDEX IF NOT EXISTS idx_alert_rules_type ON alert_rules(alert_type);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- ALERTS: Generated alert notifications (NEW - v13)
+-- ═══════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS alerts (
+    id TEXT PRIMARY KEY,                       -- UUID
+    user_id TEXT NOT NULL REFERENCES users(user_id),
+    rule_id TEXT,                              -- FK to alert_rules (NULL for system alerts)
+    alert_type TEXT NOT NULL,                  -- score_change, opportunity, breaking_news, etc.
+    priority TEXT DEFAULT 'medium',            -- low, medium, high, critical
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    data_json TEXT,                            -- JSON: contextual data {asset_id, symbol, score, etc.}
+    status TEXT DEFAULT 'pending',             -- pending, sent, read, dismissed, expired
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    read_at TEXT,
+    dismissed_at TEXT,
+    sent_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_alerts_user ON alerts(user_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_user_status ON alerts(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
+CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alerts_user_created ON alerts(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alerts_rule ON alerts(rule_id);
 
 -- Insert default user settings
 INSERT OR REPLACE INTO user_settings (user_id) VALUES ('default');

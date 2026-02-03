@@ -124,6 +124,7 @@ export function FeedbackModal({ isOpen, onClose, userEmail, userId }: FeedbackMo
             exit={{ opacity: 0 }}
             onClick={handleClose}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            aria-hidden="true"
           />
 
           {/* Modal */}
@@ -133,19 +134,23 @@ export function FeedbackModal({ isOpen, onClose, userEmail, userId }: FeedbackMo
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="feedback-modal-title"
           >
             <div className="w-full max-w-lg bg-bg-secondary border border-glass-border rounded-2xl shadow-2xl pointer-events-auto overflow-hidden">
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-glass-border bg-surface/50">
-                <h2 className="text-lg font-semibold text-text-primary">
+                <h2 id="feedback-modal-title" className="text-lg font-semibold text-text-primary">
                   Donnez-nous votre avis
                 </h2>
                 <button
                   onClick={handleClose}
                   disabled={isSubmitting}
-                  className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface transition-colors"
+                  className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface transition-colors focus:outline-none focus:ring-2 focus:ring-accent-dim"
+                  aria-label="Fermer le formulaire de feedback"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5" aria-hidden="true" />
                 </button>
               </div>
 
@@ -172,26 +177,30 @@ export function FeedbackModal({ isOpen, onClose, userEmail, userId }: FeedbackMo
                   <>
                     {/* Feedback Type Selection */}
                     <div>
-                      <label className="block text-sm font-medium text-text-secondary mb-3">
-                        Type de feedback
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {FEEDBACK_TYPES.map(({ type, label, icon: Icon, color }) => (
-                          <button
-                            key={type}
-                            onClick={() => setFeedbackType(type)}
-                            className={cn(
-                              'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all',
-                              feedbackType === type
-                                ? 'bg-accent/20 text-accent border border-accent/50'
-                                : 'bg-surface border border-glass-border text-text-secondary hover:bg-surface-hover'
-                            )}
-                          >
-                            <Icon className={cn('w-4 h-4', feedbackType === type ? 'text-accent' : color)} />
-                            {label}
-                          </button>
-                        ))}
-                      </div>
+                      <fieldset>
+                        <legend className="block text-sm font-medium text-text-secondary mb-3">
+                          Type de feedback
+                        </legend>
+                        <div className="flex flex-wrap gap-2">
+                          {FEEDBACK_TYPES.map(({ type, label, icon: Icon, color }) => (
+                            <button
+                              key={type}
+                              onClick={() => setFeedbackType(type)}
+                              aria-pressed={feedbackType === type}
+                              className={cn(
+                                'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-accent-dim',
+                                feedbackType === type
+                                  ? 'bg-accent/20 text-accent border border-accent/50'
+                                  : 'bg-surface border border-glass-border text-text-secondary hover:bg-surface-hover'
+                              )}
+                              aria-label={`Sélectionner type ${label}`}
+                            >
+                              <Icon className={cn('w-4 h-4', feedbackType === type ? 'text-accent' : color)} aria-hidden="true" />
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </fieldset>
                     </div>
 
                     {/* Subject (Optional) */}
@@ -210,41 +219,49 @@ export function FeedbackModal({ isOpen, onClose, userEmail, userId }: FeedbackMo
 
                     {/* Message */}
                     <div>
-                      <label className="block text-sm font-medium text-text-secondary mb-2">
-                        Message <span className="text-score-red">*</span>
+                      <label htmlFor="feedback-message" className="block text-sm font-medium text-text-secondary mb-2">
+                        Message <span className="text-score-red" aria-label="requis">*</span>
                       </label>
                       <textarea
+                        id="feedback-message"
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         placeholder="Décrivez votre feedback en détail..."
                         rows={4}
+                        required
+                        aria-required="true"
                         className="w-full px-4 py-3 bg-surface border border-glass-border rounded-xl text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors resize-none"
                       />
                     </div>
 
                     {/* Rating */}
                     <div>
-                      <label className="block text-sm font-medium text-text-secondary mb-2">
-                        Note globale <span className="text-text-muted">(optionnel)</span>
-                      </label>
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            onClick={() => setRating(rating === star ? null : star)}
-                            className="p-1 transition-transform hover:scale-110"
-                          >
-                            <Star
-                              className={cn(
-                                'w-7 h-7 transition-colors',
-                                rating && star <= rating
-                                  ? 'fill-amber-400 text-amber-400'
-                                  : 'text-text-muted hover:text-amber-400'
-                              )}
-                            />
-                          </button>
-                        ))}
-                      </div>
+                      <fieldset>
+                        <legend className="block text-sm font-medium text-text-secondary mb-2">
+                          Note globale <span className="text-text-muted">(optionnel)</span>
+                        </legend>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              onClick={() => setRating(rating === star ? null : star)}
+                              className="p-1 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-accent-dim rounded"
+                              aria-pressed={rating === star}
+                              aria-label={`${star} étoile${star > 1 ? 's' : ''}`}
+                            >
+                              <Star
+                                className={cn(
+                                  'w-7 h-7 transition-colors',
+                                  rating && star <= rating
+                                    ? 'fill-amber-400 text-amber-400'
+                                    : 'text-text-muted hover:text-amber-400'
+                                )}
+                                aria-hidden="true"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </fieldset>
                     </div>
 
                     {/* Email (for non-authenticated users) */}
@@ -269,6 +286,8 @@ export function FeedbackModal({ isOpen, onClose, userEmail, userId }: FeedbackMo
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="p-3 bg-score-red/10 border border-score-red/30 rounded-xl text-score-red text-sm"
+                        role="alert"
+                        aria-live="assertive"
                       >
                         {error}
                       </motion.div>

@@ -2,11 +2,13 @@
 """
 Tester le patch sur un échantillon d'actifs pour vérifier qu'il fonctionne.
 """
-import sys
 from pathlib import Path
 
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from storage.sqlite_store import SQLiteStore
 from storage.parquet_store import ParquetStore

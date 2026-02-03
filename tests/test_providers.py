@@ -3,10 +3,11 @@ import pytest
 import pandas as pd
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
-
-import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from providers.base import BaseProvider, Fundamentals, AssetMetadata
 from providers.yahoo_yfinance import YFinanceProvider

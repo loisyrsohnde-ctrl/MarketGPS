@@ -578,9 +578,62 @@ def run_news_full(args) -> int:
         print(f"  LLM: {publish.get('llm_provider', 'fallback')}")
         
         return 0
-        
+
     except Exception as e:
         logger.error(f"News full pipeline failed: {e}")
+        print(f"\n✗ Error: {e}")
+        return 1
+
+
+def run_generate_alerts(args) -> int:
+    """Generate alerts based on detection rules and current market state."""
+    print("\n" + "=" * 60)
+    print("MarketGPS - Generate Alerts")
+    print("=" * 60 + "\n")
+
+    start_time = time.time()
+
+    try:
+        from services.alert_detector import AlertDetector
+
+        store = SQLiteStore()
+        detector = AlertDetector(store)
+
+        total_alerts = 0
+
+        # Detect score changes
+        print("  Detecting score changes...")
+        alerts = detector.detect_score_changes()
+        total_alerts += len(alerts)
+        print(f"    Generated {len(alerts)} score change alerts")
+
+        # Detect opportunities
+        print("  Detecting opportunities...")
+        alerts = detector.detect_opportunities()
+        total_alerts += len(alerts)
+        print(f"    Generated {len(alerts)} opportunity alerts")
+
+        # Detect score thresholds
+        print("  Detecting score thresholds...")
+        alerts = detector.detect_score_thresholds()
+        total_alerts += len(alerts)
+        print(f"    Generated {len(alerts)} threshold alerts")
+
+        # Detect breaking news
+        print("  Detecting breaking news...")
+        alerts = detector.detect_breaking_news()
+        total_alerts += len(alerts)
+        print(f"    Generated {len(alerts)} news alerts")
+
+        elapsed = time.time() - start_time
+
+        print(f"\n✓ Alert generation complete in {elapsed:.1f}s")
+        print(f"  Total alerts generated: {total_alerts}")
+
+        return 0
+
+    except Exception as e:
+        logger.error(f"Alert generation failed: {e}")
         print(f"\n✗ Error: {e}")
         return 1
 
@@ -669,7 +722,13 @@ Examples:
         dest="news_full",
         help="Run full news pipeline (ingest + rewrite)"
     )
-    
+    group.add_argument(
+        "--generate-alerts",
+        action="store_true",
+        dest="generate_alerts",
+        help="Generate alerts based on detection rules"
+    )
+
     parser.add_argument(
         "--scope",
         type=str,
@@ -751,6 +810,8 @@ Examples:
         sys.exit(run_news_rewrite(args))
     elif args.news_full:
         sys.exit(run_news_full(args))
+    elif args.generate_alerts:
+        sys.exit(run_generate_alerts(args))
 
 
 if __name__ == "__main__":

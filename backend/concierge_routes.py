@@ -251,8 +251,8 @@ QUESTION DE L'UTILISATEUR:
         import google.generativeai as genai
         # Add fallback model if primary fails
         models_to_try.append(genai.GenerativeModel('gemini-1.5-flash'))
-    except:
-        pass
+    except ImportError as e:
+        logger.warning(f"Failed to import google.generativeai for fallback model: {e}")
 
     for model in models_to_try:
         if not model: continue

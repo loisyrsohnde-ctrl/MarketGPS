@@ -83,8 +83,10 @@ export default function LoginPage() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="mb-6 p-4 rounded-xl bg-score-red/10 border border-score-red/30 flex items-center gap-3"
+                role="alert"
+                aria-live="assertive"
               >
-                <AlertCircle className="w-5 h-5 text-score-red flex-shrink-0" />
+                <AlertCircle className="w-5 h-5 text-score-red flex-shrink-0" aria-hidden="true" />
                 <p className="text-sm text-score-red">{error}</p>
               </motion.div>
             )}
@@ -92,10 +94,11 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Email */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-text-secondary">
+                <label htmlFor="login-email" className="block text-sm font-medium text-text-secondary">
                   Adresse email
                 </label>
                 <Input
+                  id="login-email"
                   type="email"
                   placeholder="vous@exemple.com"
                   value={email}
@@ -103,23 +106,25 @@ export default function LoginPage() {
                   leftIcon={<Mail className="w-5 h-5" />}
                   required
                   autoComplete="email"
+                  ariaLabel="Adresse email"
                 />
               </div>
 
               {/* Password */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-sm font-medium text-text-secondary">
+                  <label htmlFor="login-password" className="block text-sm font-medium text-text-secondary">
                     Mot de passe
                   </label>
                   <Link
                     href="/reset-password"
-                    className="text-sm text-accent hover:text-accent-light transition-colors"
+                    className="text-sm text-accent hover:text-accent-light transition-colors focus:outline-none focus:ring-2 focus:ring-accent-dim rounded px-2 py-1"
                   >
                     Oublié ?
                   </Link>
                 </div>
                 <Input
+                  id="login-password"
                   type="password"
                   placeholder="••••••••"
                   value={password}
@@ -127,6 +132,7 @@ export default function LoginPage() {
                   leftIcon={<Lock className="w-5 h-5" />}
                   required
                   autoComplete="current-password"
+                  ariaLabel="Mot de passe"
                 />
               </div>
 

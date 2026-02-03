@@ -19,6 +19,7 @@ load_dotenv(_env_file)
 
 from fastapi import FastAPI, Request, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -26,6 +27,7 @@ from api_routes import router as api_router
 from user_routes import router as user_router
 from barbell_routes import router as barbell_router
 from strategies_routes import router as strategies_router
+from backtest_routes import router as backtest_router
 from news_routes import router as news_router
 from billing_routes import router as billing_router
 from feedback_routes import router as feedback_router
@@ -36,6 +38,8 @@ from wealth_routes import router as wealth_router
 from concierge_routes import router as concierge_router
 from notifications_routes import router as notifications_router
 from portfolio_routes import router as portfolio_router
+from gamification_routes import router as gamification_router
+from viral_news_routes import router as viral_news_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -60,12 +64,12 @@ except Exception as e:
 def ensure_tables_exist():
     """
     Ensure all required tables exist in the database.
-    Creates user_strategies and user_strategy_compositions if missing.
+    Creates user_strategies, user_strategy_compositions, and gamification tables if missing.
     """
     try:
         from storage.sqlite_store import SQLiteStore
         store = SQLiteStore()
-        
+
         with store._get_connection() as conn:
             # Create user_strategies table
             conn.execute("""
@@ -80,7 +84,7 @@ def ensure_tables_exist():
                     FOREIGN KEY (template_id) REFERENCES strategy_templates(id)
                 )
             """)
-            
+
             # Create user_strategy_compositions table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS user_strategy_compositions (
@@ -93,11 +97,11 @@ def ensure_tables_exist():
                     FOREIGN KEY (user_strategy_id) REFERENCES user_strategies(id) ON DELETE CASCADE
                 )
             """)
-            
+
             # Create indexes
             conn.execute("CREATE INDEX IF NOT EXISTS idx_user_strategies_user ON user_strategies(user_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_compositions_strategy ON user_strategy_compositions(user_strategy_id)")
-            
+
             # Also ensure strategy_templates exists
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS strategy_templates (
@@ -114,9 +118,79 @@ def ensure_tables_exist():
                     created_at TEXT DEFAULT (datetime('now'))
                 )
             """)
-        
-        logger.info("✅ All required tables verified/created")
-        
+
+            # Create gamification tables
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_gamification (
+                    user_id TEXT PRIMARY KEY,
+                    total_points INTEGER DEFAULT 0,
+                    current_level INTEGER DEFAULT 1,
+                    current_streak INTEGER DEFAULT 0,
+                    longest_streak INTEGER DEFAULT 0,
+                    last_activity_date TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_badges (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    badge_id TEXT NOT NULL,
+                    earned_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, badge_id),
+                    FOREIGN KEY (user_id) REFERENCES user_gamification(user_id) ON DELETE CASCADE
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_objectives (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    objective_type TEXT NOT NULL DEFAULT 'weekly',
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    action TEXT NOT NULL,
+                    target INTEGER NOT NULL,
+                    current INTEGER DEFAULT 0,
+                    points_reward INTEGER NOT NULL,
+                    expires_at TEXT,
+                    completed_at TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES user_gamification(user_id) ON DELETE CASCADE
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_actions (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    metadata_json TEXT,
+                    points_earned INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES user_gamification(user_id) ON DELETE CASCADE
+                )
+            """)
+
+            # Create gamification indexes
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_badges_user_id ON user_badges(user_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_badges_badge_id ON user_badges(badge_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_objectives_user_id ON user_objectives(user_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_objectives_type ON user_objectives(objective_type)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_objectives_completed ON user_objectives(completed_at)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_actions_user_id ON user_actions(user_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_actions_action ON user_actions(action)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_actions_date ON user_actions(created_at)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_actions_user_date ON user_actions(user_id, created_at)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_gamification_points ON user_gamification(total_points DESC)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_gamification_level ON user_gamification(current_level DESC)")
+
+            conn.commit()
+
+        logger.info("✅ All required tables verified/created (including gamification)")
+
     except Exception as e:
         logger.error(f"Error ensuring tables exist: {e}")
 
@@ -236,43 +310,87 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS configuration
-# Default allowed origins (includes localhost for development)
-DEFAULT_ORIGINS = [
-    # Production domains - MarketGPS
-    "https://marketgps.online",
-    "https://app.marketgps.online",
-    "https://api.marketgps.online",
-    # Legacy domains - Afristocks
-    "https://afristocks.eu",
-    "https://app.afristocks.eu",
-    # Local development
-    "http://localhost:8501",
-    "http://127.0.0.1:8501",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3001",
-]
+# Import security configuration
+from security_config import (
+    get_allowed_origins,
+    ALLOWED_METHODS,
+    ALLOWED_REQUEST_HEADERS,
+    EXPOSED_HEADERS,
+    CORS_MAX_AGE,
+    CONTENT_TYPE_OPTIONS,
+    FRAME_OPTIONS,
+    XSS_PROTECTION,
+    HSTS_HEADER,
+    CSP_HEADER,
+    REFERRER_POLICY,
+    PERMISSIONS_POLICY,
+)
 
-# Allow additional origins via environment variable (comma-separated)
-env_origins = os.environ.get("CORS_ORIGINS", "")
-extra_origins = [o.strip() for o in env_origins.split(",") if o.strip()]
-ALLOWED_ORIGINS = list(set(DEFAULT_ORIGINS + extra_origins))
+# Get CORS configuration
+ALLOWED_ORIGINS = get_allowed_origins()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_methods=ALLOWED_METHODS,
+    allow_headers=ALLOWED_REQUEST_HEADERS,
+    expose_headers=EXPOSED_HEADERS,
+    max_age=CORS_MAX_AGE,
 )
+
+
+# ============================================================================
+# Security Headers Middleware
+# ============================================================================
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware to add essential security headers to all responses.
+    Protects against:
+    - XSS attacks (X-XSS-Protection, Content-Security-Policy)
+    - Clickjacking (X-Frame-Options)
+    - MIME type sniffing (X-Content-Type-Options)
+    - Man-in-the-middle attacks (Strict-Transport-Security)
+    - Unauthorized feature access (Permissions-Policy)
+    - Information leakage (Referrer-Policy)
+    """
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        # Prevent MIME type sniffing
+        response.headers["X-Content-Type-Options"] = CONTENT_TYPE_OPTIONS
+
+        # Prevent clickjacking attacks
+        response.headers["X-Frame-Options"] = FRAME_OPTIONS
+
+        # Legacy XSS protection for older browsers
+        response.headers["X-XSS-Protection"] = XSS_PROTECTION
+
+        # Force HTTPS and prevent downgrade attacks
+        response.headers["Strict-Transport-Security"] = HSTS_HEADER
+
+        # Prevent XSS and injection attacks
+        response.headers["Content-Security-Policy"] = CSP_HEADER
+
+        # Control referrer information leakage
+        response.headers["Referrer-Policy"] = REFERRER_POLICY
+
+        # Disable unnecessary browser features
+        response.headers["Permissions-Policy"] = PERMISSIONS_POLICY
+
+        return response
+
+
+# Add the security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Include API routes for assets/scores/watchlist
 app.include_router(api_router)
 app.include_router(user_router)
 app.include_router(barbell_router)  # Barbell strategy module (ADD-ON)
 app.include_router(strategies_router)  # Strategies module (ADD-ON)
+app.include_router(backtest_router)  # Backtesting module (ADD-ON)
 app.include_router(news_router)  # News/Actualités module (ADD-ON)
 app.include_router(billing_router)  # Stripe billing module v13 (ADD-ON)
 app.include_router(feedback_router)  # Feedback system (ADD-ON)
@@ -281,8 +399,10 @@ app.include_router(news_admin_router)  # News scraping admin (ADD-ON)
 app.include_router(real_estate_router)  # Real Estate module (ADD-ON)
 app.include_router(wealth_router)  # Wealth Agent module (ADD-ON)
 app.include_router(concierge_router)  # AI Concierge module (ADD-ON)
+app.include_router(gamification_router)  # Gamification system (ADD-ON)
 app.include_router(notifications_router)  # Notifications & Alerts (ADD-ON)
 app.include_router(portfolio_router)  # Portfolio Sync (ADD-ON) - Read-only, no trading
+app.include_router(viral_news_router)  # Viral news & video scripts (ADD-ON)
 
 
 # ============================================================================
@@ -352,19 +472,20 @@ async def health_check_extended():
             try:
                 cursor = conn.execute("SELECT COUNT(*) FROM universe WHERE active=1")
                 result["database"]["active_assets"] = cursor.fetchone()[0]
-            except:
-                pass
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.debug(f"Error counting active assets: {e}")
             
             try:
                 cursor = conn.execute("SELECT COUNT(*) FROM scores_latest WHERE score_total IS NOT NULL")
                 result["database"]["scored_assets"] = cursor.fetchone()[0]
-            except:
-                pass
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.debug(f"Error counting scored assets: {e}")
             
             try:
                 cursor = conn.execute("SELECT COUNT(*) FROM news_articles")
                 result["database"]["news_articles"] = cursor.fetchone()[0]
-            except:
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.debug(f"Error counting news articles: {e}")
                 result["database"]["news_articles"] = 0
                 
     except Exception as e:

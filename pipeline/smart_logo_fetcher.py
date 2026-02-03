@@ -20,7 +20,6 @@ Usage:
     python -m pipeline.smart_logo_fetcher --top-scored  # Only logos for top scored
 """
 import os
-import sys
 import time
 import argparse
 import urllib.request
@@ -29,8 +28,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 import sqlite3
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from core.config import get_config, get_logger
 from storage.sqlite_store import SQLiteStore

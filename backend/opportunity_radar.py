@@ -179,8 +179,8 @@ class NormalizedListing:
             try:
                 pub_date = datetime.fromisoformat(self.published_at.replace('Z', '+00:00'))
                 self.days_on_market = (datetime.now(pub_date.tzinfo) - pub_date).days
-            except:
-                pass
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.warning(f"Error calculating days on market: {e}")
     
     def to_dict(self) -> Dict[str, Any]:
         """Convertir en dictionnaire."""

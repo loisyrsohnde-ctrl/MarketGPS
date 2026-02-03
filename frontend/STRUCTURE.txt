@@ -1,0 +1,26 @@
+/bin/bash: line 3: tree: command not found
+
+Admin-related files:
+./ADMIN_API_EXAMPLES.md
+./ADMIN_COMPLETE_SUMMARY.txt
+./ADMIN_COMPONENT_EXAMPLES.md
+./ADMIN_DASHBOARD_README.md
+./ADMIN_FILES_CREATED.txt
+./ADMIN_IMPLEMENTATION_SUMMARY.md
+./ADMIN_INTEGRATION_CHECKLIST.md
+./ADMIN_QUICK_START.md
+./app/admin/layout.tsx
+./app/admin/news/page.tsx
+./app/admin/page.tsx
+./app/admin/scripts/[id]/page.tsx
+./app/admin/scripts/page.tsx
+./app/admin/settings/page.tsx
+./app/admin/users/page.tsx
+./components/admin/AdminSidebar.tsx
+./components/admin/NewsTable.tsx
+./components/admin/ScriptEditor.tsx
+./components/admin/StatsCard.tsx
+./components/admin/ViralityBadge.tsx
+./components/admin/index.ts
+./public/admin.html
+./types/admin.ts

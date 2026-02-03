@@ -361,8 +361,8 @@ def is_subscription_active(subscription: Optional[Dict[str, Any]]) -> bool:
                 grace_end_dt = datetime.fromisoformat(grace_end.replace("Z", "+00:00"))
                 if datetime.utcnow() < grace_end_dt.replace(tzinfo=None):
                     return True
-            except:
-                pass
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error parsing grace period end date: {e}")
     
     return False
 
@@ -441,7 +441,8 @@ async def create_checkout_session(
                 admin = SupabaseAdmin()
                 user_data = admin.get_user_profile(user_id)
                 email = user_data.get("email") if user_data else None
-            except:
+            except (ImportError, Exception) as e:
+                logger.warning(f"Failed to retrieve email from Supabase: {e}")
                 email = None
             
             # Create Stripe customer
@@ -511,8 +512,8 @@ async def get_my_subscription(
             remaining = grace_end.replace(tzinfo=None) - datetime.utcnow()
             if remaining.total_seconds() > 0:
                 grace_remaining = int(remaining.total_seconds() / 3600)
-        except:
-            pass
+        except (ValueError, TypeError, KeyError) as e:
+            logger.debug(f"Error calculating grace period remaining: {e}")
     
     return SubscriptionResponse(
         user_id=user_id,

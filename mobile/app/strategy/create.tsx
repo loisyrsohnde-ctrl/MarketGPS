@@ -16,7 +16,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { api, StrategyTemplate, Asset } from '@/lib/api';
@@ -45,6 +45,7 @@ interface SimulationResult {
 
 export default function StrategyCreateScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const params = useLocalSearchParams<{ template?: string }>();
   const isAuthenticated = useIsAuthenticated();
   const isPro = useIsPro();
@@ -53,6 +54,7 @@ export default function StrategyCreateScreen() {
   const [blocks, setBlocks] = useState<BlockWeight[]>([]);
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Fetch template if provided
   const { data: template, isLoading: templateLoading } = useQuery({
@@ -185,7 +187,7 @@ export default function StrategyCreateScreen() {
   };
 
   // Save strategy
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!isAuthenticated) {
       Alert.alert('Connexion requise', 'Connectez-vous pour sauvegarder votre stratégie');
       return;
@@ -201,11 +203,37 @@ export default function StrategyCreateScreen() {
       return;
     }
 
-    Alert.alert(
-      'Stratégie sauvegardée',
-      `"${strategyName}" a été ajoutée à vos stratégies`,
-      [{ text: 'OK', onPress: () => router.back() }]
-    );
+    setIsSaving(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      await api.createUserStrategy({
+        name: strategyName.trim(),
+        description: template?.description,
+        template_slug: params.template,
+        blocks: blocks.map((b) => ({
+          name: b.name,
+          label: b.label,
+          weight: b.weight / 100, // Convert to decimal
+        })),
+        risk_level: template?.risk_level,
+        horizon_years: template?.horizon_years,
+      });
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.invalidateQueries({ queryKey: ['user-strategies'] });
+
+      Alert.alert(
+        'Stratégie sauvegardée',
+        `"${strategyName}" a été ajoutée à vos stratégies`,
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+    } catch (error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Erreur', 'Impossible de sauvegarder la stratégie');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (templateLoading) {
@@ -403,9 +431,9 @@ export default function StrategyCreateScreen() {
             style={styles.actionButton}
           />
           <Button
-            title="Sauvegarder"
+            title={isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
             onPress={handleSave}
-            disabled={!isValidAllocation || !strategyName.trim()}
+            disabled={!isValidAllocation || !strategyName.trim() || isSaving}
             icon={<Ionicons name="save-outline" size={18} color="#0A0F1C" />}
             style={styles.actionButton}
           />

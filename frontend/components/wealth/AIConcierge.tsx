@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
 import {
   X,
   Send,
@@ -379,19 +380,35 @@ function MessageBubble({ message }: { message: Message }) {
         <div
           className={`
             rounded-2xl px-4 py-3 text-sm leading-relaxed
-            ${isUser 
-              ? 'bg-indigo-600 text-white rounded-br-md' 
+            ${isUser
+              ? 'bg-indigo-600 text-white rounded-br-md'
               : 'bg-slate-800 text-slate-200 rounded-bl-md'}
           `}
         >
-          <div 
-            className="prose prose-sm prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ 
-              __html: message.content
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\n/g, '<br/>')
-            }} 
-          />
+          <div className="prose prose-sm prose-invert max-w-none">
+            <ReactMarkdown
+              components={{
+                p: ({ node, ...props }) => <p {...props} className="mb-2 last:mb-0" />,
+                strong: ({ node, ...props }) => <strong {...props} className="font-semibold" />,
+                table: ({ node, ...props }) => (
+                  <div className="overflow-x-auto my-2 mb-2">
+                    <table {...props} className="w-full text-xs border-collapse border border-slate-600" />
+                  </div>
+                ),
+                th: ({ node, ...props }) => (
+                  <th {...props} className="border border-slate-600 px-2 py-1 bg-slate-700/50 text-left" />
+                ),
+                td: ({ node, ...props }) => (
+                  <td {...props} className="border border-slate-600 px-2 py-1" />
+                ),
+                ul: ({ node, ...props }) => <ul {...props} className="list-disc list-inside mb-2" />,
+                ol: ({ node, ...props }) => <ol {...props} className="list-decimal list-inside mb-2" />,
+                li: ({ node, ...props }) => <li {...props} className="mb-1" />,
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          </div>
         </div>
         
         {/* Metrics */}

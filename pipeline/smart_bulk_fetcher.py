@@ -12,7 +12,6 @@ Usage:
     python -m pipeline.smart_bulk_fetcher --scope AFRICA
 """
 import os
-import sys
 import time
 import argparse
 from datetime import date, datetime, timedelta
@@ -20,8 +19,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 import pandas as pd
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from core.config import get_config, get_logger
 from storage.sqlite_store import SQLiteStore

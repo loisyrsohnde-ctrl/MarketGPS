@@ -1,16 +1,19 @@
 """
 MarketGPS v7.0 - Configuration Module
 Loads environment variables and provides application-wide settings.
+
+NOTE: Environment variables are loaded by core.bootstrap module.
+This module should be imported after bootstrap() is called.
 """
 import os
 import logging
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Optional
-from dotenv import load_dotenv
 
-# Load .env file
-load_dotenv()
+# Ensure bootstrap has been called (safe to call multiple times)
+from core.bootstrap import ensure_bootstrap
+ensure_bootstrap()
 
 # Setup logging
 logging.basicConfig(

@@ -7,14 +7,14 @@ SAFE: Uses UPSERT - does not delete existing data.
 Run: python scripts/add_forex_universe.py
 """
 
-import sys
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict
 
-# Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from core.models import AssetType, Asset
 from core.config import get_logger

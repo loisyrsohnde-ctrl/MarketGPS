@@ -15,16 +15,16 @@ This script populates:
 Run: python scripts/populate_all_universes.py
 """
 
-import sys
 import os
 from pathlib import Path
 from datetime import datetime
 import subprocess
 import time
 
-# Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+
+# Bootstrap application (load environment variables and set up paths)
+from core.bootstrap import bootstrap
+bootstrap()
 
 from core.config import get_logger
 from storage.sqlite_store import SQLiteStore

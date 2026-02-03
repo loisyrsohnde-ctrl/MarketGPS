@@ -78,6 +78,8 @@ export interface NewsArticle {
   engagement_score?: number;
   is_breaking_news?: boolean;
   importance_level?: 'high' | 'medium' | 'low';
+  // Saved status
+  is_saved?: boolean;
 }
 
 export interface BreakingNewsResponse {
@@ -139,6 +141,29 @@ export interface SubscriptionStatus {
   grace_period_remaining_hours: number | null;
 }
 
+export interface BarbellPortfolio {
+  id: string;
+  name: string;
+  risk_profile: string;
+  market_scope: string;
+  core_assets: Array<{ ticker: string; weight: number; asset?: Asset }>;
+  satellite_assets: Array<{ ticker: string; weight: number; asset?: Asset }>;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface UserStrategy {
+  id: string;
+  name: string;
+  description?: string;
+  template_slug?: string;
+  blocks: Array<{ name: string; label: string; weight: number; description?: string }>;
+  risk_level?: string;
+  horizon_years?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;
@@ -146,6 +171,68 @@ export interface PaginatedResponse<T> {
   page_size?: number;
   limit?: number;
   offset?: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Portfolio Types
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PortfolioAccount {
+  id: string;
+  name: string;
+  broker?: string;
+  account_type: 'brokerage' | 'ira' | 'roth_ira' | '401k' | 'pea' | 'cto' | 'other';
+  currency: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface PortfolioPosition {
+  id: string;
+  account_id: string;
+  ticker: string;
+  quantity: number;
+  avg_cost: number;
+  current_price?: number;
+  market_value?: number;
+  unrealized_pnl?: number;
+  unrealized_pnl_pct?: number;
+  asset?: Asset;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface PortfolioSummary {
+  total_value: number;
+  total_cost: number;
+  total_pnl: number;
+  total_pnl_pct: number;
+  currency: string;
+  accounts_count: number;
+  positions_count: number;
+  top_holdings: Array<{
+    ticker: string;
+    name: string;
+    weight: number;
+    pnl_pct: number;
+  }>;
+  allocation_by_type: Record<string, number>;
+  last_updated: string;
+}
+
+export interface PortfolioTransaction {
+  id: string;
+  account_id: string;
+  ticker: string;
+  type: 'buy' | 'sell' | 'dividend' | 'deposit' | 'withdrawal';
+  quantity: number;
+  price: number;
+  total_amount: number;
+  fees?: number;
+  notes?: string;
+  transaction_date: string;
+  created_at: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -353,6 +440,33 @@ class APIClient {
   async getImportantNews(limit = 10): Promise<PaginatedResponse<NewsArticle>> {
     return this.fetch(`/api/news/important?limit=${limit}`);
   }
+
+  async getSavedArticles(params: {
+    page?: number;
+    page_size?: number;
+  } = {}): Promise<PaginatedResponse<NewsArticle>> {
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.append('page', params.page.toString());
+    if (params.page_size) searchParams.append('page_size', params.page_size.toString());
+    const query = searchParams.toString();
+    return this.fetch(`/api/news/saved${query ? `?${query}` : ''}`);
+  }
+
+  async saveArticle(articleId: number): Promise<{ status: string }> {
+    return this.fetch(`/api/news/${articleId}/save`, {
+      method: 'POST',
+    });
+  }
+
+  async unsaveArticle(articleId: number): Promise<{ status: string }> {
+    return this.fetch(`/api/news/${articleId}/save`, {
+      method: 'DELETE',
+    });
+  }
+
+  async checkArticleSaved(articleId: number): Promise<{ is_saved: boolean }> {
+    return this.fetch(`/api/news/check/${articleId}/saved`);
+  }
   
   // ─────────────────────────────────────────────────────────────────────────
   // Strategies
@@ -380,6 +494,42 @@ class APIClient {
       body: JSON.stringify(params),
     });
   }
+
+  // User Strategies CRUD
+  async getUserStrategies(): Promise<UserStrategy[]> {
+    return this.fetch('/api/strategies/user');
+  }
+
+  async createUserStrategy(data: {
+    name: string;
+    description?: string;
+    template_slug?: string;
+    blocks: Array<{ name: string; label: string; weight: number }>;
+    risk_level?: string;
+    horizon_years?: number;
+  }): Promise<UserStrategy> {
+    return this.fetch('/api/strategies/user', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateUserStrategy(strategyId: string, data: {
+    name?: string;
+    description?: string;
+    blocks?: Array<{ name: string; label: string; weight: number }>;
+  }): Promise<UserStrategy> {
+    return this.fetch(`/api/strategies/user/${strategyId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteUserStrategy(strategyId: string): Promise<{ status: string }> {
+    return this.fetch(`/api/strategies/user/${strategyId}`, {
+      method: 'DELETE',
+    });
+  }
   
   // ─────────────────────────────────────────────────────────────────────────
   // Barbell
@@ -405,6 +555,41 @@ class APIClient {
   
   async getSatelliteCandidates(limit = 50, market_scope = 'US_EU'): Promise<PaginatedResponse<Asset>> {
     return this.fetch(`/api/barbell/candidates/satellite?limit=${limit}&market_scope=${market_scope}`);
+  }
+
+  // Saved Barbell Portfolios
+  async getSavedBarbellPortfolios(): Promise<BarbellPortfolio[]> {
+    return this.fetch('/api/barbell/portfolios');
+  }
+
+  async saveBarbellPortfolio(data: {
+    name: string;
+    risk_profile: string;
+    market_scope: string;
+    core_assets: Array<{ ticker: string; weight: number }>;
+    satellite_assets: Array<{ ticker: string; weight: number }>;
+  }): Promise<BarbellPortfolio> {
+    return this.fetch('/api/barbell/portfolios', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateBarbellPortfolio(portfolioId: string, data: {
+    name?: string;
+    core_assets?: Array<{ ticker: string; weight: number }>;
+    satellite_assets?: Array<{ ticker: string; weight: number }>;
+  }): Promise<BarbellPortfolio> {
+    return this.fetch(`/api/barbell/portfolios/${portfolioId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBarbellPortfolio(portfolioId: string): Promise<{ status: string }> {
+    return this.fetch(`/api/barbell/portfolios/${portfolioId}`, {
+      method: 'DELETE',
+    });
   }
   
   // ─────────────────────────────────────────────────────────────────────────
@@ -535,6 +720,124 @@ class APIClient {
     return this.fetch('/api/notifications/dismiss', {
       method: 'POST',
       body: JSON.stringify(notificationIds),
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Portfolio
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async getPortfolioSummary(): Promise<PortfolioSummary> {
+    return this.fetch('/api/portfolio/summary');
+  }
+
+  // Accounts
+  async getPortfolioAccounts(): Promise<PortfolioAccount[]> {
+    return this.fetch('/api/portfolio/accounts');
+  }
+
+  async createPortfolioAccount(data: {
+    name: string;
+    broker?: string;
+    account_type: string;
+    currency?: string;
+    is_default?: boolean;
+  }): Promise<PortfolioAccount> {
+    return this.fetch('/api/portfolio/accounts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePortfolioAccount(accountId: string, data: {
+    name?: string;
+    broker?: string;
+    is_default?: boolean;
+  }): Promise<PortfolioAccount> {
+    return this.fetch(`/api/portfolio/accounts/${accountId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePortfolioAccount(accountId: string): Promise<{ status: string }> {
+    return this.fetch(`/api/portfolio/accounts/${accountId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Positions
+  async getPortfolioPositions(accountId?: string): Promise<PortfolioPosition[]> {
+    const params = accountId ? `?account_id=${accountId}` : '';
+    return this.fetch(`/api/portfolio/positions${params}`);
+  }
+
+  async addPortfolioPosition(data: {
+    account_id: string;
+    ticker: string;
+    quantity: number;
+    avg_cost: number;
+  }): Promise<PortfolioPosition> {
+    return this.fetch('/api/portfolio/positions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePortfolioPosition(positionId: string, data: {
+    quantity?: number;
+    avg_cost?: number;
+  }): Promise<PortfolioPosition> {
+    return this.fetch(`/api/portfolio/positions/${positionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePortfolioPosition(positionId: string): Promise<{ status: string }> {
+    return this.fetch(`/api/portfolio/positions/${positionId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Transactions
+  async getPortfolioTransactions(params: {
+    account_id?: string;
+    page?: number;
+    page_size?: number;
+  } = {}): Promise<PaginatedResponse<PortfolioTransaction>> {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) searchParams.append(key, String(value));
+    });
+    const query = searchParams.toString();
+    return this.fetch(`/api/portfolio/transactions${query ? `?${query}` : ''}`);
+  }
+
+  async addPortfolioTransaction(data: {
+    account_id: string;
+    ticker: string;
+    type: 'buy' | 'sell' | 'dividend';
+    quantity: number;
+    price: number;
+    fees?: number;
+    notes?: string;
+    transaction_date: string;
+  }): Promise<PortfolioTransaction> {
+    return this.fetch('/api/portfolio/transactions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Import
+  async importPortfolioCSV(accountId: string, csvContent: string): Promise<{
+    imported_count: number;
+    errors: string[];
+  }> {
+    return this.fetch('/api/portfolio/import/csv', {
+      method: 'POST',
+      body: JSON.stringify({ account_id: accountId, csv_content: csvContent }),
     });
   }
 }
