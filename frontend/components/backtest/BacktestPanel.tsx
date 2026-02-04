@@ -10,7 +10,7 @@ import { useBacktest } from '@/hooks/useBacktest';
 import BacktestMetrics from './BacktestMetrics';
 import EquityCurveChart from './EquityCurveChart';
 
-interface BacktestPanelProps {
+export interface BacktestPanelProps {
   strategyId: string;
   compositions: CompositionItem[];
   onClose?: () => void;
