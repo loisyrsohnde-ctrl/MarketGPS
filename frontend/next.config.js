@@ -3,6 +3,9 @@ const nextConfig = {
   // Enable React strict mode
   reactStrictMode: true,
 
+  // Disable font optimization to prevent build timeouts
+  optimizeFonts: false,
+
   // Output standalone for Docker deployments
   output: 'standalone',
 
