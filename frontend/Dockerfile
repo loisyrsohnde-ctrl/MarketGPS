@@ -32,6 +32,12 @@ ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Disable Google Fonts download during build to prevent timeouts
+ENV NEXT_FONT_GOOGLE_MOCKED=true
+
+# Limit Node.js memory to prevent OOM on low-resource servers
+ENV NODE_OPTIONS="--max-old-space-size=2048"
+
 # Build the application
 RUN npm run build
 
