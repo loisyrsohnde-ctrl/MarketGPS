@@ -20,7 +20,7 @@ import logging
 
 from core.config import get_logger
 from storage.sqlite_store import SQLiteStore
-from backend.security import get_user_id_from_request
+from security import get_user_id_from_request
 from services.virality_service import ViralityService, ViralArticle
 from services.video_script_service import VideoScriptService, VideoScript
 

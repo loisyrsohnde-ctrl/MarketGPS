@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from core.config import get_logger
 from storage.sqlite_store import SQLiteStore
-from backend.security import get_user_id_from_request
+from security import get_user_id_from_request
 
 logger = get_logger(__name__)
 
@@ -470,7 +470,7 @@ async def get_breaking_news(
     Get recent breaking news articles.
     Used for the breaking news banner and alerts.
     """
-    from backend.news_notifications import get_notification_service
+    from news_notifications import get_notification_service
 
     try:
         service = get_notification_service()
@@ -495,7 +495,7 @@ async def get_important_news(
     Get high importance news articles.
     Used for featured/trending sections.
     """
-    from backend.news_notifications import get_notification_service
+    from news_notifications import get_notification_service
 
     try:
         service = get_notification_service()
