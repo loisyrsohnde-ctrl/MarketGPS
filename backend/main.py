@@ -290,16 +290,27 @@ def startup_seed():
         logger.warning(f"Demo seeding failed (non-critical): {e}")
 
 
+import asyncio
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     logger.info("Starting MarketGPS Backend API...")
     
-    # Seed demo data if database is empty
-    startup_seed()
+    # Run seed in background to not block startup
+    asyncio.create_task(run_startup_seed())
     
     yield
     logger.info("Shutting down MarketGPS Backend API...")
+
+async def run_startup_seed():
+    """Wrapper to run seed in async loop"""
+    await asyncio.sleep(5)  # Wait for server to be fully up
+    try:
+        # Run synchronous seed function in thread pool
+        await asyncio.to_thread(startup_seed)
+    except Exception as e:
+        logger.error(f"Background seed failed: {e}")
 
 
 # Create FastAPI app
