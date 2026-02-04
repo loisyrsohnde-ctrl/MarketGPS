@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+// import { Inter } from 'next/font/google'; // Disabled to fix build timeout
 import '@/styles/globals.css';
 import { Providers } from './providers';
 
@@ -7,12 +7,12 @@ import { Providers } from './providers';
 // FONT
 // ═══════════════════════════════════════════════════════════════════════════
 
-const inter = Inter({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-inter',
-  display: 'swap',
-});
+// const inter = Inter({
+//   subsets: ['latin'],
+//   weight: ['400', '500', '600', '700'],
+//   variable: '--font-inter',
+//   display: 'swap',
+// });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // METADATA
@@ -57,8 +57,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className={`${inter.className} dark`} suppressHydrationWarning>
-      <body className="bg-bg-primary text-text-primary antialiased">
+    // Removed inter.className to fix build timeout
+    <html lang="fr" className={`dark`} suppressHydrationWarning>
+      <body className="bg-bg-primary text-text-primary antialiased font-sans">
         <Providers>{children}</Providers>
       </body>
     </html>
