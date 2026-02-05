@@ -13,6 +13,7 @@ import re
 import json
 import logging
 import hashlib
+import sqlite3
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, asdict
