@@ -159,6 +159,22 @@ async def get_supabase_users() -> List[Dict[str, Any]]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Auth Check Endpoint
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.get("/auth/check")
+async def admin_auth_check(
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+):
+    """
+    Check if admin key is valid.
+    Used by the frontend to verify admin access.
+    """
+    require_admin(admin_key)
+    return {"status": "authorized", "role": "admin"}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Dashboard Endpoints (ALL READ-ONLY)
 # ═══════════════════════════════════════════════════════════════════════════
 

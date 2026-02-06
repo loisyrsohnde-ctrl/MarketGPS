@@ -9,11 +9,27 @@
 
 // Configuration API Backend
 export function getApiBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.NEXT_PUBLIC_API_BASE_URL ||
-    'http://localhost:8000'
-  );
+  // 1. Explicit environment variable (set at build time)
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+
+  // 2. Auto-detect production from window.location
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'app.marketgps.online' || hostname === 'marketgps.online') {
+      return 'https://api.marketgps.online';
+    }
+    if (hostname === 'app.afristocks.eu' || hostname === 'afristocks.eu') {
+      return 'https://api.afristocks.eu';
+    }
+  }
+
+  // 3. Default for local development
+  return 'http://localhost:8000';
 }
 
 export const API_CONFIG = {

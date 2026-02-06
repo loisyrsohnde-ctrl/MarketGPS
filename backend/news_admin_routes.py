@@ -12,6 +12,7 @@ Endpoints admin pour gérer le scraping d'actualités économiques africaines:
 import os
 import logging
 import asyncio
+import sqlite3
 from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Header, Query, BackgroundTasks

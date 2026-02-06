@@ -45,6 +45,7 @@ ALLOWED_REQUEST_HEADERS: List[str] = [
     "Origin",
     "X-Requested-With",
     "X-CSRF-Token",
+    "X-Admin-Key",
     "Stripe-Signature",
 ]
 
