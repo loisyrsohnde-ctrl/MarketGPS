@@ -324,18 +324,40 @@ def main():
         logger.info("RUN_ON_START enabled, executing initial run...")
         run_pipeline("startup", market_scope, args.dry_run)
     
+    # ─── News pipeline integration ─────────────────────────────
+    news_enabled = os.environ.get("NEWS_ENABLED", "true").lower() == "true"
+    news_interval = int(os.environ.get("NEWS_INTERVAL_MINUTES", "30"))
+    news_last_run: Optional[datetime] = None
+
+    if news_enabled:
+        logger.info(f"News pipeline: ENABLED (every {news_interval}min)")
+        try:
+            from pipeline.news.news_scheduler import run_news_pipeline
+            # Run news immediately on startup
+            logger.info("Running initial news pipeline...")
+            try:
+                run_news_pipeline()
+                news_last_run = get_now_et()
+            except Exception as e:
+                logger.error(f"Initial news pipeline failed: {e}")
+        except ImportError as e:
+            logger.warning(f"News pipeline not available: {e}")
+            news_enabled = False
+    else:
+        logger.info("News pipeline: DISABLED")
+
     # Main loop
     last_run_date = {}  # Track runs per mode per day
-    
+
     while not _shutdown_requested:
         now = get_now_et()
         today = now.date().isoformat()
-        
-        # Check if we should run
+
+        # Check if we should run market pipeline
         if is_trading_day(now):
             for mode, (hour, minute) in SCHEDULE.items():
                 target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-                
+
                 # Check if within 2-minute window and not already run today
                 if abs((now - target).total_seconds()) < 120:
                     run_key = f"{today}_{mode}"
@@ -343,16 +365,36 @@ def main():
                         logger.info(f"Triggering {mode} run...")
                         success = run_pipeline(mode, market_scope, args.dry_run)
                         last_run_date[run_key] = success
-        
+
+        # ─── News pipeline: run every N minutes ─────────────────
+        if news_enabled:
+            should_run_news = (
+                news_last_run is None
+                or (now - news_last_run).total_seconds() >= news_interval * 60
+            )
+            if should_run_news:
+                logger.info("Triggering news pipeline run...")
+                try:
+                    from pipeline.news.news_scheduler import run_news_pipeline
+                    run_news_pipeline()
+                    news_last_run = now
+                except Exception as e:
+                    logger.error(f"News pipeline error: {e}")
+                    news_last_run = now  # Avoid retrying immediately
+
         # Calculate and log next run
         next_run, next_mode = get_next_run_time()
         sleep_seconds = (next_run - now).total_seconds()
-        
+
         if sleep_seconds > 300:  # More than 5 minutes away
-            # Log every hour
+            news_status = ""
+            if news_enabled and news_last_run:
+                next_news = news_last_run + timedelta(minutes=news_interval)
+                news_mins = max(0, (next_news - now).total_seconds() / 60)
+                news_status = f" | News: {news_mins:.0f}min"
             logger.info(f"Next run: {next_mode} at {next_run.strftime('%Y-%m-%d %H:%M:%S %Z')} "
-                       f"({sleep_seconds/3600:.1f}h)")
-        
+                       f"({sleep_seconds/3600:.1f}h){news_status}")
+
         # Sleep for 60 seconds between checks
         for _ in range(60):
             if _shutdown_requested:
