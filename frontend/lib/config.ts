@@ -17,7 +17,7 @@ export function getApiBaseUrl(): string {
     return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
 
-  // 2. Auto-detect production from window.location
+  // 2. Auto-detect production from window.location (client-side)
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     if (hostname === 'app.marketgps.online' || hostname === 'marketgps.online') {
@@ -28,7 +28,12 @@ export function getApiBaseUrl(): string {
     }
   }
 
-  // 3. Default for local development
+  // 3. Server-side (SSR) production detection via NODE_ENV or container hostname
+  if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+    return 'https://api.marketgps.online';
+  }
+
+  // 4. Default for local development
   return 'http://localhost:8000';
 }
 
