@@ -8,6 +8,7 @@ import {
   AlertCircle, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getApiBaseUrl } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { GlassCard, GlassCardAccent } from '@/components/ui/glass-card';
 import { Pill } from '@/components/ui/badge';
@@ -69,7 +70,7 @@ interface BuilderAsset {
 // API
 // ═══════════════════════════════════════════════════════════════════════════
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_BASE = getApiBaseUrl();
 
 async function fetchBarbellSuggestion(riskProfile: string): Promise<BarbellSuggestion> {
   const res = await fetch(`${API_BASE}/api/barbell/suggest?risk_profile=${riskProfile}`);

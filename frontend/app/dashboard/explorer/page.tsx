@@ -13,6 +13,7 @@ import { AssetLogo } from '@/components/cards/asset-card';
 import { AssetListItem, AssetListSkeleton } from '@/components/cards/AssetListItem';
 import { useAssetInspector } from '@/store/useAssetInspector';
 import { cn, formatNumberSafe } from '@/lib/utils';
+import { getApiBaseUrl } from '@/lib/config';
 import type { Asset, MarketFilter, AssetType } from '@/types';
 import {
   ArrowLeft,
@@ -31,7 +32,7 @@ import {
 // API Configuration
 // ═══════════════════════════════════════════════════════════════════════════
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = getApiBaseUrl();
 
 interface ExplorerParams {
   market_scope: string;

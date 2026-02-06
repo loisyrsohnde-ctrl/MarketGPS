@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard, GlassCardAccent } from '@/components/ui/glass-card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { getApiBaseUrl } from '@/lib/config';
 import {
   ArrowLeft,
   ArrowRight,
@@ -66,7 +67,7 @@ interface StrategyAsset {
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = getApiBaseUrl();
 
 const RISK_PROFILES: RiskProfile[] = [
   {

@@ -7,6 +7,7 @@ import { GlassCard, GlassCardAccent } from '@/components/ui/glass-card';
 import { Button } from '@/components/ui/button';
 import { Pill, ScoreGaugeBadge } from '@/components/ui/badge';
 import { cn, formatNumberSafe } from '@/lib/utils';
+import { getApiBaseUrl } from '@/lib/config';
 import {
   ArrowLeft,
   Loader2,
@@ -94,7 +95,7 @@ interface SimulationResult {
 // API
 // ═══════════════════════════════════════════════════════════════════════════
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_BASE = getApiBaseUrl();
 
 async function fetchTemplate(slug: string): Promise<StrategyTemplate> {
   const res = await fetch(`${API_BASE}/api/strategies/templates/${slug}`);

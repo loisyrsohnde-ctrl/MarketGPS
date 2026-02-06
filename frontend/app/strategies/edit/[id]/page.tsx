@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { GlassCard, GlassCardAccent } from '@/components/ui/glass-card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { getApiBaseUrl } from '@/lib/config';
 import {
   ArrowLeft,
   Loader2,
@@ -53,7 +54,7 @@ interface Asset {
 // API
 // ═══════════════════════════════════════════════════════════════════════════
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = getApiBaseUrl();
 
 async function fetchStrategy(strategyId: number): Promise<UserStrategy> {
   const res = await fetch(`${API_BASE}/api/strategies/user/${strategyId}?user_id=default`);

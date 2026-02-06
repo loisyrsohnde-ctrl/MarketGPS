@@ -8,11 +8,12 @@ import {
   Loader2, ArrowUpDown, Filter
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getApiBaseUrl } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { ScoreGaugeBadge } from '@/components/ui/badge';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_BASE = getApiBaseUrl();
 
 interface CandidatesTableProps {
   type: 'core' | 'satellite';

@@ -9,13 +9,14 @@ import {
   Briefcase, ChevronDown, Sparkles, PlusCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getApiBaseUrl } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { ScoreGauge, PillarBar } from '@/components/charts/score-gauge';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = getApiBaseUrl();
 
 interface AssetDrawerProps {
   assetId: string | null;

@@ -19,11 +19,11 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build arguments for environment variables
-ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_API_BASE_URL
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+# Build arguments for environment variables (defaults = production values)
+ARG NEXT_PUBLIC_API_URL=https://api.marketgps.online
+ARG NEXT_PUBLIC_API_BASE_URL=https://api.marketgps.online
+ARG NEXT_PUBLIC_SUPABASE_URL=https://avecmzmcfliaeuxnwimu.supabase.co
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF2ZWNtem1jZmxpYWV1eG53aW11Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwODU2NjQsImV4cCI6MjA4MzY2MTY2NH0.LjeknrD5c9Favt3SYi33yZgd023FBeSKBbvPUe6Yp90
 
 # Set environment variables for build
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
