@@ -1173,19 +1173,24 @@
 
                 <!-- Pipeline Controls -->
                 <div class="control-bar">
-                    <button class="btn btn-info" onclick="runPipelineIngestion()">
+                    <button class="btn btn-primary" onclick="runQuickScan()" style="font-weight: 600;">
+                        <span id="scanSpinner" style="display: none;"><span class="spinner" style="margin-right: 6px; margin-bottom: 0;"></span></span>
+                        🔍 Rechercher nouveautés
+                    </button>
+                    <span style="color: var(--border);">|</span>
+                    <button class="btn btn-info" onclick="runPipelineIngestion()" title="Ingestion des flux RSS uniquement">
                         <span id="ingestSpinner" style="display: none;"><span class="spinner" style="margin-right: 6px; margin-bottom: 0;"></span></span>
                         Ingestion RSS
                     </button>
-                    <button class="btn" style="background: #8b5cf6; color: white;" onclick="runPipelinePublish()">
+                    <button class="btn" style="background: #8b5cf6; color: white;" onclick="runPipelinePublish()" title="Traitement LLM des articles ingérés">
                         <span id="publishSpinner" style="display: none;"><span class="spinner" style="margin-right: 6px; margin-bottom: 0;"></span></span>
                         Publier (LLM)
                     </button>
-                    <button class="btn btn-success" onclick="runPipelineComplete()">
+                    <button class="btn btn-success" onclick="runPipelineComplete()" title="Ingestion + LLM + Publication complète">
                         <span id="completeSpinner" style="display: none;"><span class="spinner" style="margin-right: 6px; margin-bottom: 0;"></span></span>
                         Pipeline complet
                     </button>
-                    <button class="btn btn-warning" onclick="runUpdateInteractions()">
+                    <button class="btn btn-warning" onclick="runUpdateInteractions()" title="Calculer/estimer les interactions de tous les articles">
                         <span id="interactSpinner" style="display: none;"><span class="spinner" style="margin-right: 6px; margin-bottom: 0;"></span></span>
                         Calculer Interactions
                     </button>
@@ -1739,11 +1744,12 @@
                         <input type="checkbox" class="article-checkbox" value="${article.id}"
                                onchange="updateSelectedArticles()" ${selectedArticleIds.has(article.id) ? 'checked' : ''}>
                     </td>
-                    <td style="cursor: pointer; max-width: 350px;" onclick="showArticleDetail('${article.id}')">
-                        <div style="font-weight: 500; color: var(--accent);">${truncate(article.title || '', 60)}</div>
-                        ${article.image_url ? '<span style="color: var(--accent); margin-right: 4px;">📷</span>' : ''}
-                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-                            ${formatDate(article.scraped_at)}
+                    <td style="cursor: pointer; max-width: 500px;" onclick="showArticleDetail('${article.id}')">
+                        <div style="font-weight: 500; color: var(--accent); line-height: 1.4;">${escapeHtml(article.title || '')}</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: flex; align-items: center; gap: 6px;">
+                            ${article.image_url ? '<span>📷</span>' : ''}
+                            <span>${formatDate(article.scraped_at)}</span>
+                            ${article.country ? '<span style="opacity:0.7;">· ' + escapeHtml(article.country) + '</span>' : ''}
                         </div>
                     </td>
                     <td>
@@ -1895,9 +1901,36 @@
 
         // ============ PIPELINE CONTROLS ============
 
-        async function runPipelineIngestion() {
-            if (!confirm('Lancer l\'ingestion RSS ?')) return;
+        async function runQuickScan() {
+            const btn = event.target.closest('button');
+            const spinner = document.getElementById('scanSpinner');
+            btn.disabled = true;
+            spinner.style.display = 'inline';
+            showToast('Recherche de nouvelles actualités en cours...', 'info');
 
+            try {
+                // Step 1: Ingestion RSS
+                const ingestRes = await fetch(`${API_URL}/news-admin/pipeline/ingest`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+                const ingestData = ingestRes.ok ? await ingestRes.json() : {};
+
+                // Step 2: Refresh articles list
+                await loadArticles();
+                await loadNewsStats();
+
+                const newCount = ingestData.result?.new_items || ingestData.new_items || 'N/A';
+                showToast(`Scan terminé ! ${newCount} nouveaux articles ingérés.`, 'success');
+            } catch (e) {
+                showToast('Erreur lors du scan: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        }
+
+        async function runPipelineIngestion() {
             const btn = event.target.closest('button');
             const spinner = document.getElementById('ingestSpinner');
             btn.disabled = true;
@@ -1911,11 +1944,12 @@
 
                 if (response.ok) {
                     const data = await response.json();
-                    showToast(`Ingestion terminée: ${data.articles_found || 0} articles trouvés`, 'success');
+                    showToast(`Ingestion terminée: ${JSON.stringify(data.result || data)}`, 'success');
                     await loadArticles();
                     await loadNewsStats();
                 } else {
-                    showToast('Erreur lors de l\'ingestion', 'error');
+                    const err = await response.json().catch(() => ({}));
+                    showToast('Erreur: ' + (err.detail || 'Échec de l\'ingestion'), 'error');
                 }
             } catch (e) {
                 showToast('Erreur de connexion', 'error');
@@ -1964,14 +1998,15 @@
             spinner.style.display = 'inline';
 
             try {
-                const response = await fetch(`${API_URL}/news-admin/pipeline/run`, {
+                const response = await fetch(`${API_URL}/news-admin/pipeline/run?sync=true`, {
                     method: 'POST',
                     headers: { 'X-Admin-Key': adminKey }
                 });
 
                 if (response.ok) {
                     const data = await response.json();
-                    showToast('Pipeline exécuté avec succès', 'success');
+                    const result = data.result || {};
+                    showToast(`Pipeline terminé: ${result.items_published || result.published || 'OK'}`, 'success');
                     await loadArticles();
                     await loadNewsStats();
                 } else {
@@ -1986,28 +2021,31 @@
         }
 
         async function runUpdateInteractions() {
-            if (!confirm('Calculer les interactions pour tous les articles ? Cela peut prendre plusieurs minutes.')) return;
-
             const btn = event.target.closest('button');
             const spinner = document.getElementById('interactSpinner');
             btn.disabled = true;
             spinner.style.display = 'inline';
+            showToast('Calcul des interactions en cours... (cela peut prendre 1-2 minutes)', 'info');
 
             try {
-                const response = await fetch(`${API_URL}/news-admin/update-interactions`, {
+                // Use sync=true to wait for result and limit to recent 200 articles
+                const response = await fetch(`${API_URL}/news-admin/update-interactions?sync=true&limit=200`, {
                     method: 'POST',
                     headers: { 'X-Admin-Key': adminKey }
                 });
 
                 if (response.ok) {
-                    showToast('Calcul des interactions lancé', 'success');
+                    const data = await response.json();
+                    const result = data.result || {};
+                    showToast(`Interactions calculées: ${result.updated || 0} articles mis à jour, ${result.errors || 0} erreurs`, 'success');
                     await loadArticles();
                     await loadNewsStats();
                 } else {
-                    showToast('Erreur lors du calcul', 'error');
+                    const err = await response.json().catch(() => ({}));
+                    showToast('Erreur: ' + (err.detail || 'Échec du calcul'), 'error');
                 }
             } catch (e) {
-                showToast('Erreur de connexion', 'error');
+                showToast('Erreur de connexion: ' + e.message, 'error');
             } finally {
                 btn.disabled = false;
                 spinner.style.display = 'none';
