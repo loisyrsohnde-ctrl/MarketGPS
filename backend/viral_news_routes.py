@@ -236,7 +236,7 @@ async def generate_video_script(
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, title, summary, source_name, published_at
+            SELECT id, title, content_md, summary, source_name, published_at
             FROM news_articles
             WHERE id = ?
         """, (request.article_id,))
@@ -247,19 +247,26 @@ async def generate_video_script(
         if not article:
             raise HTTPException(status_code=404, detail="Article not found")
 
-        article_id, title, content, source, published_at = article
+        article_id, title, content_md, summary, source, published_at = article
+        # Use content_md first (full article), fallback to summary
+        content = content_md or summary or ""
 
-        # Générer le script
-        script = await video_svc.generate_script(
+        if not content.strip():
+            raise HTTPException(status_code=400, detail="Article has no content to generate script from")
+
+        # Générer le script (Gemini SDK is synchronous, run in threadpool)
+        import asyncio
+        script = await asyncio.to_thread(
+            video_svc.generate_script_sync,
             article_id=article_id,
             title=title,
-            content=content or "",
+            content=content,
             source=source,
             date=published_at or "",
         )
 
         if not script:
-            raise HTTPException(status_code=500, detail="Failed to generate script")
+            raise HTTPException(status_code=500, detail="Gemini generation failed — check GEMINI_API_KEY and API quota")
 
         return VideoScriptResponse(
             id=script.id,

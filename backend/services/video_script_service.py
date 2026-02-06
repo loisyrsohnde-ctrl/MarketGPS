@@ -192,7 +192,7 @@ class VideoScriptService:
         except Exception as e:
             logger.error(f"Error initializing database: {e}")
 
-    async def generate_script(
+    def generate_script_sync(
         self,
         article_id: str,
         title: str,
@@ -201,7 +201,7 @@ class VideoScriptService:
         date: str,
     ) -> Optional[VideoScript]:
         """
-        Génère un script vidéo style Hugo Décrypte pour un article.
+        Génère un script vidéo style Hugo Décrypte pour un article (synchrone).
 
         Args:
             article_id: ID de l'article
@@ -214,7 +214,7 @@ class VideoScriptService:
             VideoScript généré, ou None si erreur
         """
         if not self.model:
-            logger.error("Gemini model not configured")
+            logger.error("Gemini model not configured — GEMINI_API_KEY missing or invalid")
             return None
 
         prompt = HUGO_DECRYPTE_PROMPT.format(
@@ -222,6 +222,89 @@ class VideoScriptService:
             source=source,
             date=date,
             content=content[:4000],  # Limiter pour le contexte
+        )
+
+        try:
+            logger.info(f"Generating script for article {article_id} with Gemini")
+            response = self.model.generate_content(prompt)
+            result = self._parse_response(response.text)
+
+            # Valider la réponse
+            if not all(k in result for k in ['hook', 'script', 'key_facts']):
+                logger.error(f"Invalid response format: {result}")
+                return None
+
+            word_count = len(result['script'].split())
+
+            # Vérifier la longueur (300-500 mots)
+            if word_count < 250 or word_count > 600:
+                logger.warning(f"Script word count {word_count} outside recommended range")
+
+            # Estimation durée: ~150 mots/minute
+            duration = int(word_count / 150 * 60)
+
+            script = VideoScript(
+                id=self._generate_id(),
+                article_id=article_id,
+                title=title,
+                hook=result['hook'],
+                script_text=result['script'],
+                word_count=word_count,
+                estimated_duration_seconds=duration,
+                sources_mentioned=result.get('sources_to_cite', []),
+                key_facts=result.get('key_facts', []),
+                status='draft',
+                created_at=datetime.utcnow().isoformat(),
+                updated_at=datetime.utcnow().isoformat(),
+            )
+
+            # Sauvegarder en base
+            self._save_script(script)
+            logger.info(f"Script generated successfully: {script.id}")
+
+            return script
+
+        except Exception as e:
+            logger.error(f"Error generating script: {e}")
+            return None
+
+    async def generate_script(
+        self,
+        article_id: str,
+        title: str,
+        content: str,
+        source: str,
+        date: str,
+    ) -> Optional[VideoScript]:
+        """
+        Génère un script vidéo style Hugo Décrypte pour un article (async wrapper).
+        """
+        return self.generate_script_sync(
+            article_id=article_id,
+            title=title,
+            content=content,
+            source=source,
+            date=date,
+        )
+
+    def _generate_script_internal(
+        self,
+        article_id: str,
+        title: str,
+        content: str,
+        source: str,
+        date: str,
+    ) -> Optional[VideoScript]:
+        """Internal script generation logic — kept for backward compatibility."""
+        if not self.model:
+            logger.error("Gemini model not configured")
+            return None
+
+        prompt = HUGO_DECRYPTE_PROMPT.format(
+            title=title,
+            source=source,
+            date=date,
+            content=content[:4000],
         )
 
         try:

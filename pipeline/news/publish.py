@@ -371,9 +371,11 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
                 logger.info(f"🔴 BREAKING NEWS detected: {rewritten.get('title_fr', '')[:60]}...")
 
             # Prepare article
+            original_url = raw_item.get("url", "")
             article = {
                 "slug": slug,
                 "raw_item_id": raw_item.get("id"),
+                "url": original_url,
                 "title": rewritten.get("title_fr", raw_payload.get("title", "Untitled")),
                 "excerpt": rewritten.get("excerpt_fr"),
                 "content_md": rewritten.get("content_md"),
@@ -383,8 +385,8 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
                 "language": "fr",
                 "image_url": image_url,
                 "source_name": raw_item.get("source_name", "Unknown"),
-                "source_url": raw_item.get("url"),
-                "canonical_url": raw_item.get("url"),
+                "source_url": original_url,
+                "canonical_url": original_url,
                 "published_at": raw_item.get("published_at"),
                 "status": "published",
                 "category": category,

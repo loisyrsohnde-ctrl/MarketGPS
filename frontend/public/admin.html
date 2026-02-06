@@ -2219,7 +2219,7 @@
                         <button class="btn btn-success" onclick="publishArticleFromModal('${article.id}')">Publier</button>
                         <button class="btn btn-error" onclick="rejectArticleFromModal('${article.id}')">Rejeter</button>
                         <button class="btn btn-info" onclick="generateScriptFromModal('${article.id}')">Générer Script</button>
-                        <button class="btn btn-secondary" onclick="window.open('${article.url}', '_blank')">Voir l'original</button>
+                        <button class="btn btn-secondary" onclick="window.open('${article.source_url || article.canonical_url || article.url || '#'}', '_blank')">Voir l'original</button>
                         <button class="btn btn-secondary" onclick="closeArticleModal()">Fermer</button>
                     `;
                 }
@@ -2393,12 +2393,22 @@
                     const script = await response.json();
                     showScriptViewer(body, script, articleId);
                 } else {
-                    showToast('Erreur lors de la génération du script', 'error');
-                    body.innerHTML = '<div class="empty-state">Erreur lors de la génération</div>';
+                    const err = await response.json().catch(() => ({}));
+                    const detail = err.detail || `Erreur HTTP ${response.status}`;
+                    showToast('Erreur: ' + detail, 'error');
+                    body.innerHTML = `<div class="empty-state">
+                        <div style="font-size: 18px; margin-bottom: 8px;">Erreur lors de la génération</div>
+                        <div style="font-size: 13px; color: var(--text-muted);">${escapeHtml(detail)}</div>
+                        <button class="btn btn-secondary" style="margin-top: 12px;" onclick="showArticleDetail('${articleId}')">Retour à l'article</button>
+                    </div>`;
                 }
             } catch (e) {
-                showToast('Erreur de connexion', 'error');
-                body.innerHTML = '<div class="empty-state">Erreur de connexion</div>';
+                showToast('Erreur de connexion: ' + e.message, 'error');
+                body.innerHTML = `<div class="empty-state">
+                    <div style="font-size: 18px; margin-bottom: 8px;">Erreur de connexion</div>
+                    <div style="font-size: 13px; color: var(--text-muted);">${escapeHtml(e.message)}</div>
+                    <button class="btn btn-secondary" style="margin-top: 12px;" onclick="showArticleDetail('${articleId}')">Retour à l'article</button>
+                </div>`;
             }
         }
 
