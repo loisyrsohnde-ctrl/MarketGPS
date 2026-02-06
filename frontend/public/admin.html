@@ -1202,21 +1202,28 @@
                         <span id="interactSpinner" style="display: none;"><span class="spinner" style="margin-right: 6px; margin-bottom: 0;"></span></span>
                         Calculer Interactions
                     </button>
+                    <span style="color: var(--border);">|</span>
+                    <button class="btn" style="background: #ec4899; color: white; font-weight: 600;" onclick="runScoreV2()" title="Scorer les articles récents avec l'algorithme V2 de viralité">
+                        <span id="scoreV2Spinner" style="display: none;"><span class="spinner" style="margin-right: 6px; margin-bottom: 0;"></span></span>
+                        🧠 Score V2
+                    </button>
                 </div>
 
                 <!-- Filter Bar -->
                 <div class="control-bar" style="padding: 12px 20px; border-bottom: 1px solid var(--border);">
                     <select id="newsStatusFilter" onchange="loadArticles()">
                         <option value="all">Tous</option>
+                        <option value="top_v2">🧠 Top V2 (meilleurs scores)</option>
                         <option value="pending">En attente</option>
                         <option value="published">Publiés</option>
                         <option value="rejected">Rejetés</option>
                         <option value="trending">🔥 Trending (100+)</option>
                     </select>
                     <input type="text" id="newsSearchInput" placeholder="🔍 Rechercher titre..." oninput="filterArticles()">
-                    <select id="newsSortBy" onchange="loadArticles()">
+                    <select id="newsSortBy" onchange="filterArticles()">
                         <option value="date">Trier par Date</option>
                         <option value="interactions">Trier par Interactions</option>
+                        <option value="score_v2">Trier par Score V2</option>
                         <option value="title">Trier par Titre</option>
                     </select>
                     <select id="newsPerPage" onchange="loadArticles()">
@@ -1243,12 +1250,13 @@
                                 <th>Titre</th>
                                 <th>Source</th>
                                 <th>Interactions</th>
+                                <th>Score V2</th>
                                 <th>Statut</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="articlesTable">
-                            <tr><td colspan="6" class="loading"><div class="spinner"></div>Chargement...</td></tr>
+                            <tr><td colspan="7" class="loading"><div class="spinner"></div>Chargement...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1657,9 +1665,25 @@
             newsPerPage = parseInt(document.getElementById('newsPerPage').value);
             const filter = document.getElementById('newsStatusFilter').value;
 
-            tbody.innerHTML = '<tr><td colspan="6" class="loading"><div class="spinner"></div>Chargement...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="loading"><div class="spinner"></div>Chargement...</td></tr>';
 
             try {
+                // Special handling for Top V2 filter — uses dedicated endpoint
+                if (filter === 'top_v2') {
+                    const url = `${API_URL}/news-admin/articles/top?limit=60&min_score=0`;
+                    const response = await fetch(url, {
+                        headers: { 'X-Admin-Key': adminKey }
+                    });
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData.detail || `Erreur HTTP ${response.status}`);
+                    }
+                    const data = await response.json();
+                    allArticles = data.articles || data || [];
+                    filterArticles();
+                    return;
+                }
+
                 // Backend max limit is 200, use pagination to get more
                 let allLoaded = [];
                 let offset = 0;
@@ -1704,7 +1728,7 @@
                 filterArticles();
             } catch (e) {
                 console.error('Error loading articles:', e);
-                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Erreur: ${escapeHtml(e.message)}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Erreur: ${escapeHtml(e.message)}</td></tr>`;
                 showToast('Erreur lors du chargement des articles: ' + e.message, 'error');
             }
         }
@@ -1717,7 +1741,9 @@
                 a.title && a.title.toLowerCase().includes(search)
             );
 
-            if (sort === 'interactions') {
+            if (sort === 'score_v2') {
+                filteredArticles.sort((a, b) => (b.viral_score_v2 || 0) - (a.viral_score_v2 || 0));
+            } else if (sort === 'interactions') {
                 filteredArticles.sort((a, b) => (b.total_interactions || 0) - (a.total_interactions || 0));
             } else if (sort === 'title') {
                 filteredArticles.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
@@ -1736,18 +1762,26 @@
             const pageArticles = filteredArticles.slice(start, end);
 
             if (pageArticles.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Aucun article trouvé</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Aucun article trouvé</td></tr>';
                 updatePagination();
                 return;
             }
 
-            tbody.innerHTML = pageArticles.map(article => `
+            tbody.innerHTML = pageArticles.map(article => {
+                const score = article.viral_score_v2;
+                const hasScore = score !== null && score !== undefined && score > 0;
+                const scoreColor = hasScore ? (score >= 70 ? '#22c55e' : score >= 45 ? '#f59e0b' : score >= 25 ? '#f97316' : '#6b7280') : '#6b7280';
+                const scoreBg = hasScore ? (score >= 70 ? 'rgba(34,197,94,0.15)' : score >= 45 ? 'rgba(245,158,11,0.15)' : score >= 25 ? 'rgba(249,115,22,0.15)' : 'rgba(107,114,128,0.1)') : 'transparent';
+                const rawReasons = article.viral_reasons_v2;
+                const reasons = Array.isArray(rawReasons) ? rawReasons.join(' · ') : (typeof rawReasons === 'string' ? (function(){ try { const p = JSON.parse(rawReasons); return Array.isArray(p) ? p.join(' · ') : rawReasons; } catch(e) { return rawReasons; } })() : '');
+
+                return `
                 <tr>
                     <td class="checkbox-column">
                         <input type="checkbox" class="article-checkbox" value="${article.id}"
                                onchange="updateSelectedArticles()" ${selectedArticleIds.has(article.id) ? 'checked' : ''}>
                     </td>
-                    <td style="cursor: pointer; max-width: 500px;" onclick="showArticleDetail('${article.id}')">
+                    <td style="cursor: pointer; max-width: 450px;" onclick="showArticleDetail('${article.id}')">
                         <div style="font-weight: 500; color: var(--accent); line-height: 1.4;">${escapeHtml(article.title || '')}</div>
                         <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: flex; align-items: center; gap: 6px;">
                             ${article.image_url ? '<span>📷</span>' : ''}
@@ -1769,6 +1803,14 @@
                             👍${article.likes || 0} 💬${article.comments || 0} 🔄${article.shares || 0}
                         </div>
                     </td>
+                    <td style="text-align: center;">
+                        ${hasScore ? `
+                            <div class="v2-score-badge" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 12px; background: ${scoreBg}; border: 1px solid ${scoreColor}30; position: relative;">
+                                <span style="font-size: 15px; font-weight: 800; color: ${scoreColor};">${Math.round(score)}</span>
+                                <span class="v2-why-btn" onclick="event.stopPropagation(); showV2Reasons(this, '${escapeHtml(reasons).replace(/'/g, "\\'")}')" style="cursor: pointer; font-size: 10px; background: ${scoreColor}25; color: ${scoreColor}; padding: 1px 5px; border-radius: 6px; font-weight: 600;">Why?</span>
+                            </div>
+                        ` : '<span style="font-size: 11px; color: var(--text-muted);">—</span>'}
+                    </td>
                     <td>
                         ${article.published_to_app
                             ? '<span class="badge badge-published">Publié</span>'
@@ -1782,8 +1824,8 @@
                             Voir
                         </button>
                     </td>
-                </tr>
-            `).join('');
+                </tr>`;
+            }).join('');
 
             updatePagination();
         }
@@ -2064,6 +2106,89 @@
             }
         }
 
+        // ============ SCORE V2 FUNCTIONS ============
+
+        async function runScoreV2() {
+            const btn = event.target.closest('button');
+            const spinner = document.getElementById('scoreV2Spinner');
+            btn.disabled = true;
+            spinner.style.display = 'inline';
+            showToast('Calcul des scores V2 en cours... (analyse des articles récents)', 'info');
+
+            try {
+                const response = await fetch(`${API_URL}/news-admin/score-v2?top_k=60&days_back=3&min_score=10`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const scored = data.scored || 0;
+                    const topK = data.top_k || 0;
+                    showToast(`Score V2 calculé : ${scored} articles scorés, Top ${topK} sélectionnés`, 'success');
+
+                    // Auto-switch to Top V2 view
+                    document.getElementById('newsStatusFilter').value = 'top_v2';
+                    document.getElementById('newsSortBy').value = 'score_v2';
+                    await loadArticles();
+                    await loadNewsStats();
+                } else {
+                    const err = await response.json().catch(() => ({}));
+                    showToast('Erreur Score V2: ' + (err.detail || 'Échec du calcul'), 'error');
+                }
+            } catch (e) {
+                showToast('Erreur de connexion: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        }
+
+        // Tooltip for showing V2 reasons on click
+        let _v2ReasonPopup = null;
+        function showV2Reasons(element, reasons) {
+            // Close existing popup
+            if (_v2ReasonPopup) {
+                _v2ReasonPopup.remove();
+                _v2ReasonPopup = null;
+            }
+            if (!reasons) return;
+
+            const popup = document.createElement('div');
+            popup.className = 'v2-reason-popup';
+            popup.innerHTML = `
+                <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase;">Pourquoi ce score</div>
+                <div style="font-size: 12px; color: var(--text-primary); line-height: 1.5;">${escapeHtml(reasons)}</div>
+            `;
+            popup.style.cssText = `
+                position: absolute; z-index: 9999; background: var(--bg-card, #1e1e2e);
+                border: 1px solid var(--border, #333); border-radius: 10px; padding: 10px 14px;
+                max-width: 320px; min-width: 200px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+                pointer-events: auto;
+            `;
+
+            document.body.appendChild(popup);
+
+            // Position near element
+            const rect = element.getBoundingClientRect();
+            popup.style.left = Math.max(8, rect.left - 100) + 'px';
+            popup.style.top = (rect.bottom + 8 + window.scrollY) + 'px';
+
+            _v2ReasonPopup = popup;
+
+            // Close on outside click
+            setTimeout(() => {
+                const handler = (e) => {
+                    if (!popup.contains(e.target) && e.target !== element) {
+                        popup.remove();
+                        _v2ReasonPopup = null;
+                        document.removeEventListener('click', handler);
+                    }
+                };
+                document.addEventListener('click', handler);
+            }, 50);
+        }
+
         // ============ ARTICLE DETAIL MODAL ============
 
         async function showArticleDetail(articleId) {
@@ -2138,6 +2263,31 @@
                                     </div>
                                 </div>
                             </div>
+
+                            ${(article.viral_score_v2 !== null && article.viral_score_v2 !== undefined) ? (() => {
+                                const sv2 = article.viral_score_v2;
+                                const sv2Color = sv2 >= 70 ? '#22c55e' : sv2 >= 45 ? '#f59e0b' : sv2 >= 25 ? '#f97316' : '#6b7280';
+                                const rv2 = article.viral_reasons_v2;
+                                let reasonsList = [];
+                                if (Array.isArray(rv2)) reasonsList = rv2;
+                                else if (typeof rv2 === 'string') { try { const p = JSON.parse(rv2); reasonsList = Array.isArray(p) ? p : [rv2]; } catch(e) { reasonsList = rv2 ? [rv2] : []; } }
+                                return `
+                            <div class="article-meta-group">
+                                <div class="label">Score Viralité V2</div>
+                                <div class="value" style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 22px; font-weight: 800; color: ${sv2Color};">${Math.round(sv2)}</span>
+                                    <span style="font-size: 11px; color: var(--text-muted);">/ 100</span>
+                                </div>
+                                ${reasonsList.length > 0 ? `
+                                <div style="margin-top: 6px; padding: 8px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);">
+                                    <div style="font-size: 10px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase;">Pourquoi ce score :</div>
+                                    <ul style="font-size: 12px; color: var(--text-secondary); line-height: 1.7; margin: 0; padding-left: 14px;">
+                                        ${reasonsList.map(r => '<li>' + escapeHtml(r) + '</li>').join('')}
+                                    </ul>
+                                </div>
+                                ` : ''}
+                            </div>`;
+                            })() : ''}
 
                             <div class="article-meta-group">
                                 <div class="label">Statut</div>

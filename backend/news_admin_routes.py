@@ -843,3 +843,129 @@ async def update_article_interactions(
     except Exception as e:
         logger.error(f"Error updating interactions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Viral Scorer V2 Endpoints
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.post("/score-v2")
+async def run_score_v2(
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+    top_k: int = Query(40, ge=5, le=200, description="Number of top articles to return"),
+    days_back: int = Query(3, ge=1, le=30, description="Days to look back"),
+    min_score: float = Query(25, ge=0, le=100, description="Minimum score to keep"),
+):
+    """
+    Run Viral Scorer V2 on recent articles.
+
+    Scores all articles from last `days_back` days, deduplicates,
+    clusters, and returns top-K with reasons.
+
+    Feature flag: ENABLE_VIRAL_FILTER_V2 (default: true)
+    """
+    require_admin(admin_key)
+
+    try:
+        from pipeline.news.viral_scorer_v2 import ViralScorerV2, ENABLE_VIRAL_FILTER_V2
+
+        if not ENABLE_VIRAL_FILTER_V2:
+            return {
+                "success": False,
+                "message": "Viral Filter V2 is disabled. Set ENABLE_VIRAL_FILTER_V2=true to enable.",
+            }
+
+        scorer = ViralScorerV2(get_db_conn=db._get_conn)
+        results = scorer.score_and_rank(top_k=top_k, days_back=days_back, min_score=min_score)
+        saved = scorer.save_scores(results)
+
+        return {
+            "success": True,
+            "scored": len(results),
+            "saved": saved,
+            "top_k": top_k,
+            "min_score": min_score,
+            "articles": [r.to_dict() for r in results[:20]],  # Preview first 20
+        }
+
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=f"Scorer V2 not available: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error running V2 scoring: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/articles/top")
+async def get_top_articles(
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+    limit: int = Query(40, ge=5, le=200),
+    min_score: float = Query(0, ge=0, le=100),
+    country: Optional[str] = Query(None, description="Filter by country code"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+):
+    """
+    Get top-K articles ranked by viral_score_v2.
+
+    Returns articles that have been scored by V2, sorted by score DESC.
+    If no articles scored yet, returns empty list (run POST /score-v2 first).
+    """
+    require_admin(admin_key)
+
+    try:
+        with db._get_conn() as conn:
+            query = """
+                SELECT *,
+                       viral_score_v2,
+                       viral_reasons_v2,
+                       trend_velocity_ratio,
+                       attention_proxy_score,
+                       cluster_id,
+                       cluster_label,
+                       scored_at
+                FROM news_articles
+                WHERE viral_score_v2 IS NOT NULL
+                  AND viral_score_v2 >= ?
+            """
+            params = [min_score]
+
+            if country:
+                query += " AND country = ?"
+                params.append(country.upper())
+
+            if category:
+                query += " AND category = ?"
+                params.append(category)
+
+            query += " ORDER BY viral_score_v2 DESC LIMIT ?"
+            params.append(limit)
+
+            cursor = conn.execute(query, params)
+            columns = [desc[0] for desc in cursor.description]
+            articles = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            # Parse viral_reasons_v2 from JSON string
+            for article in articles:
+                reasons = article.get("viral_reasons_v2")
+                if isinstance(reasons, str):
+                    try:
+                        article["viral_reasons_v2"] = json.loads(reasons)
+                    except Exception:
+                        article["viral_reasons_v2"] = [reasons]
+
+        return {
+            "articles": articles,
+            "total": len(articles),
+            "min_score": min_score,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting top articles: {e}")
+        # Columns might not exist yet — return empty
+        if "no such column" in str(e).lower():
+            return {
+                "articles": [],
+                "total": 0,
+                "min_score": min_score,
+                "message": "V2 scoring not yet run. Use POST /news-admin/score-v2 first.",
+            }
+        raise HTTPException(status_code=500, detail=str(e))
