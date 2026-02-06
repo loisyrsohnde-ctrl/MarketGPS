@@ -1139,35 +1139,43 @@
             <!-- ARTICLES SUB-TAB -->
             <div id="articlesSubTab" style="display: block;">
                 <!-- Stats Bar -->
-                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); padding: 0 20px; margin-bottom: 0;">
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); padding: 0 20px; margin-bottom: 0;">
                     <div style="text-align: center;">
                         <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="newsTotal">-</div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Total Articles</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 20px; font-weight: 700; color: var(--warning);" id="newsTrending">-</div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Trending (100+)</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 20px; font-weight: 700; color: var(--success);" id="newsPublished">-</div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Publiés</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Articles LLM</div>
                     </div>
                     <div style="text-align: center;">
                         <div style="font-size: 20px; font-weight: 700; color: var(--info);" id="newsPending">-</div>
                         <div style="font-size: 11px; color: var(--text-muted);">En attente</div>
                     </div>
                     <div style="text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700; color: var(--success);" id="newsPublished">-</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Approuvés</div>
+                    </div>
+                    <div style="text-align: center;">
                         <div style="font-size: 20px; font-weight: 700; color: var(--error);" id="newsRejected">-</div>
                         <div style="font-size: 11px; color: var(--text-muted);">Rejetés</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700; color: var(--warning);" id="newsTrending">-</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Trending</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700; color: var(--accent);" id="newsToday">-</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Aujourd'hui</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700; color: #a78bfa;" id="newsRawPending">-</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Bruts à traiter</div>
                     </div>
                 </div>
 
                 <!-- Pipeline Status -->
                 <div style="padding: 16px 20px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-muted);">
                     <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                        <div>Dernière exécution: <span id="pipelineLastRun" style="color: var(--text-primary);">-</span></div>
-                        <div>Prochain run: <span id="pipelineNextRun" style="color: var(--text-primary);">-</span></div>
+                        <div>Dernier article: <span id="pipelineLastRun" style="color: var(--text-primary);">-</span></div>
                         <div>Provider LLM: <span id="pipelineProvider" style="color: var(--accent);">-</span></div>
+                        <div>Sources RSS: <span id="pipelineSourcesCount" style="color: var(--text-primary);">-</span></div>
                     </div>
                 </div>
 
@@ -1623,25 +1631,20 @@
                     document.getElementById('newsPublished').textContent = stats.published || 0;
                     document.getElementById('newsPending').textContent = stats.pending || 0;
                     document.getElementById('newsRejected').textContent = stats.rejected || 0;
+                    document.getElementById('newsToday').textContent = stats.today || 0;
+                    document.getElementById('newsRawPending').textContent = stats.raw_pending || 0;
                     document.getElementById('pipelineLastRun').textContent = formatDate(stats.last_scraping) || 'Jamais';
                 }
 
-                // Load pipeline status for LLM provider info
+                // Load pipeline status for LLM provider and sources info
                 const pipelineRes = await fetch(`${API_URL}/news-admin/pipeline/status`, {
                     headers: { 'X-Admin-Key': adminKey }
                 });
                 if (pipelineRes.ok) {
                     const pipeline = await pipelineRes.json();
                     document.getElementById('pipelineProvider').textContent = pipeline.llm_provider || 'N/A';
-                    if (pipeline.last_run) {
-                        document.getElementById('pipelineLastRun').textContent = formatDate(pipeline.last_run);
-                    }
-                    // Estimate next run (30 min after last)
-                    if (pipeline.last_run) {
-                        const lastRun = new Date(pipeline.last_run);
-                        const nextRun = new Date(lastRun.getTime() + 30 * 60 * 1000);
-                        document.getElementById('pipelineNextRun').textContent = formatDate(nextRun.toISOString());
-                    }
+                    const srcEl = document.getElementById('pipelineSourcesCount');
+                    if (srcEl) srcEl.textContent = (pipeline.sources?.enabled || pipeline.sources?.total || '-') + ' actives';
                 }
             } catch (e) {
                 console.error('Error loading news stats:', e);
@@ -1906,22 +1909,31 @@
             const spinner = document.getElementById('scanSpinner');
             btn.disabled = true;
             spinner.style.display = 'inline';
-            showToast('Recherche de nouvelles actualités en cours...', 'info');
+            showToast('Recherche de nouvelles actualités en cours... (Ingestion + Traitement LLM)', 'info');
 
             try {
-                // Step 1: Ingestion RSS
-                const ingestRes = await fetch(`${API_URL}/news-admin/pipeline/ingest`, {
+                // Run the full pipeline (ingestion + LLM processing) in sync mode
+                const res = await fetch(`${API_URL}/news-admin/pipeline/run?sync=true&publish_limit=20`, {
                     method: 'POST',
                     headers: { 'X-Admin-Key': adminKey }
                 });
-                const ingestData = ingestRes.ok ? await ingestRes.json() : {};
 
-                // Step 2: Refresh articles list
+                if (res.ok) {
+                    const data = await res.json();
+                    const result = data.result || {};
+                    const msg = [
+                        result.items_ingested ? `${result.items_ingested} ingérés` : null,
+                        result.items_published ? `${result.items_published} publiés` : null,
+                        result.items_skipped ? `${result.items_skipped} filtrés` : null,
+                    ].filter(Boolean).join(', ') || 'Pipeline terminé';
+                    showToast(`Scan terminé ! ${msg}`, 'success');
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    showToast('Erreur: ' + (err.detail || 'Échec du pipeline'), 'error');
+                }
+
                 await loadArticles();
                 await loadNewsStats();
-
-                const newCount = ingestData.result?.new_items || ingestData.new_items || 'N/A';
-                showToast(`Scan terminé ! ${newCount} nouveaux articles ingérés.`, 'success');
             } catch (e) {
                 showToast('Erreur lors du scan: ' + e.message, 'error');
             } finally {

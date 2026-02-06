@@ -341,20 +341,23 @@ async def get_news_stats(
                     "last_scraping": None
                 }
 
-            # Total articles
+            # Total articles in news_articles (processed by LLM)
             stats["total_articles"] = conn.execute(
                 "SELECT COUNT(*) FROM news_articles"
             ).fetchone()[0] or 0
 
-            # By status
+            # "En attente" = articles not yet manually approved for app
+            # (pipeline sets status='published' but published_to_app=0)
             stats["pending"] = conn.execute(
-                "SELECT COUNT(*) FROM news_articles WHERE status = 'pending'"
+                "SELECT COUNT(*) FROM news_articles WHERE (published_to_app = 0 OR published_to_app IS NULL) AND status != 'rejected'"
             ).fetchone()[0] or 0
 
+            # "Publiés" = articles manually approved for app display
             stats["published"] = conn.execute(
                 "SELECT COUNT(*) FROM news_articles WHERE published_to_app = 1"
             ).fetchone()[0] or 0
 
+            # "Rejetés" = articles explicitly rejected by admin
             stats["rejected"] = conn.execute(
                 "SELECT COUNT(*) FROM news_articles WHERE status = 'rejected'"
             ).fetchone()[0] or 0
@@ -362,6 +365,26 @@ async def get_news_stats(
             # Trending (100+ interactions)
             stats["trending"] = conn.execute(
                 "SELECT COUNT(*) FROM news_articles WHERE total_interactions >= 100"
+            ).fetchone()[0] or 0
+
+            # Raw items pending LLM processing
+            try:
+                raw_pending = conn.execute(
+                    "SELECT COUNT(*) FROM news_raw_items WHERE processed = 0 AND process_error IS NULL"
+                ).fetchone()[0] or 0
+                stats["raw_pending"] = raw_pending
+
+                raw_total = conn.execute(
+                    "SELECT COUNT(*) FROM news_raw_items"
+                ).fetchone()[0] or 0
+                stats["raw_total"] = raw_total
+            except Exception:
+                stats["raw_pending"] = 0
+                stats["raw_total"] = 0
+
+            # Today's articles
+            stats["today"] = conn.execute(
+                "SELECT COUNT(*) FROM news_articles WHERE date(created_at) = date('now')"
             ).fetchone()[0] or 0
 
             # By category
@@ -383,13 +406,22 @@ async def get_news_stats(
             """)
             stats["top_sources"] = {row[0]: row[1] for row in cursor.fetchall()}
 
-            # Recent scraping
-            cursor = conn.execute("""
-                SELECT scraped_at FROM news_articles
-                ORDER BY scraped_at DESC LIMIT 1
-            """)
-            row = cursor.fetchone()
-            stats["last_scraping"] = row[0] if row else None
+            # Recent scraping / creation
+            try:
+                cursor = conn.execute("""
+                    SELECT scraped_at FROM news_articles
+                    ORDER BY scraped_at DESC LIMIT 1
+                """)
+                row = cursor.fetchone()
+                stats["last_scraping"] = row[0] if row else None
+            except Exception:
+                # Fallback to created_at if scraped_at column doesn't exist
+                cursor = conn.execute("""
+                    SELECT created_at FROM news_articles
+                    ORDER BY created_at DESC LIMIT 1
+                """)
+                row = cursor.fetchone()
+                stats["last_scraping"] = row[0] if row else None
 
         return stats
 
