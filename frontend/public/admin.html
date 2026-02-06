@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MarketGPS - Admin Dashboard</title>
-    <!-- <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"> -->
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -21,6 +20,7 @@
             --success: #22c55e;
             --warning: #f59e0b;
             --error: #ef4444;
+            --info: #3b82f6;
         }
 
         body {
@@ -77,6 +77,14 @@
             cursor: pointer;
             transition: all 0.2s;
             border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
         .btn-primary {
@@ -84,7 +92,7 @@
             color: var(--bg-primary);
         }
 
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             background: var(--accent-light);
         }
 
@@ -92,6 +100,31 @@
             background: var(--bg-card);
             color: var(--text-secondary);
             border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: var(--bg-primary);
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: var(--bg-primary);
+        }
+
+        .btn-error {
+            background: var(--error);
+            color: white;
+        }
+
+        .btn-info {
+            background: var(--info);
+            color: white;
         }
 
         /* Login Form */
@@ -132,7 +165,8 @@
             margin-bottom: 8px;
         }
 
-        .form-group input {
+        .form-group input,
+        .form-group textarea {
             width: 100%;
             padding: 12px 16px;
             background: var(--bg-primary);
@@ -140,9 +174,11 @@
             border-radius: 8px;
             color: var(--text-primary);
             font-size: 14px;
+            font-family: inherit;
         }
 
-        .form-group input:focus {
+        .form-group input:focus,
+        .form-group textarea:focus {
             outline: none;
             border-color: var(--accent);
         }
@@ -162,7 +198,7 @@
         /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 16px;
             margin-bottom: 24px;
         }
@@ -189,6 +225,7 @@
         .stat-card .value.accent { color: var(--accent); }
         .stat-card .value.warning { color: var(--warning); }
         .stat-card .value.success { color: var(--success); }
+        .stat-card .value.error { color: var(--error); }
 
         .stat-card .change {
             font-size: 12px;
@@ -211,6 +248,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
         }
 
         .section-header h3 {
@@ -279,9 +318,24 @@
             color: var(--success);
         }
 
+        .badge-pending {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--info);
+        }
+
+        .badge-published {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--success);
+        }
+
+        .badge-rejected {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--error);
+        }
+
         .badge-new {
             background: rgba(59, 130, 246, 0.15);
-            color: #60a5fa;
+            color: var(--info);
         }
 
         .badge-bug {
@@ -294,6 +348,11 @@
             color: #a78bfa;
         }
 
+        .badge-category {
+            background: rgba(139, 92, 246, 0.15);
+            color: #a78bfa;
+        }
+
         /* Tabs */
         .tabs {
             display: flex;
@@ -301,6 +360,7 @@
             margin-bottom: 24px;
             border-bottom: 1px solid var(--border);
             padding-bottom: 12px;
+            flex-wrap: wrap;
         }
 
         .tab {
@@ -325,6 +385,37 @@
             background: rgba(16, 185, 129, 0.1);
         }
 
+        .sub-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 12px;
+            padding-left: 20px;
+        }
+
+        .sub-tab {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sub-tab:hover {
+            color: var(--text-primary);
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .sub-tab.active {
+            color: var(--accent);
+            border-bottom: 2px solid var(--accent);
+        }
+
         /* Loading */
         .loading {
             display: flex;
@@ -342,6 +433,16 @@
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             margin-right: 12px;
+        }
+
+        .spinner-large {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
         }
 
         @keyframes spin {
@@ -378,10 +479,12 @@
             background: var(--bg-card);
             border-radius: 16px;
             width: 100%;
-            max-width: 700px;
+            max-width: 900px;
             max-height: 90vh;
             overflow-y: auto;
             border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
         }
 
         .modal-header {
@@ -397,6 +500,7 @@
 
         .modal-header h2 {
             font-size: 18px;
+            flex: 1;
         }
 
         .modal-close {
@@ -414,51 +518,121 @@
 
         .modal-body {
             padding: 24px;
+            flex: 1;
+            overflow-y: auto;
         }
 
-        .detail-section {
+        .modal-footer {
+            padding: 20px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
+        /* Article Modal Layout */
+        .article-modal-content {
+            display: flex;
+            gap: 24px;
+        }
+
+        .article-main {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .article-image {
+            width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            object-fit: cover;
+            margin-bottom: 20px;
+        }
+
+        .article-content {
+            line-height: 1.7;
+            color: var(--text-primary);
             margin-bottom: 24px;
         }
 
-        .detail-section h4 {
-            font-size: 12px;
-            text-transform: uppercase;
-            color: var(--text-muted);
+        .article-content h1, .article-content h2, .article-content h3 {
+            margin: 16px 0 12px 0;
+            color: var(--accent);
+        }
+
+        .article-content p {
             margin-bottom: 12px;
-            letter-spacing: 0.5px;
         }
 
-        .detail-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
+        .article-content ul, .article-content ol {
+            margin-left: 20px;
+            margin-bottom: 12px;
         }
 
-        .detail-item {
+        .article-content li {
+            margin-bottom: 6px;
+        }
+
+        .article-content a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .article-content a:hover {
+            text-decoration: underline;
+        }
+
+        .article-sidebar {
+            width: 280px;
+            flex-shrink: 0;
+        }
+
+        .article-meta-group {
             background: var(--bg-primary);
-            padding: 12px 16px;
             border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
         }
 
-        .detail-item .label {
+        .article-meta-group .label {
             font-size: 11px;
             color: var(--text-muted);
-            margin-bottom: 4px;
-        }
-
-        .detail-item .value {
-            font-size: 14px;
-            color: var(--text-primary);
-            word-break: break-all;
-        }
-
-        .detail-item .value.highlight {
-            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 8px;
             font-weight: 600;
         }
 
-        .detail-item.full-width {
-            grid-column: span 2;
+        .article-meta-group .value {
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .interactions-breakdown {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .interaction-item {
+            text-align: center;
+            padding: 8px;
+            background: rgba(16, 185, 129, 0.05);
+            border-radius: 6px;
+        }
+
+        .interaction-item-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .interaction-item-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 2px;
         }
 
         /* Filter bar */
@@ -469,7 +643,8 @@
             flex-wrap: wrap;
         }
 
-        .filter-bar select {
+        .filter-bar select,
+        .filter-bar input {
             padding: 8px 12px;
             background: var(--bg-primary);
             border: 1px solid var(--border);
@@ -479,13 +654,53 @@
         }
 
         .filter-bar input {
+            width: 200px;
+        }
+
+        /* Control Bar */
+        .control-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .control-bar .btn {
+            font-size: 13px;
             padding: 8px 12px;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 16px;
+            border-top: 1px solid var(--border);
+            font-size: 14px;
+        }
+
+        .pagination button {
+            padding: 6px 12px;
             background: var(--bg-primary);
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 6px;
             color: var(--text-primary);
-            font-size: 14px;
-            width: 200px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pagination button:hover {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: var(--accent);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         /* Clickable row */
@@ -509,6 +724,193 @@
             font-size: 12px;
         }
 
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: var(--bg-card);
+            border-left: 4px solid var(--accent);
+            border-radius: 8px;
+            padding: 16px;
+            color: var(--text-primary);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease-out;
+            min-width: 300px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .toast.success {
+            border-left-color: var(--success);
+        }
+
+        .toast.error {
+            border-left-color: var(--error);
+        }
+
+        .toast.warning {
+            border-left-color: var(--warning);
+        }
+
+        .toast.info {
+            border-left-color: var(--info);
+        }
+
+        .toast-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .toast-message {
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Detail Grid */
+        .detail-section {
+            margin-bottom: 24px;
+        }
+
+        .detail-section h4 {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .detail-item {
+            background: var(--bg-primary);
+            padding: 12px 16px;
+            border-radius: 8px;
+        }
+
+        .detail-item .label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .detail-item .value {
+            font-size: 14px;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+
+        .detail-item .value.highlight {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .detail-item.full-width {
+            grid-column: span 2;
+        }
+
+        /* Bulk Actions */
+        .bulk-actions-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            padding: 12px 20px;
+            background: rgba(16, 185, 129, 0.05);
+            border-bottom: 1px solid var(--border);
+            border-top: 1px solid var(--border);
+        }
+
+        .checkbox-column {
+            width: 40px;
+            text-align: center;
+        }
+
+        /* Script Viewer */
+        .script-viewer {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .script-hook {
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 4px solid var(--accent);
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-style: italic;
+            color: var(--accent);
+            line-height: 1.6;
+        }
+
+        .script-text {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.6;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .script-meta {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+
+        .script-meta-item {
+            background: var(--bg-card);
+            padding: 8px;
+            border-radius: 6px;
+        }
+
+        .script-meta-item .label {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+
+        .script-meta-item .value {
+            color: var(--accent);
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .header {
@@ -530,6 +932,34 @@
 
             .detail-item.full-width {
                 grid-column: span 1;
+            }
+
+            .article-modal-content {
+                flex-direction: column;
+            }
+
+            .article-sidebar {
+                width: 100%;
+            }
+
+            .filter-bar {
+                flex-direction: column;
+            }
+
+            .filter-bar input {
+                width: 100%;
+            }
+
+            .modal {
+                max-width: 95vw;
+            }
+
+            .interactions-breakdown {
+                grid-template-columns: 1fr;
+            }
+
+            .sub-tabs {
+                padding-left: 0;
             }
         }
     </style>
@@ -697,57 +1127,157 @@
         <!-- News Section -->
         <div class="section" id="newsSection" style="display: none;">
             <div class="section-header">
-                <h3>📰 Actualités Économiques Africaines</h3>
-                <div style="display: flex; gap: 8px;">
-                    <button class="btn btn-primary" onclick="triggerScraping()">🔄 Lancer Scraping</button>
-                    <button class="btn" style="background: var(--warning); color: #000;" onclick="updateInteractions()">⚡ Calculer Interactions</button>
-                    <select id="newsFilter" onchange="loadNews()" style="padding: 8px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);">
+                <h3>📰 Actualités Économiques</h3>
+            </div>
+
+            <!-- News Sub-tabs -->
+            <div class="sub-tabs">
+                <button class="sub-tab active" onclick="showNewsSubTab('articles')">📄 Articles</button>
+                <button class="sub-tab" onclick="showNewsSubTab('scripts')">🎬 Scripts Vidéo</button>
+            </div>
+
+            <!-- ARTICLES SUB-TAB -->
+            <div id="articlesSubTab" style="display: block;">
+                <!-- Stats Bar -->
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); padding: 0 20px; margin-bottom: 0;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="newsTotal">-</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Total Articles</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700; color: var(--warning);" id="newsTrending">-</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Trending (100+)</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700; color: var(--success);" id="newsPublished">-</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Publiés</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700; color: var(--info);" id="newsPending">-</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">En attente</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700; color: var(--error);" id="newsRejected">-</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Rejetés</div>
+                    </div>
+                </div>
+
+                <!-- Pipeline Status -->
+                <div style="padding: 16px 20px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-muted);">
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <div>Dernière exécution: <span id="pipelineLastRun" style="color: var(--text-primary);">-</span></div>
+                        <div>Prochain run: <span id="pipelineNextRun" style="color: var(--text-primary);">-</span></div>
+                        <div>Provider LLM: <span id="pipelineProvider" style="color: var(--accent);">-</span></div>
+                    </div>
+                </div>
+
+                <!-- Pipeline Controls -->
+                <div class="control-bar">
+                    <button class="btn btn-info" onclick="runPipelineIngestion()">
+                        <span id="ingestSpinner" style="display: none;"><span class="spinner" style="margin-right: 6px; margin-bottom: 0;"></span></span>
+                        Ingestion RSS
+                    </button>
+                    <button class="btn" style="background: #8b5cf6; color: white;" onclick="runPipelinePublish()">
+                        <span id="publishSpinner" style="display: none;"><span class="spinner" style="margin-right: 6px; margin-bottom: 0;"></span></span>
+                        Publier (LLM)
+                    </button>
+                    <button class="btn btn-success" onclick="runPipelineComplete()">
+                        <span id="completeSpinner" style="display: none;"><span class="spinner" style="margin-right: 6px; margin-bottom: 0;"></span></span>
+                        Pipeline complet
+                    </button>
+                    <button class="btn btn-warning" onclick="runUpdateInteractions()">
+                        <span id="interactSpinner" style="display: none;"><span class="spinner" style="margin-right: 6px; margin-bottom: 0;"></span></span>
+                        Calculer Interactions
+                    </button>
+                </div>
+
+                <!-- Filter Bar -->
+                <div class="control-bar" style="padding: 12px 20px; border-bottom: 1px solid var(--border);">
+                    <select id="newsStatusFilter" onchange="loadArticles()">
                         <option value="all">Tous</option>
-                        <option value="trending">🔥 Trending (100+)</option>
                         <option value="pending">En attente</option>
                         <option value="published">Publiés</option>
+                        <option value="rejected">Rejetés</option>
+                        <option value="trending">🔥 Trending (100+)</option>
+                    </select>
+                    <input type="text" id="newsSearchInput" placeholder="🔍 Rechercher titre..." oninput="filterArticles()">
+                    <select id="newsSortBy" onchange="loadArticles()">
+                        <option value="date">Trier par Date</option>
+                        <option value="interactions">Trier par Interactions</option>
+                        <option value="title">Trier par Titre</option>
+                    </select>
+                    <select id="newsPerPage" onchange="loadArticles()">
+                        <option value="20">20 articles</option>
+                        <option value="50" selected>50 articles</option>
+                        <option value="100">100 articles</option>
                     </select>
                 </div>
+
+                <!-- Bulk Actions Bar (hidden by default) -->
+                <div class="bulk-actions-bar" id="bulkActionsBar" style="display: none;">
+                    <span id="bulkSelectCount">0 sélectionné(s)</span>
+                    <button class="btn btn-success btn-sm" onclick="publishSelectedArticles()">Publier sélectionnés</button>
+                    <button class="btn btn-error btn-sm" onclick="rejectSelectedArticles()">Rejeter sélectionnés</button>
+                    <button class="btn btn-secondary btn-sm" onclick="toggleSelectAll()">Tout sélectionner</button>
+                </div>
+
+                <!-- Articles Table -->
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="checkbox-column"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"></th>
+                                <th>Titre</th>
+                                <th>Source</th>
+                                <th>Interactions</th>
+                                <th>Statut</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="articlesTable">
+                            <tr><td colspan="6" class="loading"><div class="spinner"></div>Chargement...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination" id="articlesPagination">
+                    <button onclick="previousPage()" id="prevBtn">← Précédent</button>
+                    <span id="pageInfo"></span>
+                    <button onclick="nextPage()" id="nextBtn">Suivant →</button>
+                </div>
             </div>
 
-            <!-- News Stats -->
-            <div style="display: flex; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap;">
-                <div style="text-align: center;">
-                    <div style="font-size: 24px; font-weight: 700; color: var(--text-primary);" id="newsTotal">-</div>
-                    <div style="font-size: 12px; color: var(--text-muted);">Total Articles</div>
+            <!-- SCRIPTS SUB-TAB -->
+            <div id="scriptsSubTab" style="display: none;">
+                <div class="control-bar" style="padding: 12px 20px; border-bottom: 1px solid var(--border);">
+                    <select id="scriptStatusFilter" onchange="loadScripts()">
+                        <option value="">Tous</option>
+                        <option value="draft">Brouillon</option>
+                        <option value="reviewed">Relu</option>
+                        <option value="approved">Approuvé</option>
+                        <option value="published">Publié</option>
+                    </select>
                 </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 24px; font-weight: 700; color: var(--warning);" id="newsTrending">-</div>
-                    <div style="font-size: 12px; color: var(--text-muted);">Trending</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 24px; font-weight: 700; color: var(--accent);" id="newsPublished">-</div>
-                    <div style="font-size: 12px; color: var(--text-muted);">Publiés</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 24px; font-weight: 700; color: var(--text-secondary);" id="newsPending">-</div>
-                    <div style="font-size: 12px; color: var(--text-muted);">En attente</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 12px; color: var(--text-muted);" id="newsLastScrape">Dernier scan: -</div>
-                </div>
-            </div>
 
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Article</th>
-                            <th>Source</th>
-                            <th>Interactions</th>
-                            <th>Statut</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="newsTable">
-                        <tr><td colspan="5" class="loading"><div class="spinner"></div>Chargement...</td></tr>
-                    </tbody>
-                </table>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Titre</th>
+                                <th>Accroche</th>
+                                <th>Mots</th>
+                                <th>Durée</th>
+                                <th>Statut</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scriptsTable">
+                            <tr><td colspan="7" class="loading"><div class="spinner"></div>Chargement...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -765,11 +1295,31 @@
         </div>
     </div>
 
+    <!-- Article Detail Modal -->
+    <div class="modal-overlay" id="articleModal" onclick="if(event.target===this)closeArticleModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="articleModalTitle">Article</h2>
+                <button class="modal-close" onclick="closeArticleModal()">×</button>
+            </div>
+            <div class="modal-body" id="articleModalBody">
+                <div class="loading"><div class="spinner"></div>Chargement...</div>
+            </div>
+            <div class="modal-footer" id="articleModalFooter">
+                <button class="btn btn-secondary" onclick="closeArticleModal()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
     <script>
         const API_URL = 'https://api.marketgps.online';
         let adminKey = localStorage.getItem('adminKey') || '';
 
-        // Check if already logged in
+        // ============ AUTHENTICATION ============
+
         if (adminKey) {
             checkAuth();
         }
@@ -795,8 +1345,7 @@
             const errorEl = document.getElementById('loginError');
 
             if (!key) {
-                errorEl.textContent = 'Veuillez entrer une clé admin';
-                errorEl.style.display = 'block';
+                showToast('Veuillez entrer une clé admin', 'error');
                 return;
             }
 
@@ -811,12 +1360,10 @@
                     showDashboard();
                     loadAllData();
                 } else {
-                    errorEl.textContent = 'Clé admin invalide';
-                    errorEl.style.display = 'block';
+                    showToast('Clé admin invalide', 'error');
                 }
             } catch (e) {
-                errorEl.textContent = 'Erreur de connexion au serveur';
-                errorEl.style.display = 'block';
+                showToast('Erreur de connexion au serveur', 'error');
             }
         }
 
@@ -833,6 +1380,8 @@
             document.getElementById('dashboard').classList.add('active');
             document.getElementById('headerActions').style.display = 'flex';
         }
+
+        // ============ DATA LOADING ============
 
         async function loadAllData() {
             await Promise.all([
@@ -865,7 +1414,9 @@
             }
         }
 
-        let allUsers = []; // Store for filtering
+        // ============ USERS ============
+
+        let allUsers = [];
 
         async function loadUsers() {
             const tbody = document.getElementById('usersTable');
@@ -934,6 +1485,8 @@
                 </tr>
             `).join('');
         }
+
+        // ============ SUBSCRIPTIONS ============
 
         async function loadSubscriptions() {
             const tbody = document.getElementById('subscriptionsTable');
@@ -1007,6 +1560,807 @@
             }
         }
 
+        // ============ FEEDBACKS ============
+
+        async function loadFeedbacks() {
+            const tbody = document.getElementById('feedbacksTable');
+            try {
+                const response = await fetch(`${API_URL}/admin/feedbacks?limit=50`, {
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+                const feedbacks = await response.json();
+
+                if (feedbacks.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Aucun feedback reçu</td></tr>';
+                    return;
+                }
+
+                const typeBadges = {
+                    'bug': 'badge-bug',
+                    'feature': 'badge-feature',
+                    'general': 'badge-new',
+                    'question': 'badge-new',
+                    'praise': 'badge-pro'
+                };
+
+                tbody.innerHTML = feedbacks.map(fb => `
+                    <tr>
+                        <td><span class="badge ${typeBadges[fb.type] || 'badge-new'}">${fb.type}</span></td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fb.message}</td>
+                        <td>${fb.user_email || '-'}</td>
+                        <td>${fb.rating ? '★'.repeat(fb.rating) + '☆'.repeat(5-fb.rating) : '-'}</td>
+                        <td>${formatDate(fb.created_at)}</td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Erreur lors du chargement</td></tr>';
+            }
+        }
+
+        // ============ NEWS / ARTICLES ============
+
+        let currentNewsPage = 1;
+        let newsPerPage = 50;
+        let allArticles = [];
+        let filteredArticles = [];
+        let selectedArticleIds = new Set();
+
+        async function loadNewsStats() {
+            try {
+                const response = await fetch(`${API_URL}/news-admin/stats`, {
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+                const stats = await response.json();
+
+                document.getElementById('newsTotal').textContent = stats.total_articles || 0;
+                document.getElementById('newsTrending').textContent = stats.trending || 0;
+                document.getElementById('newsPublished').textContent = stats.published || 0;
+                document.getElementById('newsPending').textContent = stats.pending || 0;
+                document.getElementById('newsRejected').textContent = stats.rejected || 0;
+
+                document.getElementById('pipelineLastRun').textContent = formatDate(stats.last_run) || 'Jamais';
+                document.getElementById('pipelineProvider').textContent = stats.llm_provider || 'N/A';
+            } catch (e) {
+                console.error('Error loading news stats:', e);
+            }
+        }
+
+        async function loadArticles() {
+            const tbody = document.getElementById('articlesTable');
+            currentNewsPage = 1;
+            newsPerPage = parseInt(document.getElementById('newsPerPage').value);
+            const filter = document.getElementById('newsStatusFilter').value;
+
+            try {
+                let url = `${API_URL}/news-admin/articles?limit=500`;
+
+                if (filter === 'trending') {
+                    url = `${API_URL}/news-admin/articles?filter=trending&limit=500`;
+                } else if (filter === 'pending') {
+                    url = `${API_URL}/news-admin/articles?filter=pending&limit=500`;
+                } else if (filter === 'published') {
+                    url = `${API_URL}/news-admin/articles?filter=published&limit=500`;
+                } else if (filter === 'rejected') {
+                    url = `${API_URL}/news-admin/articles?filter=rejected&limit=500`;
+                }
+
+                const response = await fetch(url, {
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+                const data = await response.json();
+                allArticles = data.articles || data || [];
+
+                filterArticles();
+            } catch (e) {
+                console.error('Error loading articles:', e);
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Erreur lors du chargement</td></tr>';
+            }
+        }
+
+        function filterArticles() {
+            const search = document.getElementById('newsSearchInput').value.toLowerCase();
+            const sort = document.getElementById('newsSortBy').value;
+
+            filteredArticles = allArticles.filter(a =>
+                a.title && a.title.toLowerCase().includes(search)
+            );
+
+            if (sort === 'interactions') {
+                filteredArticles.sort((a, b) => (b.total_interactions || 0) - (a.total_interactions || 0));
+            } else if (sort === 'title') {
+                filteredArticles.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+            } else {
+                filteredArticles.sort((a, b) => new Date(b.scraped_at) - new Date(a.scraped_at));
+            }
+
+            currentNewsPage = 1;
+            renderArticlesPage();
+        }
+
+        function renderArticlesPage() {
+            const tbody = document.getElementById('articlesTable');
+            const start = (currentNewsPage - 1) * newsPerPage;
+            const end = start + newsPerPage;
+            const pageArticles = filteredArticles.slice(start, end);
+
+            if (pageArticles.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Aucun article trouvé</td></tr>';
+                updatePagination();
+                return;
+            }
+
+            tbody.innerHTML = pageArticles.map(article => `
+                <tr>
+                    <td class="checkbox-column">
+                        <input type="checkbox" class="article-checkbox" value="${article.id}"
+                               onchange="updateSelectedArticles()" ${selectedArticleIds.has(article.id) ? 'checked' : ''}>
+                    </td>
+                    <td style="cursor: pointer; max-width: 350px;" onclick="showArticleDetail('${article.id}')">
+                        <div style="font-weight: 500; color: var(--accent);">${truncate(article.title || '', 60)}</div>
+                        ${article.image_url ? '<span style="color: var(--accent); margin-right: 4px;">📷</span>' : ''}
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                            ${formatDate(article.scraped_at)}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge badge-category">${article.source_name || '-'}</span>
+                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+                            ${article.category || '-'}
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-size: 16px; font-weight: 700; ${(article.total_interactions || 0) >= 100 ? 'color: var(--warning);' : ''}">
+                            ${article.total_interactions || 0}
+                        </div>
+                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
+                            👍${article.likes || 0} 💬${article.comments || 0} 🔄${article.shares || 0}
+                        </div>
+                    </td>
+                    <td>
+                        ${article.published_to_app
+                            ? '<span class="badge badge-published">Publié</span>'
+                            : article.status === 'rejected'
+                                ? '<span class="badge badge-rejected">Rejeté</span>'
+                                : '<span class="badge badge-pending">En attente</span>'
+                        }
+                    </td>
+                    <td>
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="showArticleDetail('${article.id}')">
+                            Voir
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            updatePagination();
+        }
+
+        function updatePagination() {
+            const total = filteredArticles.length;
+            const pages = Math.ceil(total / newsPerPage);
+            const start = (currentNewsPage - 1) * newsPerPage + 1;
+            const end = Math.min(currentNewsPage * newsPerPage, total);
+
+            document.getElementById('pageInfo').textContent = `${start}-${end} sur ${total} articles`;
+            document.getElementById('prevBtn').disabled = currentNewsPage === 1;
+            document.getElementById('nextBtn').disabled = currentNewsPage === pages;
+        }
+
+        function nextPage() {
+            const pages = Math.ceil(filteredArticles.length / newsPerPage);
+            if (currentNewsPage < pages) {
+                currentNewsPage++;
+                renderArticlesPage();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function previousPage() {
+            if (currentNewsPage > 1) {
+                currentNewsPage--;
+                renderArticlesPage();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function updateSelectedArticles() {
+            selectedArticleIds.clear();
+            document.querySelectorAll('.article-checkbox:checked').forEach(cb => {
+                selectedArticleIds.add(cb.value);
+            });
+
+            const count = selectedArticleIds.size;
+            const bulkBar = document.getElementById('bulkActionsBar');
+            if (count > 0) {
+                bulkBar.style.display = 'flex';
+                document.getElementById('bulkSelectCount').textContent = `${count} sélectionné(s)`;
+            } else {
+                bulkBar.style.display = 'none';
+            }
+        }
+
+        function toggleSelectAll() {
+            const checkboxes = document.querySelectorAll('.article-checkbox');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+            updateSelectedArticles();
+        }
+
+        async function publishSelectedArticles() {
+            if (selectedArticleIds.size === 0) return;
+            if (!confirm(`Publier ${selectedArticleIds.size} article(s) ?`)) return;
+
+            let success = 0;
+            let failed = 0;
+
+            for (const articleId of selectedArticleIds) {
+                try {
+                    const response = await fetch(`${API_URL}/news-admin/publish`, {
+                        method: 'POST',
+                        headers: {
+                            'X-Admin-Key': adminKey,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ article_id: articleId })
+                    });
+                    if (response.ok) success++;
+                    else failed++;
+                } catch (e) {
+                    failed++;
+                }
+            }
+
+            showToast(`${success} article(s) publié(s)${failed > 0 ? `, ${failed} erreur(s)` : ''}`, success > 0 ? 'success' : 'error');
+            selectedArticleIds.clear();
+            updateSelectedArticles();
+            await loadArticles();
+            await loadNewsStats();
+        }
+
+        async function rejectSelectedArticles() {
+            if (selectedArticleIds.size === 0) return;
+            const reason = prompt(`Raison du rejet (optionnel):`);
+            if (reason === null) return;
+
+            let success = 0;
+            let failed = 0;
+
+            for (const articleId of selectedArticleIds) {
+                try {
+                    const response = await fetch(`${API_URL}/news-admin/reject`, {
+                        method: 'POST',
+                        headers: {
+                            'X-Admin-Key': adminKey,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ article_id: articleId, reason: reason })
+                    });
+                    if (response.ok) success++;
+                    else failed++;
+                } catch (e) {
+                    failed++;
+                }
+            }
+
+            showToast(`${success} article(s) rejeté(s)${failed > 0 ? `, ${failed} erreur(s)` : ''}`, success > 0 ? 'success' : 'error');
+            selectedArticleIds.clear();
+            updateSelectedArticles();
+            await loadArticles();
+            await loadNewsStats();
+        }
+
+        // ============ PIPELINE CONTROLS ============
+
+        async function runPipelineIngestion() {
+            if (!confirm('Lancer l\'ingestion RSS ?')) return;
+
+            const btn = event.target.closest('button');
+            const spinner = document.getElementById('ingestSpinner');
+            btn.disabled = true;
+            spinner.style.display = 'inline';
+
+            try {
+                const response = await fetch(`${API_URL}/news-admin/pipeline/ingest`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showToast(`Ingestion terminée: ${data.articles_found || 0} articles trouvés`, 'success');
+                    await loadArticles();
+                    await loadNewsStats();
+                } else {
+                    showToast('Erreur lors de l\'ingestion', 'error');
+                }
+            } catch (e) {
+                showToast('Erreur de connexion', 'error');
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        }
+
+        async function runPipelinePublish() {
+            if (!confirm('Publier les articles via LLM ?')) return;
+
+            const btn = event.target.closest('button');
+            const spinner = document.getElementById('publishSpinner');
+            btn.disabled = true;
+            spinner.style.display = 'inline';
+
+            try {
+                const response = await fetch(`${API_URL}/news-admin/pipeline/publish`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showToast(`Articles publiés: ${data.articles_published || 0}`, 'success');
+                    await loadArticles();
+                    await loadNewsStats();
+                } else {
+                    showToast('Erreur lors de la publication', 'error');
+                }
+            } catch (e) {
+                showToast('Erreur de connexion', 'error');
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        }
+
+        async function runPipelineComplete() {
+            if (!confirm('Exécuter le pipeline complet ? Cela peut prendre plusieurs minutes.')) return;
+
+            const btn = event.target.closest('button');
+            const spinner = document.getElementById('completeSpinner');
+            btn.disabled = true;
+            spinner.style.display = 'inline';
+
+            try {
+                const response = await fetch(`${API_URL}/news-admin/pipeline/run`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showToast('Pipeline exécuté avec succès', 'success');
+                    await loadArticles();
+                    await loadNewsStats();
+                } else {
+                    showToast('Erreur lors de l\'exécution du pipeline', 'error');
+                }
+            } catch (e) {
+                showToast('Erreur de connexion', 'error');
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        }
+
+        async function runUpdateInteractions() {
+            if (!confirm('Calculer les interactions pour tous les articles ? Cela peut prendre plusieurs minutes.')) return;
+
+            const btn = event.target.closest('button');
+            const spinner = document.getElementById('interactSpinner');
+            btn.disabled = true;
+            spinner.style.display = 'inline';
+
+            try {
+                const response = await fetch(`${API_URL}/news-admin/update-interactions`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+
+                if (response.ok) {
+                    showToast('Calcul des interactions lancé', 'success');
+                    await loadArticles();
+                    await loadNewsStats();
+                } else {
+                    showToast('Erreur lors du calcul', 'error');
+                }
+            } catch (e) {
+                showToast('Erreur de connexion', 'error');
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        }
+
+        // ============ ARTICLE DETAIL MODAL ============
+
+        async function showArticleDetail(articleId) {
+            const modal = document.getElementById('articleModal');
+            const body = document.getElementById('articleModalBody');
+
+            modal.classList.add('active');
+            body.innerHTML = '<div class="loading"><div class="spinner-large"></div>Chargement de l\'article...</div>';
+
+            try {
+                const response = await fetch(`${API_URL}/news-admin/articles/${articleId}`, {
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+
+                if (!response.ok) throw new Error('Article not found');
+
+                const article = await response.json();
+
+                const htmlContent = markdownToHtml(article.content_md || article.summary || '');
+
+                document.getElementById('articleModalTitle').textContent = article.title || 'Article';
+
+                const footer = document.getElementById('articleModalFooter');
+                let actionButtons = '<button class="btn btn-secondary" onclick="closeArticleModal()">Fermer</button>';
+
+                if (!article.published_to_app && article.status !== 'rejected') {
+                    actionButtons = `
+                        <button class="btn btn-success" onclick="publishArticleFromModal('${article.id}')">Publier</button>
+                        <button class="btn btn-error" onclick="rejectArticleFromModal('${article.id}')">Rejeter</button>
+                        <button class="btn btn-info" onclick="generateScriptFromModal('${article.id}')">Générer Script</button>
+                        <button class="btn btn-secondary" onclick="window.open('${article.url}', '_blank')">Voir l'original</button>
+                        <button class="btn btn-secondary" onclick="closeArticleModal()">Fermer</button>
+                    `;
+                }
+
+                footer.innerHTML = actionButtons;
+
+                body.innerHTML = `
+                    <div class="article-modal-content">
+                        <div class="article-main">
+                            ${article.image_url ? `<img src="${article.image_url}" alt="${article.title}" class="article-image" onerror="this.style.display='none'">` : ''}
+                            <div class="article-content">
+                                ${htmlContent}
+                            </div>
+                        </div>
+                        <div class="article-sidebar">
+                            <div class="article-meta-group">
+                                <div class="label">Source</div>
+                                <div class="value">${article.source_name || '-'}</div>
+                            </div>
+
+                            <div class="article-meta-group">
+                                <div class="label">Catégorie</div>
+                                <div class="value">${article.category || '-'}</div>
+                            </div>
+
+                            <div class="article-meta-group">
+                                <div class="label">Interactions</div>
+                                <div class="value" style="color: ${(article.total_interactions || 0) >= 100 ? 'var(--warning)' : 'var(--text-primary)'};">${article.total_interactions || 0}</div>
+                                <div class="interactions-breakdown">
+                                    <div class="interaction-item">
+                                        <div class="interaction-item-value">${article.likes || 0}</div>
+                                        <div class="interaction-item-label">Likes</div>
+                                    </div>
+                                    <div class="interaction-item">
+                                        <div class="interaction-item-value">${article.comments || 0}</div>
+                                        <div class="interaction-item-label">Commentaires</div>
+                                    </div>
+                                    <div class="interaction-item">
+                                        <div class="interaction-item-value">${article.shares || 0}</div>
+                                        <div class="interaction-item-label">Partages</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="article-meta-group">
+                                <div class="label">Statut</div>
+                                <div class="value">
+                                    ${article.published_to_app
+                                        ? '<span class="badge badge-published">Publié</span>'
+                                        : article.status === 'rejected'
+                                            ? '<span class="badge badge-rejected">Rejeté</span>'
+                                            : '<span class="badge badge-pending">En attente</span>'
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="article-meta-group">
+                                <div class="label">Langue</div>
+                                <div class="value">${article.language || '-'}</div>
+                            </div>
+
+                            <div class="article-meta-group">
+                                <div class="label">Pays</div>
+                                <div class="value">${article.country || '-'}</div>
+                            </div>
+
+                            <div class="article-meta-group">
+                                <div class="label">Date</div>
+                                <div class="value">${formatDate(article.scraped_at)}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (e) {
+                console.error('Error loading article:', e);
+                body.innerHTML = '<div class="empty-state">Erreur lors du chargement de l\'article</div>';
+            }
+        }
+
+        async function publishArticleFromModal(articleId) {
+            try {
+                const response = await fetch(`${API_URL}/news-admin/publish`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Admin-Key': adminKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ article_id: articleId })
+                });
+
+                if (response.ok) {
+                    showToast('Article publié avec succès', 'success');
+                    closeArticleModal();
+                    await loadArticles();
+                    await loadNewsStats();
+                } else {
+                    const data = await response.json();
+                    showToast('Erreur: ' + (data.detail || 'Échec de la publication'), 'error');
+                }
+            } catch (e) {
+                showToast('Erreur de connexion', 'error');
+            }
+        }
+
+        async function rejectArticleFromModal(articleId) {
+            const reason = prompt('Raison du rejet (optionnel):');
+            if (reason === null) return;
+
+            try {
+                const response = await fetch(`${API_URL}/news-admin/reject`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Admin-Key': adminKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ article_id: articleId, reason: reason })
+                });
+
+                if (response.ok) {
+                    showToast('Article rejeté', 'success');
+                    closeArticleModal();
+                    await loadArticles();
+                    await loadNewsStats();
+                } else {
+                    showToast('Erreur lors du rejet', 'error');
+                }
+            } catch (e) {
+                showToast('Erreur de connexion', 'error');
+            }
+        }
+
+        async function generateScriptFromModal(articleId) {
+            const modal = document.getElementById('articleModal');
+            const body = document.getElementById('articleModalBody');
+
+            body.innerHTML = '<div class="loading"><div class="spinner-large"></div>Génération du script en cours...</div>';
+
+            try {
+                const response = await fetch(`${API_URL}/api/viral-news/generate-script`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ article_id: articleId })
+                });
+
+                if (response.ok) {
+                    const script = await response.json();
+                    showScriptViewer(body, script, articleId);
+                } else {
+                    showToast('Erreur lors de la génération du script', 'error');
+                    body.innerHTML = '<div class="empty-state">Erreur lors de la génération</div>';
+                }
+            } catch (e) {
+                showToast('Erreur de connexion', 'error');
+                body.innerHTML = '<div class="empty-state">Erreur de connexion</div>';
+            }
+        }
+
+        function showScriptViewer(body, script, articleId) {
+            const wordCount = (script.script_text || '').split(/\s+/).length;
+            const estimatedDuration = Math.ceil(wordCount / 130);
+            _lastScriptText = script.script_text || '';
+
+            const keyFactsHtml = (script.key_facts && script.key_facts.length > 0)
+                ? `<div style="margin-bottom: 16px;">
+                    <h4 style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">POINTS CLÉS</h4>
+                    <ul style="margin-left: 16px;">
+                        ${script.key_facts.map(f => '<li style="color: var(--text-secondary); margin-bottom: 4px;">' + escapeHtml(f) + '</li>').join('')}
+                    </ul>
+                   </div>` : '';
+
+            const sourcesHtml = (script.sources_mentioned && script.sources_mentioned.length > 0)
+                ? `<div style="margin-bottom: 16px;">
+                    <h4 style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">SOURCES CITÉES</h4>
+                    <ul style="margin-left: 16px;">
+                        ${script.sources_mentioned.map(s => '<li style="color: var(--text-secondary); margin-bottom: 4px;">' + escapeHtml(s) + '</li>').join('')}
+                    </ul>
+                   </div>` : '';
+
+            body.innerHTML = `
+                <div class="script-viewer">
+                    <div class="script-hook">"${escapeHtml(script.hook || 'N/A')}"</div>
+                    <div class="script-text">${escapeHtml(script.script_text || 'N/A')}</div>
+                    <div class="script-meta">
+                        <div class="script-meta-item">
+                            <div class="label">Mots</div>
+                            <div class="value">${wordCount}</div>
+                        </div>
+                        <div class="script-meta-item">
+                            <div class="label">Durée estimée</div>
+                            <div class="value">${estimatedDuration} min</div>
+                        </div>
+                    </div>
+                    ${keyFactsHtml}
+                    ${sourcesHtml}
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-success" onclick="copyToClipboard()">Copier le script</button>
+                        <button class="btn btn-secondary" onclick="generateScriptFromModal('${articleId}')">Régénérer</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        let _lastScriptText = '';
+        function copyToClipboard(text) {
+            const textToCopy = text || _lastScriptText;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showToast('Script copié au presse-papiers', 'success');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = textToCopy;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('Script copié au presse-papiers', 'success');
+            });
+        }
+
+        function closeArticleModal() {
+            document.getElementById('articleModal').classList.remove('active');
+        }
+
+        // ============ SCRIPTS SUB-TAB ============
+
+        async function loadScripts() {
+            const tbody = document.getElementById('scriptsTable');
+            const statusFilter = document.getElementById('scriptStatusFilter').value;
+
+            try {
+                let url = `${API_URL}/api/viral-news/scripts?limit=50`;
+                if (statusFilter) {
+                    url += `&status=${statusFilter}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+                const scripts = data.scripts || data || [];
+
+                if (scripts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Aucun script trouvé</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = scripts.map(script => {
+                    const wordCount = (script.script_text || '').split(/\s+/).length;
+                    const duration = Math.ceil(wordCount / 130);
+                    return `
+                        <tr onclick="showScriptDetailModal('${script.id}')">
+                            <td style="cursor: pointer;">
+                                <div style="font-weight: 500; color: var(--accent);">${truncate(script.title || 'Sans titre', 60)}</div>
+                            </td>
+                            <td style="cursor: pointer;">
+                                <div style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    "${truncate(script.hook || '', 50)}"
+                                </div>
+                            </td>
+                            <td>${wordCount}</td>
+                            <td>${duration} min</td>
+                            <td>
+                                <span class="badge ${
+                                    script.status === 'published' ? 'badge-published' :
+                                    script.status === 'approved' ? 'badge-active' :
+                                    script.status === 'reviewed' ? 'badge-pending' :
+                                    'badge-new'
+                                }">${script.status || 'Brouillon'}</span>
+                            </td>
+                            <td>${formatDate(script.created_at)}</td>
+                            <td>
+                                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="event.stopPropagation(); showScriptDetailModal('${script.id}')">
+                                    Voir
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Error loading scripts:', e);
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Erreur lors du chargement</td></tr>';
+            }
+        }
+
+        function showScriptDetailModal(scriptId) {
+            const modal = document.getElementById('articleModal');
+            const body = document.getElementById('articleModalBody');
+
+            modal.classList.add('active');
+            body.innerHTML = '<div class="loading"><div class="spinner-large"></div>Chargement du script...</div>';
+
+            fetch(`${API_URL}/api/viral-news/scripts/${scriptId}`)
+                .then(r => r.json())
+                .then(script => {
+                    const wordCount = (script.script_text || '').split(/\s+/).length;
+                    const duration = Math.ceil(wordCount / 130);
+
+                    document.getElementById('articleModalTitle').textContent = 'Script Vidéo';
+                    document.getElementById('articleModalFooter').innerHTML = '<button class="btn btn-secondary" onclick="closeArticleModal()">Fermer</button>';
+
+                    _lastScriptText = script.script_text || '';
+                    body.innerHTML = `
+                        <div class="script-viewer">
+                            <div class="script-hook">"${escapeHtml(script.hook || '')}"</div>
+                            <div class="script-text">${escapeHtml(script.script_text || '')}</div>
+                            <div class="script-meta">
+                                <div class="script-meta-item">
+                                    <div class="label">Mots</div>
+                                    <div class="value">${wordCount}</div>
+                                </div>
+                                <div class="script-meta-item">
+                                    <div class="label">Durée estimée</div>
+                                    <div class="value">${duration} min</div>
+                                </div>
+                                <div class="script-meta-item">
+                                    <div class="label">Statut</div>
+                                    <div class="value">${script.status || 'Brouillon'}</div>
+                                </div>
+                                <div class="script-meta-item">
+                                    <div class="label">Date</div>
+                                    <div class="value">${formatDate(script.created_at)}</div>
+                                </div>
+                            </div>
+                            <button class="btn btn-success" onclick="copyToClipboard()">Copier le script</button>
+                        </div>
+                    `;
+                })
+                .catch(e => {
+                    console.error('Error loading script:', e);
+                    body.innerHTML = '<div class="empty-state">Erreur lors du chargement</div>';
+                });
+        }
+
+        // ============ TAB MANAGEMENT ============
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.getElementById('usersSection').style.display = tabName === 'users' ? 'block' : 'none';
+            document.getElementById('subscriptionsSection').style.display = tabName === 'subscriptions' ? 'block' : 'none';
+            document.getElementById('feedbacksSection').style.display = tabName === 'feedbacks' ? 'block' : 'none';
+            document.getElementById('newsSection').style.display = tabName === 'news' ? 'block' : 'none';
+
+            if (tabName === 'news') {
+                loadNewsStats();
+                loadArticles();
+            }
+        }
+
+        function showNewsSubTab(subTabName) {
+            document.querySelectorAll('.sub-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.getElementById('articlesSubTab').style.display = subTabName === 'articles' ? 'block' : 'none';
+            document.getElementById('scriptsSubTab').style.display = subTabName === 'scripts' ? 'block' : 'none';
+
+            if (subTabName === 'scripts') {
+                loadScripts();
+            }
+        }
+
         // ============ USER DETAIL MODAL ============
 
         async function showUserDetail(userId) {
@@ -1021,9 +2375,7 @@
                     headers: { 'X-Admin-Key': adminKey }
                 });
 
-                if (!response.ok) {
-                    throw new Error('User not found');
-                }
+                if (!response.ok) throw new Error('User not found');
 
                 const user = await response.json();
 
@@ -1052,7 +2404,7 @@
                                 <div class="value">${user.email_confirmed ? '✅ Oui' : '❌ Non'}</div>
                             </div>
                             <div class="detail-item">
-                                <div class="label">Nombre de connexions</div>
+                                <div class="label">Connexions</div>
                                 <div class="value highlight">${user.sign_in_count || 0}</div>
                             </div>
                         </div>
@@ -1161,292 +2513,37 @@
             document.getElementById('userModal').classList.remove('active');
         }
 
-        // Close modal on Escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeUserModal();
-        });
+        // ============ TOAST NOTIFICATIONS ============
 
-        async function loadFeedbacks() {
-            const tbody = document.getElementById('feedbacksTable');
-            try {
-                const response = await fetch(`${API_URL}/admin/feedbacks?limit=50`, {
-                    headers: { 'X-Admin-Key': adminKey }
-                });
-                const feedbacks = await response.json();
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toastId = 'toast-' + Date.now();
 
-                if (feedbacks.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Aucun feedback reçu</td></tr>';
-                    return;
-                }
+            const icons = {
+                success: '✓',
+                error: '✕',
+                warning: '⚠',
+                info: 'ℹ'
+            };
 
-                const typeBadges = {
-                    'bug': 'badge-bug',
-                    'feature': 'badge-feature',
-                    'general': 'badge-new',
-                    'question': 'badge-new',
-                    'praise': 'badge-pro'
-                };
+            const toast = document.createElement('div');
+            toast.id = toastId;
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <span class="toast-icon">${icons[type] || 'ℹ'}</span>
+                <span class="toast-message">${message}</span>
+                <button class="toast-close" onclick="document.getElementById('${toastId}').remove()">×</button>
+            `;
 
-                tbody.innerHTML = feedbacks.map(fb => `
-                    <tr>
-                        <td><span class="badge ${typeBadges[fb.type] || 'badge-new'}">${fb.type}</span></td>
-                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fb.message}</td>
-                        <td>${fb.user_email || '-'}</td>
-                        <td>${fb.rating ? '★'.repeat(fb.rating) + '☆'.repeat(5-fb.rating) : '-'}</td>
-                        <td>${formatDate(fb.created_at)}</td>
-                    </tr>
-                `).join('');
-            } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Erreur lors du chargement</td></tr>';
-            }
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                const el = document.getElementById(toastId);
+                if (el) el.remove();
+            }, 4000);
         }
 
-        function showTab(tabName) {
-            // Update tab buttons
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            event.target.classList.add('active');
-
-            // Show/hide sections
-            document.getElementById('usersSection').style.display = tabName === 'users' ? 'block' : 'none';
-            document.getElementById('subscriptionsSection').style.display = tabName === 'subscriptions' ? 'block' : 'none';
-            document.getElementById('feedbacksSection').style.display = tabName === 'feedbacks' ? 'block' : 'none';
-            document.getElementById('newsSection').style.display = tabName === 'news' ? 'block' : 'none';
-
-            // Load news data when tab is opened
-            if (tabName === 'news') {
-                loadNews();
-                loadNewsStats();
-            }
-        }
-
-        // ============ NEWS FUNCTIONS ============
-
-        async function loadNewsStats() {
-            try {
-                const response = await fetch(`${API_URL}/news-admin/stats`, {
-                    headers: { 'X-Admin-Key': adminKey }
-                });
-                const stats = await response.json();
-
-                document.getElementById('newsTotal').textContent = stats.total_articles || 0;
-                document.getElementById('newsTrending').textContent = stats.trending || 0;
-                document.getElementById('newsPublished').textContent = stats.published || 0;
-                document.getElementById('newsPending').textContent = stats.pending || 0;
-                document.getElementById('newsLastScrape').textContent = stats.last_scraping
-                    ? `Dernier scan: ${formatDate(stats.last_scraping)}`
-                    : 'Jamais scanné';
-            } catch (e) {
-                console.error('Error loading news stats:', e);
-            }
-        }
-
-        async function loadNews() {
-            const tbody = document.getElementById('newsTable');
-            const filter = document.getElementById('newsFilter').value;
-
-            try {
-                let url = `${API_URL}/news-admin/articles?limit=50`;
-
-                if (filter === 'trending') {
-                    url = `${API_URL}/news-admin/trending?limit=50`;
-                } else if (filter === 'pending') {
-                    url = `${API_URL}/news-admin/pending?limit=50`;
-                } else if (filter === 'published') {
-                    url = `${API_URL}/news-admin/published?limit=50`;
-                }
-
-                const response = await fetch(url, {
-                    headers: { 'X-Admin-Key': adminKey }
-                });
-                const data = await response.json();
-                const articles = data.articles || data || [];
-
-                if (articles.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Aucun article trouvé. Lancez un scraping pour commencer.</td></tr>';
-                    return;
-                }
-
-                tbody.innerHTML = articles.map(article => `
-                    <tr>
-                        <td style="max-width: 350px;">
-                            <a href="${article.url}" target="_blank" style="color: var(--text-primary); text-decoration: none;">
-                                <strong>${truncate(article.title, 60)}</strong>
-                            </a>
-                            ${article.image_url ? '<span style="color: var(--accent); margin-left: 4px;">📷</span>' : ''}
-                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-                                ${formatDate(article.scraped_at)}
-                            </div>
-                        </td>
-                        <td>
-                            <span class="badge" style="background: rgba(100,116,139,0.15); color: var(--text-secondary);">
-                                ${article.source_name}
-                            </span>
-                            <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
-                                ${article.category || '-'}
-                            </div>
-                        </td>
-                        <td>
-                            <span style="font-size: 18px; font-weight: 700; ${article.total_interactions >= 100 ? 'color: var(--warning);' : ''}">
-                                ${article.total_interactions || 0}
-                            </span>
-                            <div style="font-size: 10px; color: var(--text-muted);">
-                                👍${article.likes || 0} 💬${article.comments || 0} 🔄${article.shares || 0}
-                            </div>
-                        </td>
-                        <td>
-                            ${article.published_to_app
-                                ? '<span class="badge badge-pro">Publié</span>'
-                                : article.status === 'rejected'
-                                    ? '<span class="badge badge-bug">Rejeté</span>'
-                                    : '<span class="badge badge-new">En attente</span>'
-                            }
-                        </td>
-                        <td>
-                            ${!article.published_to_app && article.status !== 'rejected' ? `
-                                <button class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;" onclick="publishArticle('${article.id}')">
-                                    ✓ Publier
-                                </button>
-                                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; margin-left: 4px;" onclick="rejectArticle('${article.id}')">
-                                    ✗
-                                </button>
-                            ` : '-'}
-                        </td>
-                    </tr>
-                `).join('');
-            } catch (e) {
-                console.error('Error loading news:', e);
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Erreur lors du chargement. Vérifiez que le backend est déployé.</td></tr>';
-            }
-        }
-
-        async function publishArticle(articleId) {
-            if (!confirm('Publier cet article dans l\'app ?')) return;
-
-            try {
-                const response = await fetch(`${API_URL}/news-admin/publish`, {
-                    method: 'POST',
-                    headers: {
-                        'X-Admin-Key': adminKey,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ article_id: articleId })
-                });
-
-                if (response.ok) {
-                    alert('Article publié !');
-                    loadNews();
-                    loadNewsStats();
-                } else {
-                    const data = await response.json();
-                    alert('Erreur: ' + (data.detail || 'Échec de la publication'));
-                }
-            } catch (e) {
-                alert('Erreur de connexion');
-            }
-        }
-
-        async function rejectArticle(articleId) {
-            const reason = prompt('Raison du rejet (optionnel):');
-            if (reason === null) return; // Cancelled
-
-            try {
-                const response = await fetch(`${API_URL}/news-admin/reject`, {
-                    method: 'POST',
-                    headers: {
-                        'X-Admin-Key': adminKey,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ article_id: articleId, reason: reason })
-                });
-
-                if (response.ok) {
-                    alert('Article rejeté');
-                    loadNews();
-                    loadNewsStats();
-                } else {
-                    alert('Erreur lors du rejet');
-                }
-            } catch (e) {
-                alert('Erreur de connexion');
-            }
-        }
-
-        async function triggerScraping() {
-            if (!confirm('Lancer le scraping des actualités africaines ? Cela peut prendre quelques minutes.')) return;
-
-            const btn = event.target;
-            btn.disabled = true;
-            btn.textContent = '⏳ Scraping en cours...';
-
-            try {
-                const response = await fetch(`${API_URL}/news-admin/scrape?min_interactions=50`, {
-                    method: 'POST',
-                    headers: { 'X-Admin-Key': adminKey }
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    alert(`Scraping terminé !\n\n` +
-                        `Sources scannées: ${data.results?.sources_scraped || 0}\n` +
-                        `Articles trouvés: ${data.results?.articles_found || 0}\n` +
-                        `Articles sauvegardés: ${data.results?.articles_saved || 0}\n` +
-                        `Articles trending: ${data.results?.trending_articles || 0}`
-                    );
-                    loadNews();
-                    loadNewsStats();
-                } else {
-                    alert('Erreur: ' + (data.detail || 'Échec du scraping'));
-                }
-            } catch (e) {
-                alert('Erreur de connexion au serveur');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '🔄 Lancer Scraping';
-            }
-        }
-
-        async function updateInteractions() {
-            if (!confirm('Calculer les interactions estimées pour tous les articles ?\n\nCette opération va estimer les likes, commentaires et partages basés sur la source, catégorie et pays.\n\nCela peut prendre plusieurs minutes pour ~2500 articles.')) return;
-
-            const btn = event.target;
-            btn.disabled = true;
-            btn.textContent = '⏳ Calcul en cours...';
-
-            try {
-                const response = await fetch(`${API_URL}/news-admin/update-interactions`, {
-                    method: 'POST',
-                    headers: { 'X-Admin-Key': adminKey }
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    if (data.mode === 'background') {
-                        alert('Mise à jour lancée en arrière-plan !\n\nLes interactions seront calculées progressivement.\nRafraîchissez la page dans quelques minutes.');
-                    } else {
-                        alert(`Mise à jour terminée !\n\n` +
-                            `Articles mis à jour: ${data.result?.updated || 0}\n` +
-                            `Erreurs: ${data.result?.errors || 0}`
-                        );
-                    }
-                    loadNews();
-                    loadNewsStats();
-                } else {
-                    alert('Erreur: ' + (data.detail || 'Échec de la mise à jour'));
-                }
-            } catch (e) {
-                alert('Erreur de connexion au serveur: ' + e.message);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '⚡ Calculer Interactions';
-            }
-        }
-
-        function truncate(str, len) {
-            if (!str) return '';
-            return str.length > len ? str.substring(0, len) + '...' : str;
-        }
+        // ============ UTILITIES ============
 
         function formatDate(dateStr) {
             if (!dateStr) return '-';
@@ -1463,6 +2560,79 @@
                 return dateStr;
             }
         }
+
+        function truncate(str, len) {
+            if (!str) return '';
+            return str.length > len ? str.substring(0, len) + '...' : str;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ============ MARKDOWN TO HTML ============
+
+        function markdownToHtml(markdown) {
+            if (!markdown) return '';
+
+            let html = markdown
+                // Headings
+                .replace(/^### (.*?)$/gm, '<h3>$1</h3>')
+                .replace(/^## (.*?)$/gm, '<h2>$1</h2>')
+                .replace(/^# (.*?)$/gm, '<h1>$1</h1>')
+                // Bold
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                // Italic
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                // Links
+                .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" style="color: var(--accent);">$1</a>')
+                // Unordered lists
+                .replace(/^- (.*?)$/gm, '<li>$1</li>')
+                // Wrap consecutive <li> in <ul>
+                .replace(/((?:<li>.*?<\/li>\n?)+)/g, '<ul style="margin: 12px 0; padding-left: 20px;">$1</ul>')
+                // Line breaks
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+
+            // Wrap in paragraphs
+            if (!html.startsWith('<')) {
+                html = '<p>' + html;
+            }
+            if (!html.endsWith('>')) {
+                html = html + '</p>';
+            }
+
+            return html;
+        }
+
+        // ============ KEYBOARD SHORTCUTS ============
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeUserModal();
+                closeArticleModal();
+            }
+        });
+
+        // ============ NEWS AUTO-REFRESH ============
+
+        let newsRefreshInterval;
+
+        const originalShowTab = showTab;
+        window.showTab = function(tabName) {
+            originalShowTab(tabName);
+
+            if (tabName === 'news' && !newsRefreshInterval) {
+                newsRefreshInterval = setInterval(() => {
+                    loadNewsStats();
+                }, 60000); // Refresh every 60 seconds
+            } else if (tabName !== 'news' && newsRefreshInterval) {
+                clearInterval(newsRefreshInterval);
+                newsRefreshInterval = null;
+            }
+        };
     </script>
 </body>
 </html>
