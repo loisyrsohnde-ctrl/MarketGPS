@@ -1607,19 +1607,37 @@
 
         async function loadNewsStats() {
             try {
-                const response = await fetch(`${API_URL}/news-admin/stats`, {
+                // Load stats
+                const statsRes = await fetch(`${API_URL}/news-admin/stats`, {
                     headers: { 'X-Admin-Key': adminKey }
                 });
-                const stats = await response.json();
+                if (statsRes.ok) {
+                    const stats = await statsRes.json();
+                    document.getElementById('newsTotal').textContent = stats.total_articles || 0;
+                    document.getElementById('newsTrending').textContent = stats.trending || 0;
+                    document.getElementById('newsPublished').textContent = stats.published || 0;
+                    document.getElementById('newsPending').textContent = stats.pending || 0;
+                    document.getElementById('newsRejected').textContent = stats.rejected || 0;
+                    document.getElementById('pipelineLastRun').textContent = formatDate(stats.last_scraping) || 'Jamais';
+                }
 
-                document.getElementById('newsTotal').textContent = stats.total_articles || 0;
-                document.getElementById('newsTrending').textContent = stats.trending || 0;
-                document.getElementById('newsPublished').textContent = stats.published || 0;
-                document.getElementById('newsPending').textContent = stats.pending || 0;
-                document.getElementById('newsRejected').textContent = stats.rejected || 0;
-
-                document.getElementById('pipelineLastRun').textContent = formatDate(stats.last_run) || 'Jamais';
-                document.getElementById('pipelineProvider').textContent = stats.llm_provider || 'N/A';
+                // Load pipeline status for LLM provider info
+                const pipelineRes = await fetch(`${API_URL}/news-admin/pipeline/status`, {
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+                if (pipelineRes.ok) {
+                    const pipeline = await pipelineRes.json();
+                    document.getElementById('pipelineProvider').textContent = pipeline.llm_provider || 'N/A';
+                    if (pipeline.last_run) {
+                        document.getElementById('pipelineLastRun').textContent = formatDate(pipeline.last_run);
+                    }
+                    // Estimate next run (30 min after last)
+                    if (pipeline.last_run) {
+                        const lastRun = new Date(pipeline.last_run);
+                        const nextRun = new Date(lastRun.getTime() + 30 * 60 * 1000);
+                        document.getElementById('pipelineNextRun').textContent = formatDate(nextRun.toISOString());
+                    }
+                }
             } catch (e) {
                 console.error('Error loading news stats:', e);
             }
@@ -1631,29 +1649,55 @@
             newsPerPage = parseInt(document.getElementById('newsPerPage').value);
             const filter = document.getElementById('newsStatusFilter').value;
 
-            try {
-                let url = `${API_URL}/news-admin/articles?limit=500`;
+            tbody.innerHTML = '<tr><td colspan="6" class="loading"><div class="spinner"></div>Chargement...</td></tr>';
 
-                if (filter === 'trending') {
-                    url = `${API_URL}/news-admin/articles?filter=trending&limit=500`;
-                } else if (filter === 'pending') {
-                    url = `${API_URL}/news-admin/articles?filter=pending&limit=500`;
-                } else if (filter === 'published') {
-                    url = `${API_URL}/news-admin/articles?filter=published&limit=500`;
-                } else if (filter === 'rejected') {
-                    url = `${API_URL}/news-admin/articles?filter=rejected&limit=500`;
+            try {
+                // Backend max limit is 200, use pagination to get more
+                let allLoaded = [];
+                let offset = 0;
+                const batchSize = 200;
+                let hasMore = true;
+
+                while (hasMore) {
+                    let url = `${API_URL}/news-admin/articles?limit=${batchSize}&offset=${offset}`;
+
+                    if (filter === 'trending') {
+                        url += '&trending=true';
+                    } else if (filter === 'pending') {
+                        url += '&status=pending';
+                    } else if (filter === 'published') {
+                        url += '&status=published';
+                    } else if (filter === 'rejected') {
+                        url += '&status=rejected';
+                    }
+
+                    const response = await fetch(url, {
+                        headers: { 'X-Admin-Key': adminKey }
+                    });
+
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData.detail || `Erreur HTTP ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    const articles = data.articles || [];
+                    allLoaded = allLoaded.concat(articles);
+
+                    // Stop if we got fewer than requested or reached a reasonable max
+                    if (articles.length < batchSize || allLoaded.length >= 1000) {
+                        hasMore = false;
+                    } else {
+                        offset += batchSize;
+                    }
                 }
 
-                const response = await fetch(url, {
-                    headers: { 'X-Admin-Key': adminKey }
-                });
-                const data = await response.json();
-                allArticles = data.articles || data || [];
-
+                allArticles = allLoaded;
                 filterArticles();
             } catch (e) {
                 console.error('Error loading articles:', e);
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Erreur lors du chargement</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Erreur: ${escapeHtml(e.message)}</td></tr>`;
+                showToast('Erreur lors du chargement des articles: ' + e.message, 'error');
             }
         }
 
