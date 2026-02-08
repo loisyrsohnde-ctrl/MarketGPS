@@ -151,10 +151,11 @@ class InputValidationMiddleware(BaseHTTPMiddleware):
                 }
             )
 
-        # Determine if this is a file upload endpoint
+        # Determine if this is a file upload or large-payload internal endpoint
         is_file_upload = self._is_file_upload_endpoint(request)
+        is_large_internal = path.startswith("/api/news/ingest")
         max_body_size = (
-            self.max_file_upload_size if is_file_upload else self.max_request_body_size
+            self.max_file_upload_size if (is_file_upload or is_large_internal) else self.max_request_body_size
         )
 
         # Validate request body size
@@ -191,7 +192,9 @@ class InputValidationMiddleware(BaseHTTPMiddleware):
                 )
 
         # Validate JSON body for injection patterns (if applicable)
-        if request.method in ["POST", "PUT", "PATCH"]:
+        # Skip injection check for internal pipeline endpoints (protected by API key)
+        _skip_body_injection = path.startswith("/api/news/ingest")
+        if request.method in ["POST", "PUT", "PATCH"] and not _skip_body_injection:
             if "application/json" in request.headers.get("content-type", ""):
                 injection_error = await self._validate_json_body(request)
                 if injection_error:
