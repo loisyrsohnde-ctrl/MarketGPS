@@ -375,7 +375,6 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
             article = {
                 "slug": slug,
                 "raw_item_id": raw_item.get("id"),
-                "url": original_url,
                 "title": rewritten.get("title_fr", raw_payload.get("title", "Untitled")),
                 "excerpt": rewritten.get("excerpt_fr"),
                 "content_md": rewritten.get("content_md"),
