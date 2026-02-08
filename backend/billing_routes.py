@@ -169,17 +169,46 @@ def _ensure_subscription_tables(store: SQLiteStore):
 
 
 def get_subscription(user_id: str, db: SQLiteStore) -> Optional[Dict[str, Any]]:
-    """Get subscription from database."""
+    """
+    Get subscription from database.
+
+    Priority:
+    1. Check 'subscriptions' table (Stripe-synced)
+    2. Fallback to 'user_entitlements' table (legacy/Supabase-synced)
+    3. Return None if no subscription found
+    """
     with db._get_connection() as conn:
+        # 1. Check Stripe-synced subscriptions table
         row = conn.execute(
             "SELECT * FROM subscriptions WHERE user_id = ?",
             (user_id,)
         ).fetchone()
-        
+
         if row:
-            columns = [desc[0] for desc in conn.execute("PRAGMA table_info(subscriptions)").fetchall()]
             col_names = [c[1] for c in conn.execute("PRAGMA table_info(subscriptions)").fetchall()]
             return dict(zip(col_names, row))
+
+        # 2. Fallback: check user_entitlements table (legacy)
+        try:
+            ent_row = conn.execute(
+                "SELECT plan, status, daily_requests_limit FROM user_entitlements WHERE user_id = ?",
+                (user_id,)
+            ).fetchone()
+
+            if ent_row and ent_row[0] and ent_row[0].upper() not in ("FREE", ""):
+                plan = ent_row[0]
+                status = ent_row[1] or "active"
+                return {
+                    "user_id": user_id,
+                    "plan": plan.lower(),
+                    "status": status,
+                    "is_active": status in ("active", "trialing"),
+                    "daily_requests_limit": ent_row[2] or 200,
+                    "source": "user_entitlements",
+                }
+        except Exception as e:
+            logger.debug(f"user_entitlements lookup failed: {e}")
+
     return None
 
 
@@ -503,8 +532,17 @@ async def get_my_subscription(
             status="inactive",
             is_active=False,
         )
-    
-    # Calculate grace period remaining
+
+    # If source is user_entitlements (legacy), return directly
+    if subscription.get("source") == "user_entitlements":
+        return SubscriptionResponse(
+            user_id=user_id,
+            plan=subscription.get("plan", "free"),
+            status=subscription.get("status", "active"),
+            is_active=subscription.get("is_active", True),
+        )
+
+    # Calculate grace period remaining (Stripe subscriptions)
     grace_remaining = None
     if subscription.get("status") == "past_due" and subscription.get("grace_period_end"):
         try:
@@ -514,7 +552,7 @@ async def get_my_subscription(
                 grace_remaining = int(remaining.total_seconds() / 3600)
         except (ValueError, TypeError, KeyError) as e:
             logger.debug(f"Error calculating grace period remaining: {e}")
-    
+
     return SubscriptionResponse(
         user_id=user_id,
         plan=subscription.get("plan", "free"),
