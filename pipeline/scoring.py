@@ -541,10 +541,15 @@ class ScoringEngine:
         
         # Data recency (is most recent bar today or yesterday?)
         if not df.empty:
-            last_date = df.index.max()
-            days_old = (pd.Timestamp.now() - last_date).days
-            recency_score = max(0, 100 - days_old * 10)
-            scores.append(recency_score)
+            try:
+                last_date = df.index.max()
+                if not isinstance(last_date, pd.Timestamp):
+                    last_date = pd.Timestamp(last_date)
+                days_old = (pd.Timestamp.now() - last_date).days
+                recency_score = max(0, 100 - days_old * 10)
+                scores.append(recency_score)
+            except (TypeError, ValueError):
+                scores.append(50)  # Default if date parsing fails
         
         # Fundamentals (only relevant for equities)
         if asset_type == AssetType.EQUITY:

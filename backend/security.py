@@ -5,7 +5,9 @@ JWT verification for Supabase tokens
 
 import os
 import logging
-from typing import Optional
+import time
+import hashlib
+from typing import Optional, Tuple
 
 from fastapi import HTTPException, Header, Depends
 from jose import jwt, JWTError
@@ -16,6 +18,30 @@ logger = logging.getLogger(__name__)
 # Supabase JWT settings
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_JWT_SECRET = None  # Will be fetched from Supabase or use anon key verification
+
+# JWT Token Cache: {token_hash: (payload, expiry_timestamp)}
+_token_cache: dict = {}
+_verify_count: int = 0
+_CACHE_TTL = 300  # 5 minutes in seconds
+_CLEANUP_THRESHOLD = 100  # Cleanup cache every 100 verifications
+
+
+def _cleanup_cache() -> None:
+    """
+    Purge expired entries from token cache.
+    Called periodically during verification to prevent unbounded memory growth.
+    """
+    global _token_cache
+    current_time = time.time()
+    expired_keys = [
+        key for key, (_, expiry) in _token_cache.items()
+        if expiry <= current_time
+    ]
+    for key in expired_keys:
+        del _token_cache[key]
+
+    if expired_keys:
+        logger.debug(f"Cleaned up {len(expired_keys)} expired tokens from cache")
 
 
 async def get_supabase_jwks() -> dict:
@@ -30,19 +56,39 @@ async def get_supabase_jwks() -> dict:
 
 def verify_supabase_token(token: str) -> Optional[dict]:
     """
-    Verify a Supabase access token.
-    
+    Verify a Supabase access token with in-memory caching (TTL: 5 minutes).
+
+    Checks cache first for previously verified tokens to reduce verification overhead.
+    Cache entries are automatically purged every 100 verifications.
+
     Returns: Decoded token payload or None if invalid
     """
+    global _verify_count
+
+    # Check cache first
+    token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
+    current_time = time.time()
+
+    if token_hash in _token_cache:
+        payload, expiry = _token_cache[token_hash]
+        if expiry > current_time:
+            logger.debug(f"Token cache hit (expires in {expiry - current_time:.0f}s)")
+            return payload
+        else:
+            # Expired cache entry
+            del _token_cache[token_hash]
+
+    # Token not in cache or expired, perform verification
     try:
         # Supabase JWT secret can be found in project settings
         # For now, we'll use the Supabase API to verify
         jwt_secret = os.environ.get("SUPABASE_JWT_SECRET")
-        
+
         # Debug: log token prefix for troubleshooting
         token_preview = token[:20] + "..." if len(token) > 20 else token
         logger.debug(f"Verifying token: {token_preview}, secret configured: {bool(jwt_secret)}")
-        
+
+        payload = None
         if jwt_secret:
             # Direct JWT verification with secret
             # Note: Supabase JWT may not have audience claim, so we don't verify it
@@ -53,7 +99,6 @@ def verify_supabase_token(token: str) -> Optional[dict]:
                     algorithms=["HS256"],
                     audience="authenticated",
                 )
-                return payload
             except JWTError as e:
                 # Try without audience verification (Supabase tokens may not have it)
                 logger.debug(f"JWT verification with audience failed, trying without: {e}")
@@ -63,11 +108,24 @@ def verify_supabase_token(token: str) -> Optional[dict]:
                     algorithms=["HS256"],
                     options={"verify_aud": False},
                 )
-                return payload
         else:
             # Fallback: Verify by calling Supabase
-            return _verify_token_via_supabase(token)
-            
+            payload = _verify_token_via_supabase(token)
+
+        # Cache successful verification
+        if payload:
+            expiry_time = current_time + _CACHE_TTL
+            _token_cache[token_hash] = (payload, expiry_time)
+            logger.debug(f"Token cached (hash: {token_hash[:8]}..., expires at {expiry_time})")
+
+        # Periodic cleanup
+        _verify_count += 1
+        if _verify_count >= _CLEANUP_THRESHOLD:
+            _cleanup_cache()
+            _verify_count = 0
+
+        return payload
+
     except JWTError as e:
         logger.warning(f"JWT verification failed: {e}")
         return None
@@ -152,8 +210,8 @@ def _verify_token_via_supabase(token: str) -> Optional[dict]:
             logger.error("Supabase credentials not configured")
             return None
         
-        # Call Supabase to verify token
-        with httpx.Client() as client:
+        # Call Supabase to verify token (with timeout to prevent resource exhaustion)
+        with httpx.Client(timeout=5.0) as client:
             response = client.get(
                 f"{supabase_url}/auth/v1/user",
                 headers={

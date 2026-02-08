@@ -1,10 +1,19 @@
 """
-MarketGPS Backend API
-FastAPI server for Stripe webhooks and billing endpoints
+MarketGPS Backend API v15.0
+FastAPI server with institutional-grade middleware stack.
+
+Middleware order (outermost → innermost):
+  1. GlobalErrorHandlerMiddleware  – catches all unhandled exceptions
+  2. RequestLoggingMiddleware      – structured JSON logging + X-Request-ID
+  3. RateLimitMiddleware           – sliding-window per-IP rate limiting
+  4. InputValidationMiddleware     – body size, query length, injection detection
+  5. SecurityHeadersMiddleware     – OWASP security headers
+  6. CORSMiddleware                – cross-origin resource sharing
 """
 
 import os
 import logging
+import json
 from typing import Optional
 from contextlib import asynccontextmanager
 
@@ -23,6 +32,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+# Route imports
 from api_routes import router as api_router
 from user_routes import router as user_router
 from barbell_routes import router as barbell_router
@@ -41,8 +51,21 @@ from portfolio_routes import router as portfolio_router
 from gamification_routes import router as gamification_router
 from viral_news_routes import router as viral_news_router
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Middleware imports (v15 institutional stack)
+from middleware import (
+    RateLimitMiddleware,
+    RequestLoggingMiddleware,
+    GlobalErrorHandlerMiddleware,
+    InputValidationMiddleware,
+)
+
+# Configure structured logging
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 
 # Initialize services (optional - only for billing)
@@ -316,8 +339,8 @@ async def run_startup_seed():
 # Create FastAPI app
 app = FastAPI(
     title="MarketGPS API",
-    description="Backend API for billing and webhooks",
-    version="1.0.0",
+    description="Institutional-grade financial intelligence platform API",
+    version="15.0.0",
     lifespan=lifespan,
 )
 
@@ -340,6 +363,11 @@ from security_config import (
 # Get CORS configuration
 ALLOWED_ORIGINS = get_allowed_origins()
 
+# ============================================================================
+# Middleware Stack (order: last added = outermost = runs first)
+# ============================================================================
+
+# 6. CORS (innermost - runs last)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -351,50 +379,33 @@ app.add_middleware(
 )
 
 
-# ============================================================================
-# Security Headers Middleware
-# ============================================================================
-
+# 5. Security Headers
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware to add essential security headers to all responses.
-    Protects against:
-    - XSS attacks (X-XSS-Protection, Content-Security-Policy)
-    - Clickjacking (X-Frame-Options)
-    - MIME type sniffing (X-Content-Type-Options)
-    - Man-in-the-middle attacks (Strict-Transport-Security)
-    - Unauthorized feature access (Permissions-Policy)
-    - Information leakage (Referrer-Policy)
-    """
+    """OWASP-compliant security headers for all responses."""
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
-
-        # Prevent MIME type sniffing
         response.headers["X-Content-Type-Options"] = CONTENT_TYPE_OPTIONS
-
-        # Prevent clickjacking attacks
         response.headers["X-Frame-Options"] = FRAME_OPTIONS
-
-        # Legacy XSS protection for older browsers
         response.headers["X-XSS-Protection"] = XSS_PROTECTION
-
-        # Force HTTPS and prevent downgrade attacks
         response.headers["Strict-Transport-Security"] = HSTS_HEADER
-
-        # Prevent XSS and injection attacks
         response.headers["Content-Security-Policy"] = CSP_HEADER
-
-        # Control referrer information leakage
         response.headers["Referrer-Policy"] = REFERRER_POLICY
-
-        # Disable unnecessary browser features
         response.headers["Permissions-Policy"] = PERMISSIONS_POLICY
-
         return response
 
-
-# Add the security headers middleware
 app.add_middleware(SecurityHeadersMiddleware)
+
+# 4. Input Validation (body size, query length, injection detection)
+app.add_middleware(InputValidationMiddleware)
+
+# 3. Rate Limiting (sliding window per-IP)
+app.add_middleware(RateLimitMiddleware)
+
+# 2. Structured Request Logging (JSON format + X-Request-ID)
+app.add_middleware(RequestLoggingMiddleware)
+
+# 1. Global Error Handler (outermost - catches everything)
+app.add_middleware(GlobalErrorHandlerMiddleware)
 
 # Include API routes for assets/scores/watchlist
 app.include_router(api_router)
@@ -446,7 +457,7 @@ class HealthResponse(BaseModel):
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "version": "1.0.0"}
+    return {"status": "healthy", "version": "15.0.0"}
 
 
 @app.get("/health/extended")
@@ -459,7 +470,7 @@ async def health_check_extended():
     
     result = {
         "status": "healthy",
-        "version": "1.0.0",
+        "version": "15.0.0",
         "timestamp": datetime.utcnow().isoformat() if 'datetime' in dir() else None,
         "database": {"connected": False},
         "services": {
@@ -500,7 +511,8 @@ async def health_check_extended():
                 result["database"]["news_articles"] = 0
                 
     except Exception as e:
-        result["database"]["error"] = str(e)
+        logger.error(f"Health check DB error: {e}")
+        result["database"]["error"] = "connection_failed"
     
     return result
 
@@ -715,7 +727,7 @@ async def stripe_webhook(
 ):
     """
     Handle Stripe webhook events.
-    Verifies signature and updates entitlements in Supabase.
+    Verifies signature, prevents replay attacks, and updates entitlements.
     """
     if not stripe_service or not supabase_admin:
         raise HTTPException(
@@ -734,10 +746,21 @@ async def stripe_webhook(
         raise HTTPException(
             status_code=400, detail="Invalid webhook signature")
 
+    event_id = event.get('id')
     event_type = event.get('type')
     data = event.get('data', {}).get('object', {})
 
-    logger.info(f"Received Stripe event: {event_type}")
+    # ── Replay attack prevention (v15) ──────────────────────────
+    if event_id:
+        try:
+            from middleware import is_event_processed, mark_event_processed
+            if is_event_processed(event_id):
+                logger.warning(f"Stripe replay blocked: {event_id}")
+                return JSONResponse({"status": "duplicate", "event_id": event_id})
+        except ImportError:
+            logger.debug("Webhook guard not available, skipping replay check")
+
+    logger.info(f"Processing Stripe event: {event_type} ({event_id})")
 
     try:
         if event_type == 'checkout.session.completed':
@@ -755,12 +778,20 @@ async def stripe_webhook(
         else:
             logger.info(f"Unhandled event type: {event_type}")
 
+        # ── Mark event as processed (v15) ───────────────────────
+        if event_id:
+            try:
+                from middleware import mark_event_processed
+                mark_event_processed(event_id)
+            except ImportError:
+                pass
+
         return JSONResponse({"status": "success"})
 
     except Exception as e:
         logger.error(f"Webhook handling error: {e}")
         # Return 200 to acknowledge receipt (prevent Stripe retries)
-        return JSONResponse({"status": "error", "message": str(e)})
+        return JSONResponse({"status": "error", "message": "Processing error"})
 
 
 # ============================================================================

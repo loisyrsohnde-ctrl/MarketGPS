@@ -1,0 +1,74 @@
+# MarketGPS Prometheus Configuration
+# Scrapes metrics from FastAPI backend and other services
+
+global:
+  scrape_interval: 15s          # How often to scrape targets by default
+  evaluation_interval: 15s       # How often to evaluate rules
+  retention_time: 15d            # How long to keep metrics
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - 'alertmanager:9093'
+
+# Load rules once and periodically evaluate them
+rule_files:
+  # - "rules/*.yml"
+
+# A scrape configuration containing exactly one endpoint to scrape
+scrape_configs:
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # PROMETHEUS ITSELF
+  # ═══════════════════════════════════════════════════════════════════════════════
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # FASTAPI BACKEND
+  # ═══════════════════════════════════════════════════════════════════════════════
+  - job_name: 'fastapi'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ['backend:8501']
+    metrics_path: '/metrics'
+    honor_timestamps: true
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # DOCKER DAEMON (if monitoring containers)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # Requires: cadvisor service
+  # - job_name: 'cadvisor'
+  #   static_configs:
+  #     - targets: ['cadvisor:8080']
+  #   metrics_path: '/metrics'
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # NODE EXPORTER (if monitoring system metrics)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # Requires: node-exporter service
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+  #   metrics_path: '/metrics'
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # POSTGRESQL EXPORTER (if monitoring database)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # Requires: postgres-exporter service
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+  #   metrics_path: '/metrics'
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # REDIS EXPORTER (if monitoring cache)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # Requires: redis-exporter service
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+  #   metrics_path: '/metrics'
