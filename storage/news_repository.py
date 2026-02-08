@@ -220,12 +220,12 @@ class NewsRepository(BaseRepository):
         """Insert a new article. Returns the article ID."""
         sql = """
             INSERT INTO news_articles (
-                slug, raw_item_id, url, title, excerpt, content_md, tldr_json,
+                slug, raw_item_id, title, excerpt, content_md, tldr_json,
                 tags_json, country, language, image_url, source_name,
                 source_url, canonical_url, published_at, status,
                 category, sentiment, is_ai_processed,
                 engagement_score, is_breaking_news, importance_level
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         try:
@@ -233,7 +233,6 @@ class NewsRepository(BaseRepository):
                 cursor = conn.execute(sql, (
                     article.get("slug"),
                     article.get("raw_item_id"),
-                    article.get("url", article.get("source_url", "")),
                     article.get("title"),
                     article.get("excerpt"),
                     article.get("content_md"),
