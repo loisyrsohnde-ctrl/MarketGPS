@@ -361,8 +361,8 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
                 published_at=raw_item.get("published_at"),
                 image_url=image_url,
                 tags=tags,
-                save_count=interactions.estimated_shares,  # Use estimated shares as saves
-                view_count=interactions.estimated_views,   # Use estimated views
+                save_count=interactions.shares,  # Use shares as saves
+                view_count=interactions.views,   # Use views
                 sources_registry=self.sources_registry
             )
 
