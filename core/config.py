@@ -136,7 +136,14 @@ class StorageConfig:
         default_factory=lambda: Path(os.getenv("DATA_DIR", str(Path(__file__).parent.parent / "data")))
     )
     sqlite_path: Path = field(
-        default_factory=lambda: Path(os.getenv("SQLITE_PATH", str(Path(__file__).parent.parent / "data/sqlite/marketgps.db")))
+        default_factory=lambda: Path(os.getenv(
+            "SQLITE_PATH",
+            # In Docker containers, always use absolute path to ensure
+            # backend (WORKDIR /app/backend) and scheduler (WORKDIR /app)
+            # both access the same shared SQLite database file.
+            "/app/data/sqlite/marketgps.db" if Path("/app/data/sqlite").exists()
+            else str(Path(__file__).parent.parent / "data/sqlite/marketgps.db")
+        ))
     )
     parquet_dir: Path = field(
         default_factory=lambda: Path(__file__).parent.parent / "data/parquet"
