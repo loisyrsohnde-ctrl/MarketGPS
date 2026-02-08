@@ -217,5 +217,3 @@ export function useGamification(): UseGamificationReturn {
     refetch,
   };
 }
-
-export type UseGamificationReturn = ReturnType<typeof useGamification>;
