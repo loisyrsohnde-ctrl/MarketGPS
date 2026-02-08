@@ -19,8 +19,16 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.exceptions import HTTPException
-from sqlalchemy.exc import OperationalError
 from pydantic import ValidationError
+
+# Project uses sqlite3 directly (not SQLAlchemy ORM)
+# Catch both sqlite3 and sqlalchemy OperationalError if available
+import sqlite3
+try:
+    from sqlalchemy.exc import OperationalError as _SAOperationalError
+    OperationalError = (_SAOperationalError, sqlite3.OperationalError)
+except ImportError:
+    OperationalError = sqlite3.OperationalError
 
 
 class GlobalErrorHandlerMiddleware(BaseHTTPMiddleware):
