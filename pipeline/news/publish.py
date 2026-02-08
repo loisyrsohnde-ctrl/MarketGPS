@@ -16,6 +16,8 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
+import requests
+
 from core.config import get_logger
 from storage.sqlite_store import SQLiteStore
 from pipeline.news.image_fetcher import fetch_article_image
@@ -23,6 +25,10 @@ from pipeline.news.scoring import score_article, load_sources_registry
 from pipeline.news.interactions_fetcher import get_interactions_fetcher, InteractionMetrics
 
 logger = get_logger(__name__)
+
+# Backend API configuration for remote publishing
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", "").rstrip("/")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "mgps-internal-pipeline-2026")
 
 # Try to import LLM libraries
 try:
@@ -49,6 +55,7 @@ class NewsPublisher:
         self.store._ensure_news_tables()
         self._init_llm()
         self.sources_registry = load_sources_registry()
+        self._pending_articles: List[Dict] = []
     
     def _init_llm(self):
         """Initialize LLM for translation/rewriting."""
@@ -397,20 +404,69 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
                 "importance_level": scoring_result.get("importance_level", "normal")
             }
             
-            # Insert article
+            # Insert article locally
             article_id = self.store.insert_news_article(article)
-            
+
             if article_id:
                 # Mark raw item as processed
                 self.store.mark_raw_item_processed(raw_item["id"])
+                # Collect article for remote API push
+                self._pending_articles.append(article)
                 return article_id
             else:
                 return None
-                
+
         except Exception as e:
             logger.error(f"Error processing raw item {raw_item.get('id')}: {e}")
             self.store.mark_raw_item_processed(raw_item.get("id"), error=str(e))
             return None
+
+    def _push_to_backend_api(self, articles: List[Dict]) -> int:
+        """
+        Push published articles to the backend API so they appear in the
+        frontend. This bridges the gap between the scheduler container
+        (which has its own SQLite) and the backend container.
+
+        Returns the number of successfully ingested articles.
+        """
+        if not BACKEND_API_URL:
+            logger.info("BACKEND_API_URL not set — skipping remote push (local dev mode)")
+            return 0
+
+        if not articles:
+            return 0
+
+        url = f"{BACKEND_API_URL}/api/news/ingest"
+        headers = {
+            "Content-Type": "application/json",
+            "X-Internal-Key": INTERNAL_API_KEY
+        }
+
+        # Send in batches of 25 to avoid timeouts
+        batch_size = 25
+        total_inserted = 0
+
+        for i in range(0, len(articles), batch_size):
+            batch = articles[i:i + batch_size]
+            payload = {"articles": batch}
+
+            try:
+                resp = requests.post(url, json=payload, headers=headers, timeout=30)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    total_inserted += data.get("inserted", 0)
+                    logger.info(
+                        f"API batch {i // batch_size + 1}: "
+                        f"{data.get('inserted', 0)} inserted, "
+                        f"{data.get('errors', 0)} errors"
+                    )
+                else:
+                    logger.error(f"API ingest failed (HTTP {resp.status_code}): {resp.text[:200]}")
+            except Exception as e:
+                logger.error(f"API ingest request failed: {e}")
+
+        logger.info(f"Remote API push complete: {total_inserted}/{len(articles)} articles ingested")
+        return total_inserted
     
     def run(self, limit: int = 50) -> Dict:
         """
@@ -454,7 +510,13 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
             f"Publishing complete: {results['items_published']}/{results['items_total']} articles "
             f"in {elapsed:.1f}s (provider: {results['llm_provider']})"
         )
-        
+
+        # Push articles to backend API (bridges separate Docker containers)
+        if self._pending_articles:
+            api_count = self._push_to_backend_api(self._pending_articles)
+            results["api_pushed"] = api_count
+            self._pending_articles = []
+
         return results
 
 

@@ -44,6 +44,9 @@ USER appuser
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV TZ=America/New_York
+# Backend API URL for remote article publishing (bridges separate containers)
+ENV BACKEND_API_URL=https://api.marketgps.online
+ENV INTERNAL_API_KEY=mgps-internal-pipeline-2026
 
 # No port exposed - scheduler is a background job
 # Health can be checked via docker inspect or log monitoring

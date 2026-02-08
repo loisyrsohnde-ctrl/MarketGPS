@@ -4,6 +4,7 @@ Endpoints for news feed, articles, and user saves.
 """
 
 import json
+import os
 from typing import Optional, List
 from fastapi import APIRouter, Query, HTTPException, Header
 from pydantic import BaseModel
@@ -574,6 +575,78 @@ async def check_article_saved(
     is_saved = db.is_article_saved_by_user(user_id, article_id)
     
     return {"article_id": article_id, "is_saved": is_saved}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Internal Pipeline Ingest Endpoint
+# ═══════════════════════════════════════════════════════════════════════════════
+
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "mgps-internal-pipeline-2026")
+
+
+class ArticleIngest(BaseModel):
+    slug: str
+    title: str
+    excerpt: Optional[str] = None
+    content_md: Optional[str] = None
+    tldr_json: Optional[str] = None
+    tags_json: Optional[str] = None
+    country: Optional[str] = None
+    language: Optional[str] = "fr"
+    image_url: Optional[str] = None
+    source_name: Optional[str] = None
+    source_url: Optional[str] = None
+    canonical_url: Optional[str] = None
+    published_at: Optional[str] = None
+    status: Optional[str] = "published"
+    category: Optional[str] = None
+    sentiment: Optional[str] = "neutral"
+    is_ai_processed: Optional[bool] = False
+    engagement_score: Optional[float] = 0.0
+    is_breaking_news: Optional[bool] = False
+    importance_level: Optional[str] = "normal"
+    raw_item_id: Optional[int] = None
+
+
+class IngestRequest(BaseModel):
+    articles: List[ArticleIngest]
+
+
+@router.post("/ingest")
+async def ingest_articles(
+    request: IngestRequest,
+    x_internal_key: Optional[str] = Header(None)
+):
+    """
+    Bulk ingest articles from the pipeline scheduler.
+    Protected by internal API key.
+    """
+    # Verify internal API key
+    if x_internal_key != INTERNAL_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid internal API key")
+
+    inserted = 0
+    errors = 0
+
+    for art in request.articles:
+        article_dict = art.dict()
+        # Convert booleans to integers for SQLite
+        article_dict["is_ai_processed"] = 1 if article_dict.get("is_ai_processed") else 0
+        article_dict["is_breaking_news"] = 1 if article_dict.get("is_breaking_news") else 0
+
+        article_id = db.insert_news_article(article_dict)
+        if article_id:
+            inserted += 1
+        else:
+            errors += 1
+
+    logger.info(f"Ingest complete: {inserted} inserted, {errors} errors out of {len(request.articles)}")
+    return {
+        "status": "ok",
+        "inserted": inserted,
+        "errors": errors,
+        "total": len(request.articles)
+    }
 
 
 # NOTE: /status endpoint moved above /{slug} route to avoid conflict
