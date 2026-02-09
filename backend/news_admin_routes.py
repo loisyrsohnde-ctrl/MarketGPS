@@ -969,3 +969,99 @@ async def get_top_articles(
                 "message": "V2 scoring not yet run. Use POST /news-admin/score-v2 first.",
             }
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/articles/top-interactions")
+async def get_top_articles_by_interactions(
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+    limit: int = Query(50, ge=5, le=100, description="Nombre max d'articles (défaut: 50, max: 100)"),
+    min_interactions: int = Query(100, ge=0, description="Interactions minimum (défaut: 100)"),
+    hours: int = Query(72, ge=1, le=168, description="Articles des dernières X heures (défaut: 72h)"),
+    language: Optional[str] = Query(None, description="Filtrer par langue (fr, en, etc.)"),
+    francophone_only: bool = Query(True, description="Seulement sources francophones (défaut: True)"),
+):
+    """
+    🔥 TOP articles triés par INTERACTIONS - Filtrage STRICT
+
+    Retourne uniquement les articles avec le plus d'interactions.
+    C'est l'endpoint recommandé pour avoir une vue pertinente.
+
+    Paramètres:
+    - limit: Nombre max d'articles (défaut: 50, max: 100)
+    - min_interactions: Seuil minimum d'interactions (défaut: 100)
+    - hours: Fenêtre temporelle en heures (défaut: 72h = 3 jours)
+    - language: Filtrer par langue (optionnel)
+    - francophone_only: Prioriser les régions francophones (défaut: True)
+    """
+    require_admin(admin_key)
+
+    # Pays francophones prioritaires
+    FRANCOPHONE_COUNTRIES = [
+        'FR', 'BE', 'CH', 'CA', 'SN', 'CI', 'CM', 'ML', 'BF', 'NE',
+        'TG', 'BJ', 'GN', 'GA', 'CG', 'CD', 'TD', 'CF', 'RW', 'BI',
+        'MG', 'DZ', 'MA', 'TN'
+    ]
+
+    try:
+        with db._get_conn() as conn:
+            # Calcul de la date limite
+            from datetime import datetime, timedelta
+            cutoff_date = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+
+            query = """
+                SELECT
+                    id, title, summary, source_name, category, country, language,
+                    url, thumbnail, published_at, scraped_at, status,
+                    total_interactions, viralityScore,
+                    viral_score_v2, viral_reasons_v2
+                FROM news_articles
+                WHERE total_interactions >= ?
+                  AND scraped_at >= ?
+            """
+            params = [min_interactions, cutoff_date]
+
+            # Filtre francophone
+            if francophone_only:
+                placeholders = ','.join('?' * len(FRANCOPHONE_COUNTRIES))
+                query += f" AND (country IN ({placeholders}) OR language = 'fr')"
+                params.extend(FRANCOPHONE_COUNTRIES)
+
+            # Filtre langue
+            if language:
+                query += " AND language = ?"
+                params.append(language.lower())
+
+            # Tri par interactions DESC, puis par date
+            query += " ORDER BY total_interactions DESC, scraped_at DESC LIMIT ?"
+            params.append(limit)
+
+            cursor = conn.execute(query, params)
+            columns = [desc[0] for desc in cursor.description]
+            articles = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            # Stats pour debug
+            if articles:
+                max_interactions = articles[0].get('total_interactions', 0)
+                min_in_result = articles[-1].get('total_interactions', 0) if articles else 0
+            else:
+                max_interactions = 0
+                min_in_result = 0
+
+        return {
+            "articles": articles,
+            "total": len(articles),
+            "filters_applied": {
+                "min_interactions": min_interactions,
+                "hours": hours,
+                "language": language,
+                "francophone_only": francophone_only,
+            },
+            "stats": {
+                "max_interactions": max_interactions,
+                "min_interactions_in_result": min_in_result,
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting top articles by interactions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

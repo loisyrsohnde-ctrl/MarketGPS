@@ -1212,23 +1212,24 @@
                 <!-- Filter Bar -->
                 <div class="control-bar" style="padding: 12px 20px; border-bottom: 1px solid var(--border);">
                     <select id="newsStatusFilter" onchange="loadArticles()">
-                        <option value="all">Tous</option>
+                        <option value="top_interactions" selected>🔥 TOP Interactions (francophone)</option>
                         <option value="top_v2">🧠 Top V2 (meilleurs scores)</option>
+                        <option value="trending">🔥 Trending (100+)</option>
                         <option value="pending">En attente</option>
                         <option value="published">Publiés</option>
                         <option value="rejected">Rejetés</option>
-                        <option value="trending">🔥 Trending (100+)</option>
+                        <option value="all">Tous (⚠️ lent)</option>
                     </select>
                     <input type="text" id="newsSearchInput" placeholder="🔍 Rechercher titre..." oninput="filterArticles()">
                     <select id="newsSortBy" onchange="filterArticles()">
+                        <option value="interactions" selected>Trier par Interactions</option>
                         <option value="date">Trier par Date</option>
-                        <option value="interactions">Trier par Interactions</option>
                         <option value="score_v2">Trier par Score V2</option>
                         <option value="title">Trier par Titre</option>
                     </select>
                     <select id="newsPerPage" onchange="loadArticles()">
-                        <option value="20">20 articles</option>
-                        <option value="50" selected>50 articles</option>
+                        <option value="20" selected>20 articles</option>
+                        <option value="50">50 articles</option>
                         <option value="100">100 articles</option>
                     </select>
                 </div>
@@ -1668,7 +1669,24 @@
             tbody.innerHTML = '<tr><td colspan="7" class="loading"><div class="spinner"></div>Chargement...</td></tr>';
 
             try {
-                // Special handling for Top V2 filter — uses dedicated endpoint
+                // 🔥 TOP Interactions filter — default, strict filtering
+                if (filter === 'top_interactions') {
+                    const url = `${API_URL}/news-admin/articles/top-interactions?limit=${newsPerPage}&min_interactions=50&hours=72&francophone_only=true`;
+                    const response = await fetch(url, {
+                        headers: { 'X-Admin-Key': adminKey }
+                    });
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData.detail || `Erreur HTTP ${response.status}`);
+                    }
+                    const data = await response.json();
+                    allArticles = data.articles || [];
+                    console.log(`✅ Loaded ${allArticles.length} TOP articles by interactions`, data.stats);
+                    filterArticles();
+                    return;
+                }
+
+                // Top V2 filter — uses score-based ranking
                 if (filter === 'top_v2') {
                     const url = `${API_URL}/news-admin/articles/top?limit=60&min_score=0`;
                     const response = await fetch(url, {
