@@ -17,12 +17,14 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from pydantic import BaseModel
 import logging
+from datetime import datetime
 
 from core.config import get_logger
 from storage.sqlite_store import SQLiteStore
 from security import get_user_id_from_request
 from services.virality_service import ViralityService, ViralArticle
 from services.video_script_service import VideoScriptService, VideoScript
+from services.francophone_filter_service import FrancophonicFilterService, FrancophonicArticle
 
 logger = get_logger(__name__)
 
@@ -35,11 +37,12 @@ db = SQLiteStore()
 # Initialize services
 virality_service = None
 video_script_service = None
+francophone_filter_service = None
 
 
 def get_services():
     """Récupère les instances des services."""
-    global virality_service, video_script_service
+    global virality_service, video_script_service, francophone_filter_service
 
     if not virality_service:
         virality_service = ViralityService(db_conn=db._get_conn)
@@ -47,7 +50,10 @@ def get_services():
     if not video_script_service:
         video_script_service = VideoScriptService(get_db_conn=db._get_conn)
 
-    return virality_service, video_script_service
+    if not francophone_filter_service:
+        francophone_filter_service = FrancophonicFilterService(db_conn=db._get_conn)
+
+    return virality_service, video_script_service, francophone_filter_service
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -111,6 +117,57 @@ class AutoProcessResponse(BaseModel):
     articles_processed: int
     scripts_generated: int
     scripts: List[VideoScriptResponse]
+
+
+class FrancophonicArticleResponse(BaseModel):
+    """Article francophone avec score de pertinence."""
+    article_id: int
+    title: str
+    source_name: str
+    country: str
+    language: str
+    total_interactions: int
+    published_at: Optional[str]
+    url: str
+
+    # Scoring components
+    interaction_score: float
+    language_score: float
+    region_score: float
+    recency_score: float
+    topic_score: float
+    francophone_relevance_score: float
+
+    # Status
+    is_featured: bool
+    rank: int
+
+
+class SourceMetricsResponse(BaseModel):
+    """Métriques d'une source."""
+    source_name: str
+    country: str
+    language: str
+    total_articles: int
+    median_interactions: float
+    avg_interactions: float
+    articles_above_2x_median: int
+
+
+class Top20Response(BaseModel):
+    """Réponse avec le TOP 20 articles francophones."""
+    date: str
+    articles: List[FrancophonicArticleResponse]
+    total_articles_analyzed: int
+    articles_qualified: int
+    featured_count: int
+    avg_relevance_score: float
+
+
+class MarkFeaturedRequest(BaseModel):
+    """Requête pour marquer un article comme vedette."""
+    article_id: int
+    featured: bool = True
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -558,4 +615,307 @@ async def auto_process_viral(
 
     except Exception as e:
         logger.error(f"Error in auto-process: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Francophone Strict Filtering Routes (TOP 20 Daily Selection)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/francophone/top20", response_model=Top20Response)
+async def get_francophone_top20(
+    days: int = Query(1, ge=1, le=7, description="Nombre de jours à analyser"),
+):
+    """
+    Récupère le TOP 20 des articles francophones les plus pertinents.
+
+    Critères de sélection stricte:
+    - Langue: Français uniquement
+    - Région: Afrique francophone + France, Belgique, Suisse, Canada
+    - Interactions: > 2x la médiane de la source
+    - Recency: Publié dans les 24-48 dernières heures
+    - Pertinence: Basée sur interactions, région, actualité, et thème
+
+    Query params:
+    - days: Nombre de jours à analyser (défaut: 1, max: 7)
+
+    Returns:
+        Top20Response avec les 20 meilleurs articles et statistiques
+    """
+    try:
+        _, _, filter_svc = get_services()
+
+        # Get top 20 articles
+        articles = filter_svc.get_daily_top_20(
+            days=days,
+            include_featured=True
+        )
+
+        if not articles:
+            return Top20Response(
+                date=datetime.utcnow().strftime("%Y-%m-%d"),
+                articles=[],
+                total_articles_analyzed=0,
+                articles_qualified=0,
+                featured_count=0,
+                avg_relevance_score=0.0
+            )
+
+        # Build response
+        article_responses = [
+            FrancophonicArticleResponse(
+                article_id=a.article_id,
+                title=a.title,
+                source_name=a.source_name,
+                country=a.country,
+                language=a.language,
+                total_interactions=a.total_interactions,
+                published_at=a.published_at,
+                url=a.url,
+                interaction_score=round(a.interaction_score, 2),
+                language_score=round(a.language_score, 2),
+                region_score=round(a.region_score, 2),
+                recency_score=round(a.recency_score, 2),
+                topic_score=round(a.topic_score, 2),
+                francophone_relevance_score=round(a.francophone_relevance_score, 2),
+                is_featured=a.is_featured,
+                rank=a.rank
+            )
+            for a in articles
+        ]
+
+        avg_score = (
+            sum(a.francophone_relevance_score for a in articles) / len(articles)
+            if articles else 0.0
+        )
+
+        featured_count = sum(1 for a in articles if a.is_featured)
+
+        return Top20Response(
+            date=datetime.utcnow().strftime("%Y-%m-%d"),
+            articles=article_responses,
+            total_articles_analyzed=0,  # Will be tracked in logging
+            articles_qualified=len(articles),
+            featured_count=featured_count,
+            avg_relevance_score=round(avg_score, 2)
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting francophone top 20: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/francophone/source-metrics", response_model=dict)
+async def get_francophone_source_metrics(
+    days: int = Query(30, ge=7, le=90, description="Nombre de jours à analyser"),
+):
+    """
+    Récupère les métriques de source pour le filtering strict.
+
+    Montre la médiane et la moyenne des interactions par source,
+    essentielles pour comprendre les seuils de qualification (2x médiane).
+
+    Query params:
+    - days: Nombre de jours à analyser (défaut: 30)
+
+    Returns:
+        Dict mapping source_name -> SourceMetricsResponse
+    """
+    try:
+        _, _, filter_svc = get_services()
+
+        metrics = filter_svc.get_source_metrics_report(days=days)
+
+        return {
+            name: {
+                "source_name": m.source_name,
+                "country": m.country,
+                "language": m.language,
+                "total_articles": m.total_articles,
+                "median_interactions": round(m.median_interactions, 2),
+                "avg_interactions": round(m.avg_interactions, 2),
+                "articles_above_2x_median": m.articles_above_2x_median,
+            }
+            for name, m in metrics.items()
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting source metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/francophone/mark-featured", response_model=dict)
+async def mark_article_featured(request: MarkFeaturedRequest):
+    """
+    Marque un article comme vedette (featured).
+
+    Les articles vedettes:
+    - Ignorent la règle du seuil 2x médiane
+    - Ont un boost de score de 1.5x
+    - Apparaissent toujours dans le TOP 20
+
+    Body:
+        - article_id: ID de l'article
+        - featured: True pour marquer, False pour demarquer (défaut: True)
+
+    Returns:
+        Dict avec succès/erreur
+    """
+    try:
+        _, _, filter_svc = get_services()
+
+        if request.featured:
+            success = filter_svc.mark_article_as_featured(request.article_id)
+            message = f"Article {request.article_id} marked as featured"
+        else:
+            success = filter_svc.unmark_article_as_featured(request.article_id)
+            message = f"Article {request.article_id} unmarked as featured"
+
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to update article")
+
+        return {
+            "success": True,
+            "message": message,
+            "article_id": request.article_id,
+            "featured": request.featured
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error marking article featured: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/francophone/recalculate-scores", response_model=dict)
+async def recalculate_francophone_scores():
+    """
+    Recalcule les scores de pertinence francophone pour tous les articles.
+
+    Cette opération doit être exécutée:
+    - Quotidiennement (tâche planifiée)
+    - Après l'ajout de nouveaux articles importants
+    - Après modification des paramètres de scoring
+
+    Peut prendre quelques secondes selon le nombre d'articles.
+
+    Returns:
+        Dict avec statistiques de recalcul
+    """
+    try:
+        _, _, filter_svc = get_services()
+
+        success = filter_svc.calculate_and_store_scores()
+
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to recalculate francophone scores"
+            )
+
+        return {
+            "success": True,
+            "message": "Francophone relevance scores recalculated",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error recalculating scores: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/viral", response_model=List[ViralArticleResponse])
+async def get_viral_articles_strict(
+    strict: bool = Query(
+        True,
+        description="Si True, utilise le filtering strict TOP 20. Si False, utilise les anciennes règles de viralité."
+    ),
+    limit: int = Query(20, ge=1, le=100, description="Nombre d'articles à retourner"),
+    francophone_only: bool = Query(False, description="Inclure seulement les sources francophones"),
+    min_virality: float = Query(1.0, ge=0.5, description="Score de viralité minimum"),
+    days: int = Query(7, ge=1, le=30, description="Nombre de jours à considérer"),
+):
+    """
+    Endpoint flexible pour les articles viraux.
+
+    Utilise le filtering strict TOP 20 par défaut (strict=True).
+    Compatible avec l'ancienne API virale avec strict=False.
+
+    Query params:
+    - strict: Utiliser le strict filtering TOP 20 (défaut: True)
+    - limit: Nombre max d'articles (défaut: 20)
+    - francophone_only: Seulement les sources francophones
+    - min_virality: Score minimum (pour mode non-strict)
+    - days: Nombre de jours à analyser
+
+    Returns:
+        List[ViralArticleResponse]
+    """
+    try:
+        if strict:
+            # New strict filtering mode
+            _, _, filter_svc = get_services()
+
+            articles = filter_svc.get_daily_top_20(
+                days=min(days, 2),  # Cap at 2 days for TOP 20
+                include_featured=True
+            )
+
+            return [
+                ViralArticleResponse(
+                    article_id=str(a.article_id),
+                    title=a.title,
+                    source_name=a.source_name,
+                    interactions=a.total_interactions,
+                    virality_score=a.francophone_relevance_score / 10.0,
+                    region=a.country,
+                    language=a.language,
+                    published_at=a.published_at,
+                    url=a.url,
+                )
+                for a in articles[:limit]
+            ]
+        else:
+            # Old virality mode (backward compatibility)
+            virality_svc, _, _ = get_services()
+
+            viral_articles = virality_svc.get_viral_articles(
+                limit=limit,
+                include_francophone_priority=not francophone_only,
+                virality_multiplier=10.0,
+                days=days,
+            )
+
+            # Filter by minimum virality
+            filtered = [
+                a for a in viral_articles
+                if a.virality_score >= min_virality
+            ]
+
+            # Filter by francophone if requested
+            if francophone_only:
+                filtered = [a for a in filtered if a.language == 'fr']
+
+            # Convert to response
+            return [
+                ViralArticleResponse(
+                    article_id=a.article_id,
+                    title=a.title,
+                    source_name=a.source_name,
+                    interactions=a.interactions,
+                    virality_score=a.virality_score,
+                    region=a.region,
+                    language=a.language,
+                    published_at=a.published_at,
+                    url=a.url,
+                )
+                for a in filtered[:limit]
+            ]
+
+    except Exception as e:
+        logger.error(f"Error getting viral articles: {e}")
         raise HTTPException(status_code=500, detail=str(e))

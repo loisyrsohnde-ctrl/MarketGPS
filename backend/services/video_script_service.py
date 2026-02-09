@@ -10,8 +10,8 @@ Style caractéristique:
 
 import json
 import sqlite3
-from typing import Optional, Dict, List
-from dataclasses import dataclass, asdict
+from typing import Optional, Dict, List, Any
+from dataclasses import dataclass, asdict, field
 from datetime import datetime
 import logging
 import uuid
@@ -19,7 +19,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# Template Gemini pour la génération de scripts
+# Template Gemini pour la génération de scripts courts (Hugo Décrypte style)
 HUGO_DECRYPTE_PROMPT = '''Tu es un rédacteur de scripts pour des vidéos d'actualité style "Hugo Décrypte".
 
 STYLE HUGO DÉCRYPTE:
@@ -55,6 +55,209 @@ RÉPONDS EN JSON:
   "script": "Le script complet pour voix off (300-500 mots)",
   "key_facts": ["fait clé 1", "fait clé 2", "fait clé 3"],
   "sources_to_cite": ["source 1", "source 2"]
+}}'''
+
+# Template pour scripts YouTube longs (10 minutes)
+YOUTUBE_LONG_FORM_PROMPT = '''Tu es un rédacteur expert en création de contenus YouTube pour un public francophone africain et global.
+
+OBJECTIF:
+Créer un script pour une vidéo YouTube de 10 minutes (~1500 mots) qui propose une analyse approfondie d'un sujet d'actualité.
+
+STYLE:
+- Accroche percutante dans les 3 premières secondes
+- Ton expert mais accessible (pas de jargon non expliqué)
+- Structure narrative qui maintient l'engagement
+- Adressé directement aux spectateurs ("tu", "vous")
+- Utilise des transitions fluides entre les sections
+- Inclut des moments de "révélation" ou de "twist" informatif
+
+STRUCTURE REQUISE:
+1. INTRO HOOK (15 secondes): Question rhétorique ou statement qui captive
+2. CONTEXTE GLOBAL (1-2 minutes): Background, historique, qui est affecté
+3. ANALYSE APPROFONDIE (4-5 sections, 6-8 minutes):
+   - Causes/origines
+   - Impacts économiques/sociaux
+   - Perspectives régionales (Afrique, monde)
+   - Perspectives futures/tendances
+4. EXPERT INSIGHTS (1-2 minutes): Ce que les experts disent, données clés
+5. IMPLICATIONS PRATIQUES (1 minute): "Pourquoi tu devrais t'en soucier"
+6. CONCLUSION + CTA (30 secondes): Résumé, appel à l'action (like, subscribe, comment)
+
+CONTRAINTES:
+- Exactement entre 1400-1600 mots
+- Destiné à être lu en voix off (pas de dialogues)
+- Chaque section doit être claire et mémorable
+- Inclure au minimum 3 statistiques/données concrètes
+- Pas de publicités déguisées ou promotions
+- Langage neutre et factuel
+
+ARTICLE À ANALYSER:
+Titre: {title}
+Source: {source}
+Date: {date}
+Contenu: {content}
+
+RÉPONDS EN JSON:
+{{
+  "title_suggestions": [
+    "Suggestion 1 pour titre YouTube (50-60 caractères)",
+    "Suggestion 2 pour titre YouTube",
+    "Suggestion 3 pour titre YouTube"
+  ],
+  "description": "Description YouTube complète avec timestamps de chaque section (200-300 mots)",
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "script_sections": [
+    {{
+      "section": "intro",
+      "duration_seconds": 15,
+      "title": "Hook d'introduction",
+      "content": "Texte exact pour voix off..."
+    }},
+    {{
+      "section": "context",
+      "duration_seconds": 90,
+      "title": "Contexte global",
+      "content": "Texte exact pour voix off..."
+    }},
+    {{
+      "section": "analysis_part1",
+      "duration_seconds": 120,
+      "title": "Causes et origines",
+      "content": "Texte exact pour voix off..."
+    }},
+    {{
+      "section": "analysis_part2",
+      "duration_seconds": 120,
+      "title": "Impacts économiques",
+      "content": "Texte exact pour voix off..."
+    }},
+    {{
+      "section": "analysis_part3",
+      "duration_seconds": 120,
+      "title": "Perspective africaine",
+      "content": "Texte exact pour voix off..."
+    }},
+    {{
+      "section": "analysis_part4",
+      "duration_seconds": 120,
+      "title": "Tendances futures",
+      "content": "Texte exact pour voix off..."
+    }},
+    {{
+      "section": "expert_insights",
+      "duration_seconds": 90,
+      "title": "Ce que disent les experts",
+      "content": "Texte exact pour voix off..."
+    }},
+    {{
+      "section": "implications",
+      "duration_seconds": 60,
+      "title": "Pourquoi c'est important pour toi",
+      "content": "Texte exact pour voix off..."
+    }},
+    {{
+      "section": "conclusion",
+      "duration_seconds": 30,
+      "title": "Conclusion et appel à l'action",
+      "content": "Texte exact pour voix off..."
+    }}
+  ],
+  "total_word_count": 1500,
+  "key_statistics": [
+    {"stat": "Statistique 1", "source": "Source of stat"},
+    {"stat": "Statistique 2", "source": "Source of stat"}
+  ],
+  "thumbnail_suggestions": [
+    "Text to display on thumbnail 1",
+    "Text to display on thumbnail 2"
+  ]
+}}'''
+
+# Template pour enrichissement d'articles
+ARTICLE_ENRICHMENT_PROMPT = '''Tu es un chercheur et analyste spécialisé dans les actualités africaines et mondiales.
+
+TÂCHE:
+Enrichir le contenu d'un article en ajoutant:
+1. Contexte historique pertinent
+2. Statistiques et données clés
+3. Perspectives régionales (particulièrement Afrique)
+4. Tendances et prédictions
+5. Acteurs clés impliqués
+
+L'enrichissement doit:
+- Rester factuel et sourcé
+- Ajouter de la profondeur au sujet
+- Être compréhensible par un public non-expert
+- Inclure au minimum 3 faits/données supplémentaires
+- Respecter l'angle original de l'article
+
+ARTICLE À ENRICHIR:
+Titre: {title}
+Contenu original: {content}
+
+RÉPONDS EN JSON:
+{{
+  "enriched_content": "Contenu original enrichi avec contexte, statistiques et analyse approfondie",
+  "added_statistics": [
+    {{
+      "statistic": "La statistique",
+      "context": "Explication et contexte",
+      "source": "Source si disponible"
+    }}
+  ],
+  "historical_context": "Contexte historique pertinent en 2-3 paragraphes",
+  "regional_impact": {{
+    "africa": "Impact et pertinence pour l'Afrique",
+    "global": "Perspective mondiale"
+  }},
+  "key_actors": ["Acteur 1", "Acteur 2", "Acteur 3"],
+  "future_implications": "Tendances et implications futures en 2-3 paragraphes"
+}}'''
+
+# Template pour métadonnées sociales
+SOCIAL_METADATA_PROMPT = '''Tu es un expert en optimisation de contenu pour réseaux sociaux et YouTube.
+
+TÂCHE:
+Générer des métadonnées optimisées pour partage sur YouTube et réseaux sociaux:
+1. 3 variantes de titre YouTube (différentes longueurs et angles)
+2. Description YouTube détaillée avec timestamps
+3. Hashtags pertinents (mix de populaires et nichés)
+4. Suggestions pour miniatures/thumbnails
+
+Optimisation requise:
+- Titres: Hook fort, mots-clés importants au début
+- Description: Structure avec timestamps, CTA, liens
+- Hashtags: 10-15 hashtags variés et pertinents
+- Thumbnails: Texte court, accrocheur, en français
+
+ARTICLE:
+Titre: {title}
+Contenu: {content}
+
+RÉPONDS EN JSON:
+{{
+  "title_variants": [
+    {{
+      "variant": "Titre long pour maximum visibilité (55-60 caractères)",
+      "approach": "Approche utilisée (curiosity gap, numbers, etc)"
+    }},
+    {{
+      "variant": "Titre court et direct (40-45 caractères)",
+      "approach": "Approche utilisée"
+    }},
+    {{
+      "variant": "Titre avec angle africain/local",
+      "approach": "Approche utilisée"
+    }}
+  ],
+  "description": "Description YouTube complète:\\n00:00 - Introduction\\n00:30 - Premier point\\n02:15 - Deuxième point\\n...\\n\\nContenu et contexte...\\n\\nSuscribe pour plus de contenu...\\n\\n#hashtag #hashtag",
+  "hashtags": ["#hashtag1", "#hashtag2", "#hashtag3"],
+  "thumbnail_text_options": [
+    "Texte court et impactant pour thumbnail",
+    "Alternative 2",
+    "Alternative 3"
+  ],
+  "seo_keywords": ["keyword1", "keyword2", "keyword3"]
 }}'''
 
 @dataclass
@@ -112,6 +315,63 @@ class VideoScript:
             created_at=created_at,
             updated_at=updated_at,
         )
+
+
+@dataclass
+class YouTubeScript:
+    """Représente un script YouTube long-form (10 minutes)."""
+    id: str
+    article_id: str
+    title_suggestions: List[str]
+    description: str
+    tags: List[str]
+    script_sections: List[Dict[str, Any]]
+    total_word_count: int
+    key_statistics: List[Dict[str, str]]
+    thumbnail_suggestions: List[str]
+    status: str = 'draft'
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+
+    def to_dict(self) -> Dict:
+        """Convertit en dictionnaire."""
+        return asdict(self)
+
+
+@dataclass
+class SocialMetadata:
+    """Métadonnées sociales pour un article."""
+    id: str
+    article_id: str
+    title_variants: List[Dict[str, str]]
+    description: str
+    hashtags: List[str]
+    thumbnail_text_options: List[str]
+    seo_keywords: List[str]
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+
+    def to_dict(self) -> Dict:
+        """Convertit en dictionnaire."""
+        return asdict(self)
+
+
+@dataclass
+class EnrichedArticle:
+    """Article enrichi avec contexte et données additionnelles."""
+    id: str
+    original_article_id: str
+    enriched_content: str
+    added_statistics: List[Dict[str, str]]
+    historical_context: str
+    regional_impact: Dict[str, str]
+    key_actors: List[str]
+    future_implications: str
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+
+    def to_dict(self) -> Dict:
+        """Convertit en dictionnaire."""
+        return asdict(self)
 
 
 class VideoScriptService:
@@ -575,6 +835,94 @@ class VideoScriptService:
         """Génère un ID unique pour le script."""
         return f"script_{uuid.uuid4().hex[:12]}"
 
+    def rewrite_as_journalistic_article(
+        self,
+        article_content: str,
+        script_text: str,
+    ) -> Optional[str]:
+        """
+        Rédige le script vidéo en style article journalistique professionnel.
+
+        Transforme un script vidéo court en article blog/actualité complet:
+        - Enrichissement de contexte et de faits
+        - Structure journalistique (introduction, développement, conclusion)
+        - Ton professionnel et inclusif
+        - Adaptation pour lecture linéaire (vs. voix off)
+
+        Args:
+            article_content: Contenu complet de l'article source
+            script_text: Texte du script vidéo à transformer
+
+        Returns:
+            Article journalistique rédité, ou None si erreur
+        """
+        if not self.model:
+            logger.error("Gemini model not configured for journalistic rewrite")
+            return None
+
+        prompt = '''Tu es un journaliste professionnel rédigeant pour un blog/portail d'actualités.
+
+TÂCHE:
+Transformer ce script vidéo court en article journalistique complet et professionnel.
+
+STYLE REQUIS:
+- Introduction accrocheuse avec le fait principal
+- Structure claire: Contexte → Enjeux → Développement → Conclusion
+- Ton professionnel, factuel et accessible
+- Paragraphes bien structurés (4-6 phrases chacun)
+- Inclusion de détails et contexte enrichis
+- Longueur cible: 500-800 mots
+
+ENRICHISSEMENT:
+- Ajouter contexte historique ou comparatif si pertinent
+- Inclure citations ou chiffres si disponibles
+- Expliquer les enjeux et implications
+- Adapter pour lectorat large (pas uniquement francophone)
+
+STRUCTURE RECOMMANDÉE:
+1. Titre accrocheur (optionnel, sur une ligne seule)
+2. Chapô/lead (1-2 phrases percutantes)
+3. 3-4 paragraphes de développement
+4. Conclusion ou perspective
+
+ORIGINAL (script vidéo):
+{script}
+
+ARTICLE SOURCE (pour enrichissement):
+{article}
+
+Rédige directement l'article sans explications préalables. Commence par le titre si pertinent, puis le contenu.
+'''
+
+        try:
+            logger.info("Rewriting script as journalistic article")
+            prompt_formatted = prompt.format(
+                script=script_text[:2000],  # Limiter la longueur
+                article=article_content[:3000],
+            )
+
+            response = self.model.generate_content(prompt_formatted)
+            rewritten = response.text.strip()
+
+            if not rewritten:
+                logger.warning("Gemini returned empty response for journalistic rewrite")
+                return None
+
+            # Nettoyer les artefacts markdown si présents
+            if rewritten.startswith("```"):
+                # Si c'est un bloc de code, l'extraire
+                if "```markdown" in rewritten:
+                    rewritten = rewritten.split("```markdown")[1].split("```")[0].strip()
+                elif "```" in rewritten:
+                    rewritten = rewritten.split("```")[1].split("```")[0].strip()
+
+            logger.info(f"Journalistic rewrite completed: {len(rewritten)} characters")
+            return rewritten
+
+        except Exception as e:
+            logger.error(f"Error rewriting as journalistic article: {e}")
+            return None
+
     def _save_script(self, script: VideoScript):
         """Sauvegarde le script en base de données."""
         if not self.get_conn:
@@ -611,3 +959,246 @@ class VideoScriptService:
 
         except Exception as e:
             logger.error(f"Error saving script: {e}")
+
+    def generate_youtube_script(
+        self,
+        article_content: str,
+        article_title: str,
+        article_id: Optional[str] = None,
+        source: str = "Unknown",
+        date: str = "",
+    ) -> Optional[YouTubeScript]:
+        """
+        Génère un script YouTube long-form (10 minutes, ~1500 mots).
+
+        Inclut: accroche, contexte, plusieurs sections d'analyse, expert insights,
+        implications pratiques, et conclusion avec CTA.
+
+        Args:
+            article_content: Contenu de l'article à transformer
+            article_title: Titre de l'article
+            article_id: ID de l'article (optionnel)
+            source: Source de l'article
+            date: Date de publication
+
+        Returns:
+            YouTubeScript généré, ou None si erreur
+        """
+        if not self.model:
+            logger.error("Gemini model not configured — GEMINI_API_KEY missing or invalid")
+            return None
+
+        prompt = YOUTUBE_LONG_FORM_PROMPT.format(
+            title=article_title,
+            source=source,
+            date=date,
+            content=article_content[:6000],  # Augmenter la limite pour plus de contexte
+        )
+
+        try:
+            logger.info(f"Generating YouTube long-form script for {article_title}")
+            response = self.model.generate_content(prompt)
+            result = self._parse_response(response.text)
+
+            # Valider la réponse
+            required_keys = ['title_suggestions', 'description', 'tags', 'script_sections', 'total_word_count']
+            if not all(k in result for k in required_keys):
+                logger.error(f"Invalid response format for YouTube script: missing keys")
+                return None
+
+            youtube_script = YouTubeScript(
+                id=self._generate_id(),
+                article_id=article_id or self._generate_id(),
+                title_suggestions=result.get('title_suggestions', []),
+                description=result.get('description', ''),
+                tags=result.get('tags', []),
+                script_sections=result.get('script_sections', []),
+                total_word_count=result.get('total_word_count', 0),
+                key_statistics=result.get('key_statistics', []),
+                thumbnail_suggestions=result.get('thumbnail_suggestions', []),
+                status='draft',
+            )
+
+            logger.info(f"YouTube script generated successfully: {youtube_script.id}")
+            return youtube_script
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing error in YouTube script generation: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error generating YouTube script: {e}")
+            return None
+
+    def generate_social_metadata(
+        self,
+        article_content: str,
+        article_title: str,
+        article_id: Optional[str] = None,
+    ) -> Optional[SocialMetadata]:
+        """
+        Génère des métadonnées optimisées pour réseaux sociaux et YouTube.
+
+        Inclut:
+        - 3 variantes de titre (différents angles et longueurs)
+        - Description YouTube avec timestamps
+        - Hashtags et mots-clés SEO
+        - Suggestions pour miniatures/thumbnails
+
+        Args:
+            article_content: Contenu de l'article
+            article_title: Titre de l'article
+            article_id: ID de l'article (optionnel)
+
+        Returns:
+            SocialMetadata générées, ou None si erreur
+        """
+        if not self.model:
+            logger.error("Gemini model not configured — GEMINI_API_KEY missing or invalid")
+            return None
+
+        prompt = SOCIAL_METADATA_PROMPT.format(
+            title=article_title,
+            content=article_content[:4000],
+        )
+
+        try:
+            logger.info(f"Generating social metadata for {article_title}")
+            response = self.model.generate_content(prompt)
+            result = self._parse_response(response.text)
+
+            # Valider la réponse
+            required_keys = ['title_variants', 'description', 'hashtags', 'thumbnail_text_options', 'seo_keywords']
+            if not all(k in result for k in required_keys):
+                logger.error(f"Invalid response format for social metadata: missing keys")
+                return None
+
+            metadata = SocialMetadata(
+                id=self._generate_id(),
+                article_id=article_id or self._generate_id(),
+                title_variants=result.get('title_variants', []),
+                description=result.get('description', ''),
+                hashtags=result.get('hashtags', []),
+                thumbnail_text_options=result.get('thumbnail_text_options', []),
+                seo_keywords=result.get('seo_keywords', []),
+            )
+
+            logger.info(f"Social metadata generated successfully: {metadata.id}")
+            return metadata
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing error in social metadata generation: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error generating social metadata: {e}")
+            return None
+
+    def enrich_article_with_research(
+        self,
+        article_content: str,
+        article_title: str,
+        article_id: Optional[str] = None,
+    ) -> Optional[EnrichedArticle]:
+        """
+        Enrichit un article avec recherche et contexte supplémentaire.
+
+        Ajoute:
+        - Contexte historique pertinent
+        - Statistiques et données clés
+        - Perspectives régionales (notamment Afrique)
+        - Tendances et prédictions futures
+        - Acteurs clés impliqués
+
+        Args:
+            article_content: Contenu de l'article original
+            article_title: Titre de l'article
+            article_id: ID de l'article (optionnel)
+
+        Returns:
+            EnrichedArticle avec contexte supplémentaire, ou None si erreur
+        """
+        if not self.model:
+            logger.error("Gemini model not configured — GEMINI_API_KEY missing or invalid")
+            return None
+
+        prompt = ARTICLE_ENRICHMENT_PROMPT.format(
+            title=article_title,
+            content=article_content[:5000],
+        )
+
+        try:
+            logger.info(f"Enriching article with research: {article_title}")
+            response = self.model.generate_content(prompt)
+            result = self._parse_response(response.text)
+
+            # Valider la réponse
+            required_keys = ['enriched_content', 'added_statistics', 'historical_context',
+                           'regional_impact', 'key_actors', 'future_implications']
+            if not all(k in result for k in required_keys):
+                logger.error(f"Invalid response format for article enrichment: missing keys")
+                return None
+
+            enriched = EnrichedArticle(
+                id=self._generate_id(),
+                original_article_id=article_id or self._generate_id(),
+                enriched_content=result.get('enriched_content', ''),
+                added_statistics=result.get('added_statistics', []),
+                historical_context=result.get('historical_context', ''),
+                regional_impact=result.get('regional_impact', {}),
+                key_actors=result.get('key_actors', []),
+                future_implications=result.get('future_implications', ''),
+            )
+
+            logger.info(f"Article enriched successfully: {enriched.id}")
+            return enriched
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing error in article enrichment: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error enriching article: {e}")
+            return None
+
+    def get_youtube_script_by_article(self, article_id: str) -> Optional[Dict]:
+        """
+        Récupère les données d'un script YouTube pour un article.
+
+        Args:
+            article_id: ID de l'article
+
+        Returns:
+            Dict avec le script YouTube, ou None
+        """
+        # Note: Implémentation simplifiée - dans une vraie app,
+        # il faudrait stocker les YouTubeScript en BD
+        logger.info(f"Retrieving YouTube script for article {article_id}")
+        return None
+
+    def get_social_metadata_by_article(self, article_id: str) -> Optional[Dict]:
+        """
+        Récupère les métadonnées sociales d'un article.
+
+        Args:
+            article_id: ID de l'article
+
+        Returns:
+            Dict avec les métadonnées, ou None
+        """
+        # Note: Implémentation simplifiée - dans une vraie app,
+        # il faudrait stocker les SocialMetadata en BD
+        logger.info(f"Retrieving social metadata for article {article_id}")
+        return None
+
+    def get_enriched_article(self, article_id: str) -> Optional[Dict]:
+        """
+        Récupère un article enrichi.
+
+        Args:
+            article_id: ID de l'article
+
+        Returns:
+            Dict avec l'article enrichi, ou None
+        """
+        # Note: Implémentation simplifiée - dans une vraie app,
+        # il faudrait stocker les EnrichedArticle en BD
+        logger.info(f"Retrieving enriched article {article_id}")
+        return None

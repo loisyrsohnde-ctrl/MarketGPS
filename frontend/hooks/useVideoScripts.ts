@@ -33,20 +33,25 @@ export function useVideoScripts(params?: UseVideoScriptsParams): UseVideoScripts
       if (params?.page) queryParams.append('page', params.page.toString());
       if (params?.limit) queryParams.append('limit', params.limit.toString());
 
-      const response = await fetch(
-        `/api/admin/scripts?${queryParams.toString()}`
-      );
+      const url = `/api/admin/scripts?${queryParams.toString()}`;
+      console.log('Fetching scripts from:', url);
+
+      const response = await fetch(url);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch scripts');
+        throw new Error(`Failed to fetch scripts: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('Scripts response:', data);
+
       setScripts(data.scripts || []);
       setTotal(data.total || 0);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      console.error('Error fetching scripts:', errorMessage);
+      setError(errorMessage);
       setScripts([]);
     } finally {
       setLoading(false);

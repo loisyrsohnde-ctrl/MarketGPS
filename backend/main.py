@@ -50,6 +50,7 @@ from notifications_routes import router as notifications_router
 from portfolio_routes import router as portfolio_router
 from gamification_routes import router as gamification_router
 from viral_news_routes import router as viral_news_router
+from admin_news_api import router as admin_news_router
 
 # Middleware imports (v15 institutional stack)
 from middleware import (
@@ -425,6 +426,7 @@ app.include_router(gamification_router)  # Gamification system (ADD-ON)
 app.include_router(notifications_router)  # Notifications & Alerts (ADD-ON)
 app.include_router(portfolio_router)  # Portfolio Sync (ADD-ON) - Read-only, no trading
 app.include_router(viral_news_router)  # Viral news & video scripts (ADD-ON)
+app.include_router(admin_news_router)  # Unified admin news API (ADD-ON)
 
 
 # ============================================================================

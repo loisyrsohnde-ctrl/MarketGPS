@@ -3,13 +3,15 @@
 import { useState } from 'react';
 import { useViralNews } from '@/hooks/useViralNews';
 import { NewsTable } from '@/components/admin/NewsTable';
-import { Filter, RefreshCw } from 'lucide-react';
+import { Filter, RefreshCw, LayoutGrid, List } from 'lucide-react';
 
 export default function NewsPage() {
   const [region, setRegion] = useState<string>();
   const [language, setLanguage] = useState<string>();
   const [minViralityScore, setMinViralityScore] = useState<number>();
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
 
   const { articles, total, loading, error, refetch } = useViralNews({
     region,
@@ -20,6 +22,7 @@ export default function NewsPage() {
   });
 
   const handleGenerateScript = async (articleId: string) => {
+    setGeneratingId(articleId);
     try {
       const response = await fetch('/api/admin/scripts/generate', {
         method: 'POST',
@@ -28,10 +31,18 @@ export default function NewsPage() {
       });
 
       if (response.ok) {
-        refetch();
+        const data = await response.json();
+        console.log('Script generated:', data);
+        // Refetch to update the hasScript status
+        await refetch();
+      } else {
+        const errorData = await response.json();
+        console.error('Error generating script:', errorData);
       }
     } catch (error) {
       console.error('Erreur lors de la génération du script:', error);
+    } finally {
+      setGeneratingId(null);
     }
   };
 
@@ -143,25 +154,55 @@ export default function NewsPage() {
         </div>
       )}
 
-      {/* Stats */}
-      {!loading && (
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          {total > 0 ? (
-            <>
-              Affichage de <strong>1-{Math.min(20, total)}</strong> sur{' '}
-              <strong>{total}</strong> actualités
-            </>
-          ) : (
-            'Aucune actualité trouvée'
-          )}
-        </div>
-      )}
+      {/* View Controls & Stats */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {/* Stats */}
+        {!loading && (
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            {total > 0 ? (
+              <>
+                Affichage de <strong>1-{Math.min(20, total)}</strong> sur{' '}
+                <strong>{total}</strong> actualités
+              </>
+            ) : (
+              'Aucune actualité trouvée'
+            )}
+          </div>
+        )}
 
-      {/* News Table */}
+        {/* View Mode Toggle */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewMode('cards')}
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              viewMode === 'cards'
+                ? 'bg-blue-600 text-white dark:bg-blue-500'
+                : 'border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800'
+            }`}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Cartes
+          </button>
+          <button
+            onClick={() => setViewMode('table')}
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              viewMode === 'table'
+                ? 'bg-blue-600 text-white dark:bg-blue-500'
+                : 'border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800'
+            }`}
+          >
+            <List className="h-4 w-4" />
+            Tableau
+          </button>
+        </div>
+      </div>
+
+      {/* News Table/Cards */}
       <NewsTable
         articles={articles}
         isLoading={loading}
         onGenerateScript={handleGenerateScript}
+        viewMode={viewMode}
       />
 
       {/* Pagination */}
