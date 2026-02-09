@@ -1670,8 +1670,9 @@
 
             try {
                 // 🔥 TOP Interactions filter — default, strict filtering
+                // Uses /trending endpoint (100+ interactions) with strict limit
                 if (filter === 'top_interactions') {
-                    const url = `${API_URL}/news-admin/articles/top-interactions?limit=${newsPerPage}&min_interactions=50&hours=72&francophone_only=true`;
+                    const url = `${API_URL}/news-admin/trending?limit=${newsPerPage}`;
                     const response = await fetch(url, {
                         headers: { 'X-Admin-Key': adminKey }
                     });
@@ -1680,8 +1681,11 @@
                         throw new Error(errData.detail || `Erreur HTTP ${response.status}`);
                     }
                     const data = await response.json();
-                    allArticles = data.articles || [];
-                    console.log(`✅ Loaded ${allArticles.length} TOP articles by interactions`, data.stats);
+                    // Sort by interactions DESC and limit
+                    let articles = data.articles || data || [];
+                    articles.sort((a, b) => (b.total_interactions || 0) - (a.total_interactions || 0));
+                    allArticles = articles.slice(0, newsPerPage);
+                    console.log(`✅ Loaded ${allArticles.length} TOP articles (100+ interactions)`);
                     filterArticles();
                     return;
                 }
