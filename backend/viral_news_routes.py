@@ -199,7 +199,7 @@ async def get_viral_articles(
         List[ViralArticleResponse]
     """
     try:
-        virality_svc, _ = get_services()
+        virality_svc, _, _ = get_services()
 
         viral_articles = virality_svc.get_viral_articles(
             limit=limit,
@@ -251,7 +251,7 @@ async def get_source_stats(days: int = Query(30, ge=7, le=90)):
         Dict avec source_name -> SourceStatsResponse
     """
     try:
-        virality_svc, _ = get_services()
+        virality_svc, _, _ = get_services()
 
         stats = virality_svc.calculate_source_stats(days=days)
 
@@ -286,7 +286,7 @@ async def generate_video_script(
         VideoScriptResponse avec le script généré
     """
     try:
-        _, video_svc = get_services()
+        _, video_svc, _ = get_services()
 
         # Récupérer l'article
         conn = db._get_conn()
@@ -365,7 +365,7 @@ async def get_scripts(
         List[VideoScriptResponse]
     """
     try:
-        _, video_svc = get_services()
+        _, video_svc, _ = get_services()
 
         scripts = video_svc.get_scripts(status=status, limit=limit, offset=offset)
 
@@ -404,7 +404,7 @@ async def get_script(script_id: str):
         VideoScriptResponse
     """
     try:
-        _, video_svc = get_services()
+        _, video_svc, _ = get_services()
 
         script = video_svc.get_script_by_id(script_id)
 
@@ -453,7 +453,7 @@ async def update_script(
         VideoScriptResponse mis à jour
     """
     try:
-        _, video_svc = get_services()
+        _, video_svc, _ = get_services()
 
         success = video_svc.update_script(
             script_id=script_id,
@@ -505,7 +505,7 @@ async def publish_script_to_news(script_id: str):
         Dict avec succès/erreur
     """
     try:
-        _, video_svc = get_services()
+        _, video_svc, _ = get_services()
 
         success = video_svc.publish_script_to_news(script_id)
 
@@ -540,7 +540,7 @@ async def auto_process_viral(
         AutoProcessResponse avec articles et scripts générés
     """
     try:
-        virality_svc, video_svc = get_services()
+        virality_svc, video_svc, _ = get_services()
 
         # Récupérer les articles viraux
         viral_articles = virality_svc.get_viral_articles(
