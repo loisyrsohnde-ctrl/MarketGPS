@@ -1207,6 +1207,11 @@
                         <span id="scoreV2Spinner" style="display: none;"><span class="spinner" style="margin-right: 6px; margin-bottom: 0;"></span></span>
                         🧠 Score V2
                     </button>
+                    <span style="color: var(--border);">|</span>
+                    <button class="btn" style="background: #ef4444; color: white; font-weight: 600;" onclick="runCleanup()" title="🧹 Nettoyer: Garder TOP 50 des 5 derniers jours, supprimer le reste">
+                        <span id="cleanupSpinner" style="display: none;"><span class="spinner" style="margin-right: 6px; margin-bottom: 0;"></span></span>
+                        🧹 Nettoyer
+                    </button>
                 </div>
 
                 <!-- Filter Bar -->
@@ -2160,6 +2165,69 @@
                 }
             } catch (e) {
                 showToast('Erreur de connexion: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        }
+
+        async function runCleanup() {
+            const btn = event.target.closest('button');
+            const spinner = document.getElementById('cleanupSpinner');
+
+            // Confirmation dialog
+            const confirmed = confirm(
+                '⚠️ ATTENTION: Nettoyage de la base de données\n\n' +
+                'Cette action va:\n' +
+                '• Garder uniquement le TOP 50 articles des 5 derniers jours\n' +
+                '• SUPPRIMER tous les autres articles (~' + (parseInt(document.getElementById('newsTotal')?.textContent || 0) - 50) + ' articles)\n\n' +
+                'Cette action est IRRÉVERSIBLE!\n\n' +
+                'Continuer?'
+            );
+
+            if (!confirmed) {
+                showToast('Nettoyage annulé', 'info');
+                return;
+            }
+
+            btn.disabled = true;
+            spinner.style.display = 'inline';
+            showToast('🧹 Nettoyage en cours... Suppression des anciens articles', 'info');
+
+            try {
+                // First do a dry run to show what will be deleted
+                const dryResponse = await fetch(`${API_URL}/news-admin/cleanup?keep_days=5&keep_top=50&dry_run=true`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+
+                if (!dryResponse.ok) {
+                    const err = await dryResponse.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Échec de la simulation');
+                }
+
+                const dryData = await dryResponse.json();
+                console.log('Dry run result:', dryData);
+
+                // Now do the actual cleanup
+                const response = await fetch(`${API_URL}/news-admin/cleanup?keep_days=5&keep_top=50&dry_run=false`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Key': adminKey }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showToast(`✅ ${data.actually_deleted || 0} articles supprimés! Reste: ${data.total_after || 0} articles`, 'success');
+
+                    // Reload stats and articles
+                    await loadNewsStats();
+                    await loadArticles();
+                } else {
+                    const err = await response.json().catch(() => ({}));
+                    showToast('Erreur nettoyage: ' + (err.detail || 'Échec'), 'error');
+                }
+            } catch (e) {
+                showToast('Erreur: ' + e.message, 'error');
             } finally {
                 btn.disabled = false;
                 spinner.style.display = 'none';

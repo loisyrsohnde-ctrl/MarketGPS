@@ -290,6 +290,117 @@ async def reject_article(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/cleanup")
+async def cleanup_articles(
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+    keep_days: int = Query(5, ge=1, le=30, description="Garder articles des X derniers jours"),
+    keep_top: int = Query(50, ge=10, le=200, description="Garder TOP N articles par interactions"),
+    dry_run: bool = Query(True, description="Simulation sans suppression réelle"),
+):
+    """
+    🧹 NETTOYAGE de la base de données - Garde seulement le TOP des derniers jours.
+
+    ⚠️ ATTENTION: Supprime définitivement les articles!
+
+    Paramètres:
+    - keep_days: Garder uniquement les articles des X derniers jours (défaut: 5)
+    - keep_top: Garder le TOP N articles par interactions (défaut: 50)
+    - dry_run: Si true, simule sans supprimer (défaut: true)
+
+    Logique:
+    1. Sélectionne les TOP N articles des X derniers jours, triés par interactions
+    2. Supprime TOUS les autres articles
+    """
+    require_admin(admin_key)
+
+    from datetime import datetime, timedelta
+
+    try:
+        with db._get_conn() as conn:
+            # Calculer la date limite
+            cutoff_date = (datetime.utcnow() - timedelta(days=keep_days)).isoformat()
+
+            # Compter les articles actuels
+            total_before = conn.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0]
+
+            # Trouver les IDs des TOP articles à garder
+            # (articles des X derniers jours, triés par interactions, limite N)
+            keep_query = """
+                SELECT id FROM news_articles
+                WHERE scraped_at >= ?
+                ORDER BY total_interactions DESC
+                LIMIT ?
+            """
+            cursor = conn.execute(keep_query, [cutoff_date, keep_top])
+            ids_to_keep = [row[0] for row in cursor.fetchall()]
+
+            # Compter ce qui sera supprimé
+            if ids_to_keep:
+                placeholders = ','.join('?' * len(ids_to_keep))
+                to_delete_count = conn.execute(
+                    f"SELECT COUNT(*) FROM news_articles WHERE id NOT IN ({placeholders})",
+                    ids_to_keep
+                ).fetchone()[0]
+            else:
+                to_delete_count = total_before
+
+            # Statistiques des articles gardés
+            if ids_to_keep:
+                placeholders = ','.join('?' * len(ids_to_keep))
+                stats_query = f"""
+                    SELECT
+                        MIN(total_interactions) as min_interactions,
+                        MAX(total_interactions) as max_interactions,
+                        AVG(total_interactions) as avg_interactions
+                    FROM news_articles
+                    WHERE id IN ({placeholders})
+                """
+                stats = conn.execute(stats_query, ids_to_keep).fetchone()
+                min_int, max_int, avg_int = stats
+            else:
+                min_int, max_int, avg_int = 0, 0, 0
+
+            result = {
+                "dry_run": dry_run,
+                "keep_days": keep_days,
+                "keep_top": keep_top,
+                "cutoff_date": cutoff_date,
+                "total_before": total_before,
+                "articles_to_keep": len(ids_to_keep),
+                "articles_to_delete": to_delete_count,
+                "kept_stats": {
+                    "min_interactions": min_int or 0,
+                    "max_interactions": max_int or 0,
+                    "avg_interactions": round(avg_int or 0, 1)
+                }
+            }
+
+            # Supprimer si pas en dry_run
+            if not dry_run and ids_to_keep:
+                placeholders = ','.join('?' * len(ids_to_keep))
+                conn.execute(
+                    f"DELETE FROM news_articles WHERE id NOT IN ({placeholders})",
+                    ids_to_keep
+                )
+                conn.commit()
+
+                # Vérifier
+                total_after = conn.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0]
+                result["total_after"] = total_after
+                result["actually_deleted"] = total_before - total_after
+                result["message"] = f"✅ Nettoyage terminé! {total_before - total_after} articles supprimés."
+            elif not dry_run and not ids_to_keep:
+                result["message"] = "⚠️ Aucun article récent trouvé. Rien supprimé."
+            else:
+                result["message"] = f"🔍 Simulation: {to_delete_count} articles seraient supprimés."
+
+            return result
+
+    except Exception as e:
+        logger.error(f"Error cleaning up articles: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/scrape")
 async def trigger_scraping(
     admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
