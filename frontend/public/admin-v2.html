@@ -1,0 +1,2355 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarketGPS Admin Dashboard</title>
+    <style>
+        /* ==================== CSS VARIABLES & RESET ==================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #000000;
+            --bg-secondary: #111111;
+            --bg-card: #1c1c1e;
+            --bg-elevated: #2c2c2e;
+            --bg-glass: rgba(255,255,255,0.04);
+            --text-primary: #f5f5f7;
+            --text-secondary: #a1a1a6;
+            --text-tertiary: #636366;
+            --accent: #0a84ff;
+            --accent-hover: #409cff;
+            --green: #30d158;
+            --orange: #ff9f0a;
+            --red: #ff453a;
+            --purple: #bf5af2;
+            --pink: #ff375f;
+            --teal: #64d2ff;
+            --yellow: #ffd60a;
+            --border: rgba(255,255,255,0.08);
+            --border-hover: rgba(255,255,255,0.15);
+
+            --sidebar-width: 260px;
+            --header-height: 64px;
+            --transition: all 0.3s ease;
+        }
+
+        html, body {
+            font-family: -apple-system, 'SF Pro Display', 'SF Pro Text', 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100%;
+        }
+
+        /* ==================== LAYOUT ==================== */
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            padding: 20px 0;
+            z-index: 100;
+        }
+
+        .sidebar-logo {
+            padding: 0 20px 30px;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .sidebar-section {
+            padding: 0;
+            margin-bottom: 25px;
+        }
+
+        .sidebar-section-title {
+            padding: 8px 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-tertiary);
+        }
+
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 20px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar-item:hover {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border-left-color: var(--accent);
+        }
+
+        .sidebar-item.active {
+            background: var(--bg-elevated);
+            color: var(--accent);
+            border-left-color: var(--accent);
+            font-weight: 500;
+        }
+
+        .sidebar-icon {
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: var(--sidebar-width);
+            right: 0;
+            height: var(--header-height);
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 90;
+        }
+
+        .header-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .breadcrumb-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .breadcrumb-separator {
+            color: var(--text-tertiary);
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .search-box {
+            width: 250px;
+            padding: 8px 12px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 13px;
+            transition: var(--transition);
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: var(--bg-elevated);
+        }
+
+        .icon-button {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .icon-button:hover {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+        }
+
+        .main-content {
+            margin-left: var(--sidebar-width);
+            margin-top: var(--header-height);
+            height: calc(100vh - var(--header-height));
+            overflow-y: auto;
+            padding: 30px;
+            background: var(--bg-primary);
+        }
+
+        /* ==================== COMPONENTS ==================== */
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
+        }
+
+        .page-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+        }
+
+        .grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            border-color: var(--border-hover);
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-elevated) 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .stat-change {
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stat-change.positive { color: var(--green); }
+        .stat-change.negative { color: var(--red); }
+        .stat-change.warning { color: var(--orange); }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .badge-primary { background: var(--accent); color: white; }
+        .badge-success { background: rgba(48, 209, 88, 0.2); color: var(--green); }
+        .badge-warning { background: rgba(255, 159, 10, 0.2); color: var(--orange); }
+        .badge-danger { background: rgba(255, 69, 58, 0.2); color: var(--red); }
+        .badge-secondary { background: var(--bg-elevated); color: var(--text-secondary); }
+
+        .button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .button-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .button-primary:hover:not(:disabled) {
+            background: var(--accent-hover);
+        }
+
+        .button-secondary {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .button-secondary:hover {
+            background: var(--bg-elevated);
+            border-color: var(--border-hover);
+        }
+
+        .button-danger {
+            background: rgba(255, 69, 58, 0.2);
+            color: var(--red);
+        }
+
+        .button-danger:hover:not(:disabled) {
+            background: rgba(255, 69, 58, 0.3);
+        }
+
+        .button-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .table th {
+            background: var(--bg-elevated);
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            font-size: 11px;
+        }
+
+        .table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .table tr:hover {
+            background: var(--bg-elevated);
+        }
+
+        .table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .input-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .input, .textarea, .select {
+            padding: 10px 12px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 13px;
+            transition: var(--transition);
+        }
+
+        .input:focus, .textarea:focus, .select:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: var(--bg-elevated);
+        }
+
+        .textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        /* ==================== MODAL ==================== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: var(--bg-card);
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 20px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        /* ==================== TOAST ==================== */
+        .toast-container {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 2000;
+        }
+
+        .toast {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease;
+            min-width: 300px;
+        }
+
+        .toast-success { border-left: 3px solid var(--green); }
+        .toast-error { border-left: 3px solid var(--red); }
+        .toast-warning { border-left: 3px solid var(--orange); }
+        .toast-info { border-left: 3px solid var(--accent); }
+
+        /* ==================== ANIMATIONS ==================== */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .view-enter {
+            animation: fadeIn 0.3s ease;
+        }
+
+        /* ==================== SCROLLBAR ==================== */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-hover);
+        }
+
+        /* ==================== UTILITIES ==================== */
+        .flex { display: flex; }
+        .flex-center { display: flex; align-items: center; justify-content: center; }
+        .flex-between { display: flex; align-items: center; justify-content: space-between; }
+        .flex-col { display: flex; flex-direction: column; }
+        .gap-1 { gap: 4px; }
+        .gap-2 { gap: 8px; }
+        .gap-3 { gap: 12px; }
+        .gap-4 { gap: 16px; }
+        .gap-5 { gap: 20px; }
+
+        .mb-1 { margin-bottom: 4px; }
+        .mb-2 { margin-bottom: 8px; }
+        .mb-3 { margin-bottom: 12px; }
+        .mb-4 { margin-bottom: 16px; }
+        .mb-5 { margin-bottom: 20px; }
+
+        .text-xs { font-size: 11px; }
+        .text-sm { font-size: 12px; }
+        .text-md { font-size: 14px; }
+        .text-lg { font-size: 16px; }
+        .text-xl { font-size: 20px; }
+
+        .font-bold { font-weight: 700; }
+        .font-semibold { font-weight: 600; }
+        .font-medium { font-weight: 500; }
+
+        .text-primary { color: var(--text-primary); }
+        .text-secondary { color: var(--text-secondary); }
+        .text-tertiary { color: var(--text-tertiary); }
+        .text-accent { color: var(--accent); }
+        .text-success { color: var(--green); }
+        .text-danger { color: var(--red); }
+
+        .opacity-50 { opacity: 0.5; }
+        .opacity-75 { opacity: 0.75; }
+
+        .cursor-pointer { cursor: pointer; }
+        .cursor-not-allowed { cursor: not-allowed; opacity: 0.6; }
+
+        .hidden { display: none !important; }
+        .block { display: block; }
+
+        /* ==================== LOADING ==================== */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-card) 50%, var(--bg-elevated) 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        /* ==================== ARTICLE SPECIFIC ==================== */
+        .article-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .article-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+
+        .article-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .article-snippet {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .article-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
+
+        /* ==================== FILTER BUTTONS ==================== */
+        .filter-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 12px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .filter-btn:hover {
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        /* ==================== EMPTY STATE ==================== */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .empty-state-icon {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .empty-state-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .empty-state-description {
+            font-size: 13px;
+            color: var(--text-secondary);
+            max-width: 400px;
+        }
+
+        /* ==================== LOGIN ==================== */
+        .login-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: var(--bg-primary);
+        }
+
+        .login-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .login-logo {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .login-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .login-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+        }
+
+        .login-input {
+            width: 100%;
+            margin-bottom: 12px;
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 14px;
+        }
+
+        .login-button:hover {
+            background: var(--accent-hover);
+        }
+
+        .login-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ==================== MARKDOWN CONTENT ==================== */
+        .markdown-content {
+            line-height: 1.6;
+        }
+
+        .markdown-content h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 20px 0 10px 0;
+        }
+
+        .markdown-content h2 {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 16px 0 8px 0;
+        }
+
+        .markdown-content h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 12px 0 6px 0;
+        }
+
+        .markdown-content p {
+            margin: 10px 0;
+            color: var(--text-secondary);
+        }
+
+        .markdown-content ul, .markdown-content ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .markdown-content li {
+            margin: 5px 0;
+            color: var(--text-secondary);
+        }
+
+        .markdown-content code {
+            background: var(--bg-elevated);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .markdown-content pre {
+            background: var(--bg-elevated);
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+
+        .markdown-content blockquote {
+            border-left: 3px solid var(--accent);
+            padding-left: 12px;
+            margin: 10px 0;
+            color: var(--text-secondary);
+        }
+
+        /* ==================== PIPELINE CONTROLS ==================== */
+        .pipeline-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .pipeline-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+
+        .pipeline-btn:hover:not(:disabled) {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .pipeline-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pipeline-btn-icon {
+            font-size: 28px;
+        }
+
+        .pipeline-btn-text {
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        /* ==================== INTERACTION BREAKDOWN ==================== */
+        .interaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .interaction-item:last-child {
+            border-bottom: none;
+        }
+
+        .interaction-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .interaction-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* ==================== CHECKBOX ==================== */
+        .checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        /* ==================== TOOLTIP ==================== */
+        .tooltip-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            text-align: center;
+            line-height: 16px;
+            font-size: 11px;
+            cursor: help;
+            margin-left: 4px;
+            position: relative;
+        }
+
+        .tooltip-icon:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            background: var(--bg-elevated);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            white-space: nowrap;
+            bottom: 100%;
+            left: -50px;
+            border: 1px solid var(--border);
+            z-index: 1001;
+        }
+
+        /* ==================== MODAL SIDEBAR ==================== */
+        .modal-sidebar {
+            display: flex;
+            gap: 20px;
+        }
+
+        .modal-main {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .modal-side {
+            width: 250px;
+            flex-shrink: 0;
+        }
+
+        .side-section {
+            background: var(--bg-elevated);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .side-section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 12px;
+        }
+
+        .side-value {
+            font-size: 13px;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+
+        /* ==================== SEARCH & FILTER ==================== */
+        .search-filter-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        /* ==================== PAGINATION ==================== */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .pagination-btn {
+            padding: 8px 12px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            border-color: var(--accent);
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination-info {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <div id="modal-container"></div>
+    <div id="toast-container" class="toast-container"></div>
+
+    <script>
+        // ==================== CONFIG ==================== //
+        const API_URL = 'https://api.marketgps.online';
+        const ADMIN_KEY_STORAGE = 'marketgps_admin_key';
+
+        // ==================== STATE ==================== //
+        const state = {
+            authenticated: false,
+            adminKey: null,
+            currentRoute: '#/dashboard',
+            userData: null,
+            stats: null,
+            users: [],
+            subscriptions: [],
+            feedbacks: [],
+            newsStats: null,
+            articles: [],
+            scripts: [],
+            loading: false,
+            selectedArticles: new Set(),
+            currentUserFilter: 'all',
+            currentArticleFilter: 'all',
+            currentArticlePage: 1,
+            articlesPerPage: 50
+        };
+
+        // ==================== ROUTER ==================== //
+        class Router {
+            static parseRoute() {
+                const hash = window.location.hash || '#/dashboard';
+                const parts = hash.slice(1).split('/').filter(Boolean);
+                return {
+                    path: hash,
+                    view: parts[0] || 'dashboard',
+                    subview: parts[1] || null,
+                    id: parts[2] || null
+                };
+            }
+
+            static navigate(path) {
+                window.location.hash = path;
+            }
+
+            static getBreadcrumbs(route) {
+                const breadcrumbs = [{ label: 'Dashboard', path: '#/dashboard' }];
+                const mapping = {
+                    'dashboard': 'Vue d\'ensemble',
+                    'analytics': 'Analytics',
+                    'users': 'Utilisateurs',
+                    'subscriptions': 'Abonnements',
+                    'feedbacks': 'Feedbacks',
+                    'news-africa': 'Actualités Afrique',
+                    'news-europe': 'Actualités Europe',
+                    'scripts': 'Scripts Vidéo',
+                    'settings': 'Paramètres'
+                };
+
+                if (route.view !== 'dashboard') {
+                    breadcrumbs.push({
+                        label: mapping[route.view] || route.view,
+                        path: `#/${route.view}`
+                    });
+
+                    if (route.subview) {
+                        breadcrumbs.push({
+                            label: route.subview.replace(/-/g, ' '),
+                            path: `#/${route.view}/${route.subview}`
+                        });
+                    }
+                }
+
+                return breadcrumbs;
+            }
+        }
+
+        // ==================== API ==================== //
+        class API {
+            static async request(method, endpoint, body = null) {
+                const options = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Key': state.adminKey
+                    }
+                };
+
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+
+                try {
+                    const response = await fetch(`${API_URL}${endpoint}`, options);
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            showToast('Admin key expired', 'error');
+                            logout();
+                        }
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return await response.json();
+                } catch (error) {
+                    console.error('API Error:', error);
+                    throw error;
+                }
+            }
+
+            static async getStats() {
+                return this.request('GET', '/admin/stats');
+            }
+
+            static async getUsers(limit = 200, filter = 'all') {
+                return this.request('GET', `/admin/users?limit=${limit}&filter=${filter}`);
+            }
+
+            static async getUserDetail(userId) {
+                return this.request('GET', `/admin/user/${userId}`);
+            }
+
+            static async getSubscriptions(limit = 100, status = 'active') {
+                return this.request('GET', `/admin/subscriptions?limit=${limit}&status=${status}`);
+            }
+
+            static async getFeedbacks(limit = 50) {
+                return this.request('GET', `/admin/feedbacks?limit=${limit}`);
+            }
+
+            static async getNewsStats() {
+                return this.request('GET', '/news-admin/stats');
+            }
+
+            static async getArticles(limit = 50, offset = 0, status = null, trending = false) {
+                let endpoint = `/news-admin/articles?limit=${limit}&offset=${offset}`;
+                if (status) endpoint += `&status=${status}`;
+                if (trending) endpoint += `&trending=true`;
+                return this.request('GET', endpoint);
+            }
+
+            static async getArticleDetail(id) {
+                return this.request('GET', `/news-admin/articles/${id}`);
+            }
+
+            static async publishArticle(articleId) {
+                return this.request('POST', '/news-admin/publish', { article_id: articleId });
+            }
+
+            static async rejectArticle(articleId, reason = '') {
+                return this.request('POST', '/news-admin/reject', { article_id: articleId, reason });
+            }
+
+            static async publishBulk(articleIds) {
+                return this.request('POST', '/news-admin/publish-bulk', { article_ids: articleIds });
+            }
+
+            static async rejectBulk(articleIds, reason = '') {
+                return this.request('POST', '/news-admin/reject-bulk', { article_ids: articleIds, reason });
+            }
+
+            static async getTrendingArticles(limit = 50) {
+                return this.request('GET', `/news-admin/trending?limit=${limit}`);
+            }
+
+            static async getTopV2Articles(limit = 60, minScore = 0) {
+                return this.request('GET', `/news-admin/articles/top?limit=${limit}&min_score=${minScore}`);
+            }
+
+            static async runPipelineFull() {
+                return this.request('POST', '/news-admin/pipeline/run?sync=true');
+            }
+
+            static async ingestRSS() {
+                return this.request('POST', '/news-admin/pipeline/ingest');
+            }
+
+            static async publishPipeline() {
+                return this.request('POST', '/news-admin/pipeline/publish');
+            }
+
+            static async updateInteractions(limit = 200) {
+                return this.request('POST', `/news-admin/update-interactions?sync=true&limit=${limit}`);
+            }
+
+            static async scoreV2(topK = 60, daysBack = 3, minScore = 10) {
+                return this.request('POST', `/news-admin/score-v2?top_k=${topK}&days_back=${daysBack}&min_score=${minScore}`);
+            }
+
+            static async cleanup(keepDays = 5, keepTop = 50, dryRun = false) {
+                return this.request('POST', `/news-admin/cleanup?keep_days=${keepDays}&keep_top=${keepTop}&dry_run=${dryRun}`);
+            }
+
+            static async generateVideoScript(articleId) {
+                return this.request('POST', '/api/viral-news/generate-script', { article_id: articleId });
+            }
+
+            static async getVideoScripts(limit = 50, status = '') {
+                let endpoint = `/api/viral-news/scripts?limit=${limit}`;
+                if (status) endpoint += `&status=${status}`;
+                return this.request('GET', endpoint);
+            }
+        }
+
+        // ==================== AUTH ==================== //
+        function login(adminKey) {
+            state.adminKey = adminKey;
+            state.authenticated = true;
+            localStorage.setItem(ADMIN_KEY_STORAGE, adminKey);
+            showToast('Connecté avec succès', 'success');
+            render();
+        }
+
+        function logout() {
+            state.authenticated = false;
+            state.adminKey = null;
+            localStorage.removeItem(ADMIN_KEY_STORAGE);
+            render();
+        }
+
+        function checkAuth() {
+            const stored = localStorage.getItem(ADMIN_KEY_STORAGE);
+            if (stored) {
+                state.adminKey = stored;
+                state.authenticated = true;
+            }
+        }
+
+        // ==================== UTILS ==================== //
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '—';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('fr-FR', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        function formatTime(dateStr) {
+            if (!dateStr) return '—';
+            const date = new Date(dateStr);
+            return date.toLocaleTimeString('fr-FR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function formatNumber(num) {
+            return new Intl.NumberFormat('fr-FR').format(num || 0);
+        }
+
+        function truncate(text, length = 60) {
+            return text && text.length > length ? text.substring(0, length) + '...' : text || '';
+        }
+
+        function markdownToHtml(md) {
+            if (!md) return '';
+            let html = escapeHtml(md);
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            html = html.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" style="color: var(--accent);">$1</a>');
+            html = html.replace(/\n/g, '<br>');
+            return `<div class="markdown-content">${html}</div>`;
+        }
+
+        // ==================== TOAST ==================== //
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        // ==================== MODAL SYSTEM ==================== //
+        function showModal(title, content, footer = '') {
+            const container = document.getElementById('modal-container');
+            const html = `
+                <div class="modal-overlay show" id="modal-overlay" onclick="closeModal()">
+                    <div class="modal" onclick="event.stopPropagation()">
+                        <div class="modal-header">
+                            <div class="modal-title">${escapeHtml(title)}</div>
+                            <button class="modal-close" onclick="closeModal()">✕</button>
+                        </div>
+                        <div class="modal-body">${content}</div>
+                        ${footer ? `<div class="modal-footer">${footer}</div>` : ''}
+                    </div>
+                </div>
+            `;
+            container.innerHTML = html;
+        }
+
+        function closeModal() {
+            document.getElementById('modal-container').innerHTML = '';
+        }
+
+        // ==================== ICONS ==================== //
+        const Icons = {
+            grid: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>',
+            chart: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22"></line><path d="M17 5H9.5a1.5 1.5 0 0 0-1.5 1.5v12a1.5 1.5 0 0 0 1.5 1.5H17"></path><path d="M6 12H3"></path></svg>',
+            dollar: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a4 4 0 0 0 0 8h5a4 4 0 0 1 0 8H6"></path></svg>',
+            trending: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>',
+            globe: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>',
+            activity: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>',
+            users: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+            layers: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 20 7 20 17 12 22 4 17 4 7 12 2"></polygon><polyline points="12 2 12 22"></polyline><polyline points="20 7 12 12 4 7"></polyline><polyline points="20 17 12 12 4 17"></polyline></svg>',
+            newspaper: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>',
+            list: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>',
+            download: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>',
+            message: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>',
+            settings: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v6"></path><path d="M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24"></path><path d="M1 12h6m6 0h6"></path><path d="M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"></path></svg>',
+            bell: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>',
+            x: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>',
+            check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+            fire: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.56 2.75c4.37 6.03 6.02 9.42 8.6 17.72m0 0c3.87-5.32 4.35-10.32 5.38-16.32m0 0c.79 1.5 1.61 4.2 1.99 8.5m0 0H21"></path></svg>',
+            video: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>',
+        };
+
+        function svgIcon(name) {
+            return Icons[name] || '';
+        }
+
+        // ==================== LOGIN VIEW ==================== //
+        function renderLoginView() {
+            return `
+                <div class="login-container">
+                    <div class="login-box">
+                        <div class="login-logo">📊 MarketGPS</div>
+                        <div class="login-title">Admin Dashboard</div>
+                        <div class="login-subtitle">Entrez votre clé d'administration</div>
+                        <form onsubmit="handleLogin(event)">
+                            <input type="password" id="adminKeyInput" class="input login-input" placeholder="Admin Key" required />
+                            <button type="submit" class="login-button">Se connecter</button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleLogin(event) {
+            event.preventDefault();
+            const adminKey = document.getElementById('adminKeyInput').value;
+            if (adminKey) {
+                login(adminKey);
+            }
+        }
+
+        // ==================== SIDEBAR VIEW ==================== //
+        function renderSidebar() {
+            const route = Router.parseRoute();
+            const isActive = (path) => route.path.startsWith(path) || (path === '#/dashboard' && route.view === 'dashboard');
+
+            return `
+                <div class="sidebar">
+                    <div class="sidebar-logo">📊 MarketGPS</div>
+
+                    <div class="sidebar-section">
+                        <div class="sidebar-section-title">TABLEAU DE BORD</div>
+                        <a href="#/dashboard" class="sidebar-item ${isActive('#/dashboard') ? 'active' : ''}">
+                            <div class="sidebar-icon">${svgIcon('grid')}</div>
+                            <span>Vue d'ensemble</span>
+                        </a>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <div class="sidebar-section-title">UTILISATEURS</div>
+                        <a href="#/users" class="sidebar-item ${isActive('#/users') && !route.subview ? 'active' : ''}">
+                            <div class="sidebar-icon">${svgIcon('users')}</div>
+                            <span>Liste Utilisateurs</span>
+                        </a>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <div class="sidebar-section-title">ABONNEMENTS</div>
+                        <a href="#/subscriptions" class="sidebar-item ${isActive('#/subscriptions') && !route.subview ? 'active' : ''}">
+                            <div class="sidebar-icon">💳</div>
+                            <span>Abonnements</span>
+                        </a>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <div class="sidebar-section-title">ACTUALITÉS AFRIQUE</div>
+                        <a href="#/news-africa" class="sidebar-item ${isActive('#/news-africa') && !route.subview ? 'active' : ''}">
+                            <div class="sidebar-icon">${svgIcon('newspaper')}</div>
+                            <span>Dashboard</span>
+                        </a>
+                        <a href="#/news-africa/all" class="sidebar-item ${isActive('#/news-africa/all') ? 'active' : ''}">
+                            <div class="sidebar-icon">${svgIcon('list')}</div>
+                            <span>Tous les Articles</span>
+                        </a>
+                        <a href="#/news-africa/pipeline" class="sidebar-item ${isActive('#/news-africa/pipeline') ? 'active' : ''}">
+                            <div class="sidebar-icon">${svgIcon('settings')}</div>
+                            <span>Pipeline Control</span>
+                        </a>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <div class="sidebar-section-title">SCRIPTS VIDÉO</div>
+                        <a href="#/scripts" class="sidebar-item ${isActive('#/scripts') && !route.subview ? 'active' : ''}">
+                            <div class="sidebar-icon">${svgIcon('video')}</div>
+                            <span>Dashboard</span>
+                        </a>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <div class="sidebar-section-title">FEEDBACKS</div>
+                        <a href="#/feedbacks" class="sidebar-item ${isActive('#/feedbacks') && !route.subview ? 'active' : ''}">
+                            <div class="sidebar-icon">${svgIcon('message')}</div>
+                            <span>Dashboard</span>
+                        </a>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <div class="sidebar-section-title">SYSTÈME</div>
+                        <button onclick="logout()" class="sidebar-item" style="width: 100%; text-align: left; background: none; border: none; cursor: pointer;">
+                            <div class="sidebar-icon">🚪</div>
+                            <span>Déconnexion</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== HEADER VIEW ==================== //
+        function renderHeader() {
+            const route = Router.parseRoute();
+            const breadcrumbs = Router.getBreadcrumbs(route);
+
+            return `
+                <div class="header">
+                    <div class="header-breadcrumb">
+                        ${breadcrumbs.map((bc, idx) => `
+                            <a href="${bc.path}" class="breadcrumb-item" style="color: var(--text-secondary); text-decoration: none;">
+                                ${escapeHtml(bc.label)}
+                            </a>
+                            ${idx < breadcrumbs.length - 1 ? '<span class="breadcrumb-separator">/</span>' : ''}
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== DASHBOARD VIEW ==================== //
+        function viewDashboard() {
+            return `
+                <div class="view-enter">
+                    <div class="page-title">Vue d'ensemble</div>
+                    <div class="page-subtitle">Résumé de votre plateforme</div>
+
+                    <div class="grid grid-4">
+                        <div class="stat-card">
+                            <div class="stat-label">Utilisateurs Totaux</div>
+                            <div class="stat-value">${state.stats ? formatNumber(state.stats.total_users || 0) : '—'}</div>
+                            <div class="stat-change positive">↑ 12% ce mois</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Utilisateurs Pro</div>
+                            <div class="stat-value">${state.stats ? formatNumber(state.stats.pro_users || 0) : '—'}</div>
+                            <div class="stat-change positive">↑ 8% ce mois</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Utilisateurs Free</div>
+                            <div class="stat-value">${state.stats ? formatNumber(state.stats.free_users || 0) : '—'}</div>
+                            <div class="stat-change positive">↑ 15% ce mois</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Abonnements Actifs</div>
+                            <div class="stat-value">${state.stats ? formatNumber(state.stats.active_subscriptions || 0) : '—'}</div>
+                            <div class="stat-change positive">↑ 5% ce mois</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-2" style="margin-top: 30px;">
+                        <div class="card">
+                            <div class="chart-title">Nouveaux utilisateurs cette semaine</div>
+                            <div style="font-size: 32px; font-weight: 700; color: var(--accent);">
+                                ${state.stats ? formatNumber(state.stats.new_users_week || 0) : '—'}
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="chart-title">Feedbacks reçus</div>
+                            <div style="font-size: 32px; font-weight: 700; color: var(--green);">
+                                ${state.stats ? formatNumber(state.stats.total_feedbacks || 0) : '—'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== USERS VIEW ==================== //
+        function viewUsers() {
+            return `
+                <div class="view-enter">
+                    <div class="flex-between mb-4">
+                        <div>
+                            <div class="page-title">Utilisateurs</div>
+                            <div class="page-subtitle">Liste complète des utilisateurs</div>
+                        </div>
+                    </div>
+
+                    <div class="filter-group">
+                        <button class="filter-btn active" onclick="updateUserFilter('all')">Tous</button>
+                        <button class="filter-btn" onclick="updateUserFilter('pro')">Pro</button>
+                        <button class="filter-btn" onclick="updateUserFilter('free')">Free</button>
+                    </div>
+
+                    <div class="card">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Nom</th>
+                                    <th>Statut</th>
+                                    <th>Créé le</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${state.users.length > 0 ? state.users.map(user => `
+                                    <tr>
+                                        <td>${escapeHtml(user.email || user.user_email || '')}</td>
+                                        <td>${escapeHtml(user.full_name || user.name || '—')}</td>
+                                        <td>
+                                            <span class="badge ${user.subscription_status === 'active' ? 'badge-success' : 'badge-secondary'}">
+                                                ${user.subscription_status === 'active' ? 'Pro' : 'Free'}
+                                            </span>
+                                        </td>
+                                        <td>${formatDate(user.created_at)}</td>
+                                        <td>
+                                            <button class="button button-sm button-secondary" onclick="showUserModal('${user.id || user.user_id}')">
+                                                Détails
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('') : `
+                                    <tr><td colspan="5" style="text-align: center; color: var(--text-tertiary);">Aucun utilisateur</td></tr>
+                                `}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== SUBSCRIPTIONS VIEW ==================== //
+        function viewSubscriptions() {
+            return `
+                <div class="view-enter">
+                    <div class="flex-between mb-4">
+                        <div>
+                            <div class="page-title">Abonnements</div>
+                            <div class="page-subtitle">Gestion des abonnements clients</div>
+                        </div>
+                    </div>
+
+                    <div class="filter-group">
+                        <button class="filter-btn active" onclick="updateSubscriptionFilter('active')">Actifs</button>
+                        <button class="filter-btn" onclick="updateSubscriptionFilter('canceled')">Annulés</button>
+                        <button class="filter-btn" onclick="updateSubscriptionFilter('past_due')">En retard</button>
+                    </div>
+
+                    <div class="card">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>ID Abonnement</th>
+                                    <th>Client</th>
+                                    <th>Plan</th>
+                                    <th>Montant</th>
+                                    <th>Statut</th>
+                                    <th>Début</th>
+                                    <th>Prochain paiement</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${state.subscriptions.length > 0 ? state.subscriptions.map(sub => `
+                                    <tr>
+                                        <td>${escapeHtml(sub.id || sub.subscription_id || '')}</td>
+                                        <td>${escapeHtml(sub.customer_email || sub.email || '—')}</td>
+                                        <td>${escapeHtml(sub.plan || 'Pro')}</td>
+                                        <td>$${(sub.amount || 0).toFixed(2)}</td>
+                                        <td>
+                                            <span class="badge ${sub.status === 'active' ? 'badge-success' : sub.status === 'canceled' ? 'badge-danger' : 'badge-warning'}">
+                                                ${sub.status || 'active'}
+                                            </span>
+                                        </td>
+                                        <td>${formatDate(sub.start_date || sub.created_at)}</td>
+                                        <td>${formatDate(sub.next_billing_date || sub.renewal_date || '—')}</td>
+                                    </tr>
+                                `).join('') : `
+                                    <tr><td colspan="7" style="text-align: center; color: var(--text-tertiary);">Aucun abonnement</td></tr>
+                                `}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== FEEDBACKS VIEW ==================== //
+        function viewFeedbacks() {
+            return `
+                <div class="view-enter">
+                    <div class="page-title">Feedbacks</div>
+                    <div class="page-subtitle">Retours et avis des utilisateurs</div>
+
+                    <div style="display: grid; gap: 16px;">
+                        ${state.feedbacks.length > 0 ? state.feedbacks.map((fb) => `
+                            <div class="card">
+                                <div class="flex-between mb-3">
+                                    <div>
+                                        <div class="font-semibold">${escapeHtml(fb.user_email || 'Anonyme')}</div>
+                                        <div class="text-sm text-tertiary">${formatDate(fb.created_at)}</div>
+                                    </div>
+                                    <span class="badge badge-secondary">
+                                        ${escapeHtml(fb.type || 'General')}
+                                    </span>
+                                </div>
+                                <div class="mb-3">${escapeHtml(fb.message || '')}</div>
+                            </div>
+                        `).join('') : `
+                            <div class="empty-state">
+                                <div class="empty-state-icon">${svgIcon('message')}</div>
+                                <div class="empty-state-title">Aucun feedback</div>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== NEWS AFRICA DASHBOARD ==================== //
+        function viewNewsAfrica() {
+            return `
+                <div class="view-enter">
+                    <div class="page-title">News Africa Dashboard</div>
+                    <div class="page-subtitle">Gestion des actualités africaines</div>
+
+                    <div class="grid grid-4 mb-5">
+                        <div class="stat-card">
+                            <div class="stat-label">Articles Totaux</div>
+                            <div class="stat-value">${state.newsStats ? formatNumber(state.newsStats.total_articles || 0) : '—'}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Publiés</div>
+                            <div class="stat-value">${state.newsStats ? formatNumber(state.newsStats.published || 0) : '—'}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">En attente</div>
+                            <div class="stat-value">${state.newsStats ? formatNumber(state.newsStats.pending || 0) : '—'}</div>
+                            <div class="stat-change warning">Besoin de révision</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Rejetés</div>
+                            <div class="stat-value">${state.newsStats ? formatNumber(state.newsStats.rejected || 0) : '—'}</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-2 gap-5">
+                        <button class="card" style="border: 1px dashed var(--border); cursor: pointer; padding: 20px; text-align: center; transition: var(--transition);" onclick="Router.navigate('#/news-africa/all')">
+                            <div style="font-size: 24px; margin-bottom: 10px;">${svgIcon('list')}</div>
+                            <div class="font-semibold">Tous les articles</div>
+                            <div class="text-sm text-tertiary">Gérer les articles</div>
+                        </button>
+                        <button class="card" style="border: 1px dashed var(--border); cursor: pointer; padding: 20px; text-align: center; transition: var(--transition);" onclick="Router.navigate('#/news-africa/pipeline')">
+                            <div style="font-size: 24px; margin-bottom: 10px;">${svgIcon('settings')}</div>
+                            <div class="font-semibold">Contrôle Pipeline</div>
+                            <div class="text-sm text-tertiary">Gérer l'ingestion</div>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== ALL ARTICLES VIEW ==================== //
+        function viewAllArticles() {
+            return `
+                <div class="view-enter">
+                    <div class="flex-between mb-4">
+                        <div>
+                            <div class="page-title">Tous les Articles</div>
+                            <div class="page-subtitle">Gestion complète des articles</div>
+                        </div>
+                        <button class="button button-primary" onclick="loadArticlesData()">
+                            🔄 Actualiser
+                        </button>
+                    </div>
+
+                    <div class="search-filter-bar">
+                        <input type="text" id="articleSearch" class="input search-input" placeholder="Rechercher par titre..." onkeyup="filterArticlesBySearch()">
+                        <select id="articleFilter" class="select" onchange="filterArticlesByStatus(this.value)">
+                            <option value="">Tous</option>
+                            <option value="pending">En attente</option>
+                            <option value="published">Publiés</option>
+                            <option value="rejected">Rejetés</option>
+                        </select>
+                    </div>
+
+                    <div style="display: grid; gap: 12px;">
+                        ${state.articles.length > 0 ? state.articles.map(article => `
+                            <div class="article-card" onclick="showArticleModal('${article.id || article.article_id}')">
+                                <div class="flex-between mb-2">
+                                    <div>
+                                        <div class="article-title">${escapeHtml(article.title || 'Sans titre')}</div>
+                                        <div class="text-xs text-tertiary">${formatDate(article.created_at)} • ${escapeHtml(article.country || '—')}</div>
+                                    </div>
+                                    <span class="badge ${
+                                        article.status === 'published' ? 'badge-success' :
+                                        article.status === 'rejected' ? 'badge-danger' :
+                                        'badge-warning'
+                                    }">
+                                        ${article.status || 'pending'}
+                                    </span>
+                                </div>
+                                <div class="article-snippet">${escapeHtml(truncate(article.content || article.summary || '', 100))}</div>
+                                <div class="flex-between" style="font-size: 12px;">
+                                    <span class="text-secondary">
+                                        Interactions: ${article.likes || 0} likes, ${article.comments || 0} comments
+                                    </span>
+                                    <span class="badge badge-primary" style="background: rgba(10, 132, 255, 0.2); color: var(--accent);">
+                                        V2: ${(article.score_v2 || 0).toFixed(1)}
+                                    </span>
+                                </div>
+                            </div>
+                        `).join('') : `
+                            <div class="empty-state">
+                                <div class="empty-state-icon">${svgIcon('newspaper')}</div>
+                                <div class="empty-state-title">Aucun article</div>
+                                <div class="empty-state-description">Aucun article ne correspond à votre recherche</div>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== PIPELINE CONTROL VIEW ==================== //
+        function viewPipelineControl() {
+            return `
+                <div class="view-enter">
+                    <div class="page-title">Pipeline Control</div>
+                    <div class="page-subtitle">Gestion complète du pipeline de contenu</div>
+
+                    <div class="card mb-5">
+                        <div style="font-size: 14px; font-weight: 600; margin-bottom: 16px;">Statistiques</div>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                            <div style="padding: 12px; background: var(--bg-elevated); border-radius: 8px;">
+                                <div class="text-xs text-secondary mb-1">Dernier scraping</div>
+                                <div style="font-size: 14px; font-weight: 600;">${state.newsStats && state.newsStats.last_scraping ? formatTime(state.newsStats.last_scraping) : '—'}</div>
+                            </div>
+                            <div style="padding: 12px; background: var(--bg-elevated); border-radius: 8px;">
+                                <div class="text-xs text-secondary mb-1">Sources actives</div>
+                                <div style="font-size: 14px; font-weight: 600;">${state.newsStats ? state.newsStats.active_sources || 0 : '—'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pipeline-grid">
+                        <button class="pipeline-btn" onclick="runPipelineStep('search')" id="btn-search">
+                            <div class="pipeline-btn-icon">🔍</div>
+                            <div class="pipeline-btn-text">Rechercher nouveautés</div>
+                        </button>
+                        <button class="pipeline-btn" onclick="runPipelineStep('ingest')" id="btn-ingest">
+                            <div class="pipeline-btn-icon">📥</div>
+                            <div class="pipeline-btn-text">Ingestion RSS</div>
+                        </button>
+                        <button class="pipeline-btn" onclick="runPipelineStep('publish')" id="btn-publish">
+                            <div class="pipeline-btn-icon">🚀</div>
+                            <div class="pipeline-btn-text">Publier (LLM)</div>
+                        </button>
+                        <button class="pipeline-btn" onclick="runPipelineStep('full')" id="btn-full">
+                            <div class="pipeline-btn-icon">⚙️</div>
+                            <div class="pipeline-btn-text">Pipeline complet</div>
+                        </button>
+                        <button class="pipeline-btn" onclick="runPipelineStep('interactions')" id="btn-interactions">
+                            <div class="pipeline-btn-icon">💬</div>
+                            <div class="pipeline-btn-text">Calculer Interactions</div>
+                        </button>
+                        <button class="pipeline-btn" onclick="runPipelineStep('score')" id="btn-score">
+                            <div class="pipeline-btn-icon">🧠</div>
+                            <div class="pipeline-btn-text">Score V2</div>
+                        </button>
+                        <button class="pipeline-btn" onclick="runPipelineStep('cleanup')" id="btn-cleanup">
+                            <div class="pipeline-btn-icon">🧹</div>
+                            <div class="pipeline-btn-text">Nettoyer</div>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== SCRIPTS VIEW ==================== //
+        function viewScripts() {
+            return `
+                <div class="view-enter">
+                    <div class="flex-between mb-4">
+                        <div>
+                            <div class="page-title">Scripts Vidéo</div>
+                            <div class="page-subtitle">Gestion des scripts générés</div>
+                        </div>
+                        <button class="button button-primary" onclick="loadScriptsData()">
+                            🔄 Actualiser
+                        </button>
+                    </div>
+
+                    <div class="card">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Titre</th>
+                                    <th>Hook</th>
+                                    <th>Mots</th>
+                                    <th>Durée</th>
+                                    <th>Statut</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${state.scripts.length > 0 ? state.scripts.map(script => `
+                                    <tr>
+                                        <td>${escapeHtml(truncate(script.title || '', 40))}</td>
+                                        <td>${escapeHtml(truncate(script.hook || '', 40))}</td>
+                                        <td>${script.word_count || 0}</td>
+                                        <td>${script.estimated_duration || '—'}</td>
+                                        <td>
+                                            <span class="badge badge-success">
+                                                ${script.status || 'Generated'}
+                                            </span>
+                                        </td>
+                                        <td>${formatDate(script.created_at)}</td>
+                                        <td>
+                                            <button class="button button-sm button-secondary" onclick="showScriptModal('${script.id}')">
+                                                Voir
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('') : `
+                                    <tr><td colspan="7" style="text-align: center; color: var(--text-tertiary);">Aucun script</td></tr>
+                                `}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== USER DETAIL MODAL ==================== //
+        async function showUserModal(userId) {
+            try {
+                const user = await API.getUserDetail(userId);
+                const content = `
+                    <div class="modal-sidebar">
+                        <div class="modal-main">
+                            <h3 style="margin-bottom: 16px;">Informations personnelles</h3>
+                            <div class="input-group">
+                                <label class="input-label">Email</label>
+                                <div>${escapeHtml(user.email || '—')}</div>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Nom</label>
+                                <div>${escapeHtml(user.full_name || '—')}</div>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Téléphone</label>
+                                <div>${escapeHtml(user.phone || '—')}</div>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Fournisseur</label>
+                                <div>${escapeHtml(user.provider || 'Email')}</div>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Email confirmé</label>
+                                <div>${user.email_confirmed ? '✓ Oui' : '✗ Non'}</div>
+                            </div>
+
+                            <h3 style="margin-top: 24px; margin-bottom: 16px;">Activité</h3>
+                            <div class="input-group">
+                                <label class="input-label">Créé le</label>
+                                <div>${formatDate(user.created_at)} ${formatTime(user.created_at)}</div>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Dernière connexion</label>
+                                <div>${formatDate(user.last_sign_in)} ${formatTime(user.last_sign_in)}</div>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Nombre de connexions</label>
+                                <div>${user.sign_in_count || 0}</div>
+                            </div>
+                        </div>
+                        <div class="modal-side">
+                            ${user.subscription ? `
+                                <div class="side-section">
+                                    <div class="side-section-title">Abonnement</div>
+                                    <div class="interaction-item">
+                                        <span class="interaction-label">Plan</span>
+                                        <span class="interaction-value">${escapeHtml(user.subscription.plan)}</span>
+                                    </div>
+                                    <div class="interaction-item">
+                                        <span class="interaction-label">Statut</span>
+                                        <span class="interaction-value badge badge-success">${user.subscription.status}</span>
+                                    </div>
+                                    <div class="interaction-item">
+                                        <span class="interaction-label">Montant</span>
+                                        <span class="interaction-value">$${(user.subscription.amount || 0).toFixed(2)}</span>
+                                    </div>
+                                    <div class="interaction-item">
+                                        <span class="interaction-label">Intervalle</span>
+                                        <span class="interaction-value">${user.subscription.interval}</span>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+                showModal(`Utilisateur: ${user.email}`, content, `
+                    <button class="button button-secondary" onclick="closeModal()">Fermer</button>
+                `);
+            } catch (error) {
+                showToast('Erreur lors du chargement', 'error');
+                console.error(error);
+            }
+        }
+
+        // ==================== ARTICLE DETAIL MODAL ==================== //
+        async function showArticleModal(articleId) {
+            try {
+                const article = await API.getArticleDetail(articleId);
+                const interactionsTotal = (article.likes || 0) + (article.comments || 0) + (article.shares || 0);
+
+                const content = `
+                    <div class="modal-sidebar">
+                        <div class="modal-main">
+                            <h3 style="margin-bottom: 12px;">${escapeHtml(article.title)}</h3>
+                            <div class="text-secondary text-sm mb-4">Publié le ${formatDate(article.created_at)}</div>
+
+                            ${article.image_url ? `<img src="${escapeHtml(article.image_url)}" style="width: 100%; border-radius: 8px; margin-bottom: 20px; max-height: 300px; object-fit: cover;">` : ''}
+
+                            <div class="markdown-content">
+                                ${markdownToHtml(article.content || article.summary || '')}
+                            </div>
+
+                            ${article.source_url ? `
+                                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                                    <a href="${escapeHtml(article.source_url)}" target="_blank" class="button button-secondary" style="width: 100%;">
+                                        Voir l'article original
+                                    </a>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="modal-side">
+                            <div class="side-section">
+                                <div class="side-section-title">Source</div>
+                                <div class="side-value">${escapeHtml(article.source || '—')}</div>
+                            </div>
+
+                            <div class="side-section">
+                                <div class="side-section-title">Catégorie</div>
+                                <div class="side-value">${escapeHtml(article.category || '—')}</div>
+                            </div>
+
+                            <div class="side-section">
+                                <div class="side-section-title">Interactions</div>
+                                <div class="interaction-item">
+                                    <span class="interaction-label">👍 J'aime</span>
+                                    <span class="interaction-value">${article.likes || 0}</span>
+                                </div>
+                                <div class="interaction-item">
+                                    <span class="interaction-label">💬 Commentaires</span>
+                                    <span class="interaction-value">${article.comments || 0}</span>
+                                </div>
+                                <div class="interaction-item">
+                                    <span class="interaction-label">🔄 Partages</span>
+                                    <span class="interaction-value">${article.shares || 0}</span>
+                                </div>
+                                <div class="interaction-item">
+                                    <span class="interaction-label">Total</span>
+                                    <span class="interaction-value">${interactionsTotal}</span>
+                                </div>
+                            </div>
+
+                            <div class="side-section">
+                                <div class="side-section-title">Score V2</div>
+                                <div style="font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 8px;">
+                                    ${(article.score_v2 || 0).toFixed(2)}
+                                </div>
+                                <div class="text-xs text-secondary">
+                                    ${article.score_v2_reason || 'Basé sur interactions et engagement'}
+                                </div>
+                            </div>
+
+                            <div class="side-section">
+                                <div class="side-section-title">Métadonnées</div>
+                                <div class="interaction-item">
+                                    <span class="interaction-label">Statut</span>
+                                    <span class="badge ${
+                                        article.status === 'published' ? 'badge-success' :
+                                        article.status === 'rejected' ? 'badge-danger' :
+                                        'badge-warning'
+                                    }">${article.status}</span>
+                                </div>
+                                <div class="interaction-item">
+                                    <span class="interaction-label">Langue</span>
+                                    <span class="interaction-value">${escapeHtml(article.language || 'fr')}</span>
+                                </div>
+                                <div class="interaction-item">
+                                    <span class="interaction-label">Pays</span>
+                                    <span class="interaction-value">${escapeHtml(article.country || '—')}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                let footer = '';
+                if (article.status !== 'published') {
+                    footer = `<button class="button button-primary" onclick="publishArticleAction('${article.id}')">Publier</button>`;
+                }
+                if (article.status !== 'rejected') {
+                    footer += `<button class="button button-danger" onclick="rejectArticleAction('${article.id}')">Rejeter</button>`;
+                }
+                footer += `<button class="button button-secondary" onclick="closeModal()">Fermer</button>`;
+
+                showModal(`Article: ${article.title}`, content, footer);
+            } catch (error) {
+                showToast('Erreur lors du chargement', 'error');
+                console.error(error);
+            }
+        }
+
+        // ==================== SCRIPT DETAIL MODAL ==================== //
+        async function showScriptModal(scriptId) {
+            const script = state.scripts.find(s => s.id === scriptId);
+            if (!script) {
+                showToast('Script non trouvé', 'error');
+                return;
+            }
+
+            const content = `
+                <div>
+                    <h3 style="margin-bottom: 16px;">${escapeHtml(script.title)}</h3>
+                    <div style="margin-bottom: 20px; padding: 16px; background: var(--bg-elevated); border-radius: 8px;">
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">HOOK</div>
+                        <div style="font-size: 14px; font-weight: 600;">${escapeHtml(script.hook || '')}</div>
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">SCRIPT</div>
+                        <pre style="background: var(--bg-elevated); padding: 16px; border-radius: 8px; overflow-x: auto; line-height: 1.6;">${escapeHtml(script.script_text || '')}</pre>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">MOTS</div>
+                            <div style="font-size: 18px; font-weight: 700;">${script.word_count || 0}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">DURÉE ESTIMÉE</div>
+                            <div style="font-size: 18px; font-weight: 700;">${script.estimated_duration || '—'}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            showModal(`Script: ${script.title}`, content, `
+                <button class="button button-primary" onclick="copyToClipboard('${escapeHtml(script.script_text || '')}')">
+                    Copier le texte
+                </button>
+                <button class="button button-secondary" onclick="closeModal()">Fermer</button>
+            `);
+        }
+
+        // ==================== ACTION HANDLERS ==================== //
+        async function publishArticleAction(articleId) {
+            try {
+                await API.publishArticle(articleId);
+                showToast('Article publié', 'success');
+                closeModal();
+                await loadArticlesData();
+            } catch (error) {
+                showToast('Erreur lors de la publication', 'error');
+            }
+        }
+
+        async function rejectArticleAction(articleId) {
+            const reason = prompt('Raison du rejet:');
+            if (reason === null) return;
+            try {
+                await API.rejectArticle(articleId, reason);
+                showToast('Article rejeté', 'success');
+                closeModal();
+                await loadArticlesData();
+            } catch (error) {
+                showToast('Erreur lors du rejet', 'error');
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text);
+            showToast('Copié!', 'success');
+        }
+
+        async function runPipelineStep(step) {
+            const btnId = `btn-${step === 'search' ? 'search' : step}`;
+            const btn = document.getElementById(btnId);
+            if (btn) btn.disabled = true;
+
+            try {
+                showToast(`Exécution: ${step}...`, 'info');
+
+                if (step === 'search') {
+                    await API.getArticles(50, 0, 'pending', false);
+                } else if (step === 'ingest') {
+                    await API.ingestRSS();
+                } else if (step === 'publish') {
+                    await API.publishPipeline();
+                } else if (step === 'full') {
+                    await API.runPipelineFull();
+                } else if (step === 'interactions') {
+                    await API.updateInteractions();
+                } else if (step === 'score') {
+                    await API.scoreV2();
+                } else if (step === 'cleanup') {
+                    if (confirm('Êtes-vous sûr? Cette action supprimera les anciens articles.')) {
+                        await API.cleanup(5, 50, false);
+                    }
+                }
+
+                showToast('Étape complétée', 'success');
+                state.newsStats = null;
+                await loadData();
+            } catch (error) {
+                showToast('Erreur lors de l\'exécution', 'error');
+                console.error(error);
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        function updateUserFilter(filter) {
+            state.currentUserFilter = filter;
+            state.users = [];
+            loadData();
+        }
+
+        function updateSubscriptionFilter(status) {
+            state.subscriptions = [];
+            loadData();
+        }
+
+        function filterArticlesByStatus(status) {
+            state.currentArticleFilter = status || 'all';
+            state.articles = [];
+            loadArticlesData();
+        }
+
+        function filterArticlesBySearch() {
+            render();
+        }
+
+        async function loadArticlesData() {
+            try {
+                state.loading = true;
+                const status = state.currentArticleFilter !== 'all' ? state.currentArticleFilter : null;
+                state.articles = (await API.getArticles(200, 0, status, false).catch(() => [])) || [];
+                render();
+            } catch (error) {
+                showToast('Erreur lors du chargement', 'error');
+            } finally {
+                state.loading = false;
+            }
+        }
+
+        async function loadScriptsData() {
+            try {
+                state.loading = true;
+                state.scripts = (await API.getVideoScripts(50).catch(() => [])) || [];
+                render();
+            } catch (error) {
+                showToast('Erreur lors du chargement', 'error');
+            } finally {
+                state.loading = false;
+            }
+        }
+
+        // ==================== MAIN RENDER ==================== //
+        async function loadData() {
+            if (!state.authenticated) return;
+
+            state.loading = true;
+
+            try {
+                if (!state.stats) {
+                    state.stats = await API.getStats().catch(() => null);
+                }
+
+                const route = Router.parseRoute();
+
+                if (route.view === 'users' && state.users.length === 0) {
+                    const filter = state.currentUserFilter || 'all';
+                    state.users = (await API.getUsers(200, filter).catch(() => [])) || [];
+                }
+
+                if (route.view === 'subscriptions' && state.subscriptions.length === 0) {
+                    state.subscriptions = (await API.getSubscriptions(100, 'active').catch(() => [])) || [];
+                }
+
+                if (route.view === 'feedbacks' && state.feedbacks.length === 0) {
+                    state.feedbacks = (await API.getFeedbacks(50).catch(() => [])) || [];
+                }
+
+                if ((route.view === 'news-africa' || route.view === 'news-europe') && !state.newsStats) {
+                    state.newsStats = await API.getNewsStats().catch(() => null);
+                }
+
+                if (route.view === 'news-africa' && route.subview === 'all' && state.articles.length === 0) {
+                    await loadArticlesData();
+                }
+
+                if (route.view === 'scripts' && state.scripts.length === 0) {
+                    await loadScriptsData();
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+            }
+
+            state.loading = false;
+            render();
+        }
+
+        function getViewContent(route) {
+            switch (true) {
+                case route.view === 'dashboard':
+                    return viewDashboard();
+                case route.view === 'users':
+                    return viewUsers();
+                case route.view === 'subscriptions':
+                    return viewSubscriptions();
+                case route.view === 'feedbacks':
+                    return viewFeedbacks();
+                case route.view === 'news-africa':
+                    if (route.subview === 'all') return viewAllArticles();
+                    if (route.subview === 'pipeline') return viewPipelineControl();
+                    return viewNewsAfrica();
+                case route.view === 'scripts':
+                    return viewScripts();
+                default:
+                    return viewDashboard();
+            }
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+
+            if (!state.authenticated) {
+                app.innerHTML = renderLoginView();
+                return;
+            }
+
+            const route = Router.parseRoute();
+            const content = getViewContent(route);
+
+            app.innerHTML = `
+                ${renderSidebar()}
+                ${renderHeader()}
+                <div class="main-content">
+                    ${content}
+                </div>
+            `;
+
+            // Update active nav items
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('href') === route.path ||
+                    (route.view === 'dashboard' && item.getAttribute('href') === '#/dashboard')) {
+                    item.classList.add('active');
+                }
+            });
+
+            // Update filter buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const firstFilterBtn = document.querySelector('.filter-btn');
+            if (firstFilterBtn) firstFilterBtn.classList.add('active');
+        }
+
+        // ==================== INITIALIZATION ==================== //
+        window.addEventListener('hashchange', () => {
+            render();
+            loadData();
+        });
+
+        checkAuth();
+        render();
+        loadData();
+    </script>
+</body>
+</html>
