@@ -8,7 +8,13 @@
     "WEST": "Afrique de l'Ouest (UEMOA + Nigeria/Ghana)",
     "CENTRAL": "Afrique Centrale (CEMAC)",
     "EAST": "Afrique de l'Est (EAC)",
-    "SOUTH": "Afrique Australe (SADC)"
+    "SOUTH": "Afrique Australe (SADC)",
+    "EUROPE": {
+      "DE": "Germany",
+      "FR": "France",
+      "UK": "United Kingdom",
+      "EU": "European Union"
+    }
   },
   "country_to_region": {
     "MA": "NORTH", "DZ": "NORTH", "TN": "NORTH", "EG": "NORTH", "LY": "NORTH",
@@ -351,7 +357,7 @@
       "region": "WEST",
       "language": "fr",
       "tags": ["business", "economy", "fintech"],
-      "trust_score": 0.8,
+      "trust_score": 0.88,
       "enabled": true
     },
     {
@@ -363,7 +369,7 @@
       "region": "WEST",
       "language": "fr",
       "tags": ["business", "economy", "politics"],
-      "trust_score": 0.8,
+      "trust_score": 0.88,
       "enabled": true
     },
     {
@@ -411,7 +417,7 @@
       "region": "WEST",
       "language": "fr",
       "tags": ["business", "economy", "fintech"],
-      "trust_score": 0.8,
+      "trust_score": 0.75,
       "enabled": true
     },
     {
@@ -423,7 +429,7 @@
       "region": "CENTRAL",
       "language": "fr",
       "tags": ["business", "economy", "fintech"],
-      "trust_score": 0.8,
+      "trust_score": 0.88,
       "enabled": true
     },
     {
@@ -435,7 +441,7 @@
       "region": "CENTRAL",
       "language": "fr",
       "tags": ["business", "investment", "economy"],
-      "trust_score": 0.8,
+      "trust_score": 0.88,
       "enabled": true
     },
     {
@@ -459,7 +465,7 @@
       "region": "CENTRAL",
       "language": "en",
       "tags": ["business", "economy", "investment"],
-      "trust_score": 0.8,
+      "trust_score": 0.88,
       "enabled": true
     },
     {
@@ -688,6 +694,126 @@
       "language": "en",
       "tags": ["tech", "startup", "business", "innovation"],
       "trust_score": 0.8,
+      "enabled": true
+    },
+    {
+      "name": "Deutsche Welle (French)",
+      "url": "https://www.dw.com",
+      "rss_url": "https://rss.dw.com/xml/rss-fr-all",
+      "type": "rss",
+      "country": "DE",
+      "region": "EUROPE",
+      "language": "fr",
+      "tags": ["international", "politics", "economy"],
+      "trust_score": 0.95,
+      "enabled": true
+    },
+    {
+      "name": "Euronews (French)",
+      "url": "https://fr.euronews.com",
+      "rss_url": "https://fr.euronews.com/rss",
+      "type": "rss",
+      "country": null,
+      "region": "EUROPE",
+      "language": "fr",
+      "tags": ["europe", "politics", "economy"],
+      "trust_score": 0.9,
+      "enabled": true
+    },
+    {
+      "name": "EurActiv (French)",
+      "url": "https://www.euractiv.fr",
+      "rss_url": "https://www.euractiv.fr/feed/",
+      "type": "rss",
+      "country": null,
+      "region": "EUROPE",
+      "language": "fr",
+      "tags": ["policy", "regulation", "eu"],
+      "trust_score": 0.9,
+      "enabled": true
+    },
+    {
+      "name": "Les Echos",
+      "url": "https://www.lesechos.fr",
+      "rss_url": "https://www.lesechos.fr/rss/rss_une.xml",
+      "type": "rss",
+      "country": "FR",
+      "region": "EUROPE",
+      "language": "fr",
+      "tags": ["business", "finance", "markets"],
+      "trust_score": 0.95,
+      "enabled": true
+    },
+    {
+      "name": "Le Monde Économie",
+      "url": "https://www.lemonde.fr",
+      "rss_url": "https://www.lemonde.fr/economie/rss_full.xml",
+      "type": "rss",
+      "country": "FR",
+      "region": "EUROPE",
+      "language": "fr",
+      "tags": ["economy", "business", "politics"],
+      "trust_score": 0.95,
+      "enabled": true
+    },
+    {
+      "name": "Handelsblatt",
+      "url": "https://www.handelsblatt.com",
+      "rss_url": "https://www.handelsblatt.com/contentexport/feed/",
+      "type": "rss",
+      "country": "DE",
+      "region": "EUROPE",
+      "language": "de",
+      "tags": ["business", "finance", "markets", "germany"],
+      "trust_score": 0.95,
+      "enabled": true
+    },
+    {
+      "name": "Der Spiegel Wirtschaft",
+      "url": "https://www.spiegel.de",
+      "rss_url": "https://www.spiegel.de/wirtschaft/index.rss",
+      "type": "rss",
+      "country": "DE",
+      "region": "EUROPE",
+      "language": "de",
+      "tags": ["economy", "business", "germany"],
+      "trust_score": 0.95,
+      "enabled": true
+    },
+    {
+      "name": "France 24 Économie",
+      "url": "https://www.france24.com",
+      "rss_url": "https://www.france24.com/fr/éco-tech/rss",
+      "type": "rss",
+      "country": "FR",
+      "region": "EUROPE",
+      "language": "fr",
+      "tags": ["international", "economy", "business"],
+      "trust_score": 0.95,
+      "enabled": true
+    },
+    {
+      "name": "RFI Économie",
+      "url": "https://www.rfi.fr",
+      "rss_url": "https://www.rfi.fr/fr/économie/rss",
+      "type": "rss",
+      "country": "FR",
+      "region": "EUROPE",
+      "language": "fr",
+      "tags": ["international", "economy", "africa-europe"],
+      "trust_score": 0.9,
+      "enabled": true
+    },
+    {
+      "name": "Tagesschau Wirtschaft",
+      "url": "https://www.tagesschau.de",
+      "rss_url": "https://www.tagesschau.de/wirtschaft/index~rss2.xml",
+      "type": "rss",
+      "country": "DE",
+      "region": "EUROPE",
+      "language": "de",
+      "tags": ["economy", "germany", "politics"],
+      "trust_score": 0.95,
       "enabled": true
     }
   ]

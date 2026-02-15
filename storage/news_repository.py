@@ -12,10 +12,17 @@ logger = get_logger(__name__)
 class NewsRepository(BaseRepository):
     """Repository for news operations."""
 
-    # Pays francophones prioritaires (Afrique de l'Ouest et Centrale)
-    FRANCOPHONE_PRIORITY_COUNTRIES = [
-        'CM', 'CI', 'SN', 'BJ', 'TG', 'GA', 'CG', 'ML', 'BF', 'NE', 'TD', 'GN', 'RW', 'CD'
+    # Pays francophones prioritaires — Tier 1 : Côte d'Ivoire & Cameroun
+    TIER1_PRIORITY_COUNTRIES = ['CI', 'CM']
+
+    # Tier 2 : Autres pays francophones (apparaissent après Tier 1,
+    # sauf si leur engagement_score dépasse celui des articles Tier 1)
+    TIER2_FRANCOPHONE_COUNTRIES = [
+        'SN', 'BJ', 'TG', 'GA', 'CG', 'ML', 'BF', 'NE', 'TD', 'GN', 'RW', 'CD'
     ]
+
+    # Tous les pays francophones combinés (pour rétro-compatibilité)
+    FRANCOPHONE_PRIORITY_COUNTRIES = TIER1_PRIORITY_COUNTRIES + TIER2_FRANCOPHONE_COUNTRIES
 
     # Region to country mapping for news filtering
     REGION_TO_COUNTRIES = {
@@ -97,12 +104,20 @@ class NewsRepository(BaseRepository):
                     published_at DESC
             """
         elif prioritize_francophone and not country and not region:
-            # Default with francophone priority
-            franco_countries = ','.join([f"'{c}'" for c in self.FRANCOPHONE_PRIORITY_COUNTRIES])
+            # Priorité : CI & CM d'abord (Tier 1), puis autres francophones
+            # uniquement si leur engagement dépasse le seuil, puis le reste.
+            tier1 = ','.join([f"'{c}'" for c in self.TIER1_PRIORITY_COUNTRIES])
+            tier2 = ','.join([f"'{c}'" for c in self.TIER2_FRANCOPHONE_COUNTRIES])
             order_clause = f"""
                 ORDER BY
                     is_breaking_news DESC,
-                    CASE WHEN country IN ({franco_countries}) THEN 0 ELSE 1 END,
+                    CASE
+                        WHEN country IN ({tier1}) THEN 0
+                        WHEN country IN ({tier2}) AND engagement_score >= 60 THEN 1
+                        WHEN country IN ({tier2}) THEN 3
+                        ELSE 2
+                    END,
+                    engagement_score DESC,
                     published_at DESC
             """
         else:

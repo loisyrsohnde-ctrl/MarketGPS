@@ -196,6 +196,11 @@ class InteractionsFetcher:
         # Calculer le total et le score de viralité
         total_interactions = likes + comments + shares
 
+        # BUG FIX #1: Validate interaction count (check if it's actually a year)
+        total_interactions = self._validate_interaction_count(
+            total_interactions, published_at
+        )
+
         # Obtenir la baseline de la source
         source_key = source_name.lower().strip()
         baseline = SOURCE_BASELINE.get(source_key, SOURCE_BASELINE["default"])
@@ -373,6 +378,83 @@ class InteractionsFetcher:
         except Exception as e:
             logger.debug(f"Could not check Google virality: {e}")
             return 0
+
+    def _validate_interaction_count(self, total: int, published_at: datetime) -> int:
+        """
+        BUG FIX #1: Validate that interaction count is not actually a year.
+
+        If total_interactions is between 1990 and 2030, it's likely a year
+        extracted from the publication date instead of actual interactions.
+        Set to 0 if suspicious.
+        """
+        # Check if the value is suspiciously in the year range
+        if 1990 <= total <= 2030:
+            logger.warning(
+                f"Suspicious interaction count {total} detected (looks like a year). "
+                f"Setting to 0 for article published at {published_at}"
+            )
+            return 0
+
+        # Additional check: if published_at exists, verify total doesn't match its year
+        if published_at:
+            try:
+                if isinstance(published_at, str):
+                    pub_date = datetime.fromisoformat(published_at.replace("Z", ""))
+                else:
+                    pub_date = published_at
+
+                pub_year = pub_date.year
+                if total == pub_year:
+                    logger.warning(
+                        f"Interaction count {total} matches publication year. "
+                        f"This is likely a parsing error. Setting to 0."
+                    )
+                    return 0
+            except Exception as e:
+                logger.debug(f"Could not validate date: {e}")
+
+        return total
+
+    def _check_duplicate_interactions(self, articles: List[Dict], source_name: str) -> Dict[str, bool]:
+        """
+        BUG FIX #2: Detect when multiple articles from the same source have
+        identical interaction counts (likely a site-wide metric, not per-article).
+
+        If 3+ articles from the same source have the exact same interaction count,
+        flag those counts as unreliable.
+
+        Returns dict mapping interaction_count -> is_unreliable
+        """
+        if not articles:
+            return {}
+
+        # Filter articles by source
+        same_source = [
+            a for a in articles
+            if (a.get("source_name") or "").lower() == source_name.lower()
+        ]
+
+        if len(same_source) < 3:
+            return {}
+
+        # Count occurrences of each interaction count
+        count_freq = {}
+        for article in same_source:
+            count = article.get("total_interactions", 0)
+            if count > 0:
+                count_freq[count] = count_freq.get(count, 0) + 1
+
+        # Flag as unreliable if count appears 3+ times
+        unreliable = {}
+        for count, freq in count_freq.items():
+            if freq >= 3:
+                unreliable[count] = True
+                logger.warning(
+                    f"Unreliable interaction count detected: {count} appears {freq} times "
+                    f"for source '{source_name}'. Likely a site-wide metric."
+                )
+
+        return unreliable
 
     def _estimate_interactions(
         self,
