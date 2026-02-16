@@ -356,7 +356,7 @@ export async function fetchProgressStats(userId: string): Promise<AcademyProgres
       totalLessons && totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
     // Estimate time remaining (assuming ~30 minutes per lesson average)
-    const estimatedMinutesRemaining = (totalLessons || 0 - completedLessons) * 30;
+    const estimatedMinutesRemaining = ((totalLessons || 0) - completedLessons) * 30;
 
     return {
       total_lessons: totalLessons || 0,
