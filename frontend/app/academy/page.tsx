@@ -59,7 +59,7 @@ export default function AcademyPage() {
     const partLessons = userProgress.filter((p) => {
       // Filter lessons belonging to this part
       const partNum = partIndex + 1;
-      return p.lesson_id.toString().startsWith(partNum);
+      return p.lesson_id.toString().startsWith(String(partNum));
     });
 
     if (partLessons.length === 0) return 0;
