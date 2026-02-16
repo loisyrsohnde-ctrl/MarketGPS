@@ -144,7 +144,7 @@ export default function LessonPage() {
                 </h2>
                 <AcademyVideoPlayer
                   src={lesson.video_url}
-                  subtitles={lesson.vtt_url ? [{ src: lesson.vtt_url, label: 'English', lang: 'en' }] : []}
+                  subtitles={lesson.vtt_url ? [{ src: lesson.vtt_url, label: 'Français', lang: 'fr' }] : []}
                   onComplete={handleLessonComplete}
                 />
               </div>
