@@ -104,23 +104,35 @@ export function useAdminDashboard() {
 }
 
 function computeTrend7Days(diagData: any) {
-  const trend: { date: string; count: number }[] = [];
-  const now = new Date();
+  // Use real daily breakdown from diagnostics if available
+  const dailyBreakdown = diagData.news?.daily_breakdown;
+  if (dailyBreakdown && typeof dailyBreakdown === 'object') {
+    return Object.entries(dailyBreakdown)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-7)
+      .map(([date, count]) => ({
+        date: date.split('-').slice(1).join('/'),
+        count: count as number,
+      }));
+  }
 
+  // Fallback: show only today's real count, no fake historical data
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0].split('-').slice(1).join('/');
+  const todayCount = diagData.news?.articles_today || 0;
+  const weekCount = diagData.news?.articles_this_week || 0;
+  const avgDaily = weekCount > 0 ? Math.round(weekCount / 7) : 0;
+
+  const trend: { date: string; count: number }[] = [];
   for (let i = 6; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = date.toISOString().split('T')[0].split('-').slice(1).join('/');
 
-    // Approximate distribution across 7 days
-    const dailyCount = Math.floor(
-      ((diagData.news?.articles_today || 0) * (Math.random() * 0.5 + 0.75)) ||
-        0
-    );
-
+    // Use real today count for today, weekly average for past days
     trend.push({
-      date: dateStr.split('-').slice(1).join('/'),
-      count: dailyCount,
+      date: dateStr,
+      count: i === 0 ? todayCount : avgDaily,
     });
   }
 
