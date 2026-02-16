@@ -29,6 +29,7 @@ import {
   Compass,
   Bot,
   Link2,
+  GraduationCap,
 } from 'lucide-react';
 import { FeedbackButton } from '@/components/feedback';
 
@@ -130,6 +131,12 @@ export function Sidebar({ scopeCounts, onLogout, isAuthenticated = true }: Sideb
           { href: '/dashboard/wealth/opportunities', icon: Target, label: 'Opportunités' },
           { href: '/dashboard/wealth/analyze', icon: Eye, label: 'Analyser un bien' },
           { href: '/dashboard/wealth', icon: Wallet, label: 'Mon Patrimoine' },
+        ],
+      },
+      {
+        section: 'Formation',
+        items: [
+          { href: '/academy', icon: GraduationCap, label: 'QuantAI Academy' },
         ],
       },
       {

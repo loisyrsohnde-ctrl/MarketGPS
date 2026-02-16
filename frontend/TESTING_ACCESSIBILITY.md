@@ -302,7 +302,7 @@ jobs:
 ## 10. Ressources de Formation
 
 ### Vidéos
-- [Web Accessibility by Google](https://www.udacity.com/course/web-accessibility--ud891)
+- [Web Accessibility by Google](https://web.dev/learn/accessibility)
 - [A11y Bytes](https://www.youtube.com/c/A11yBytes)
 - [Deque University](https://dequeuniversity.com/)
 

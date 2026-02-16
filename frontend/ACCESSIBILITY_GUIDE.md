@@ -239,7 +239,7 @@ Lors de l'ajout de nouveaux composants:
 - [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)
 - [ARIA Authoring Practices](https://www.w3.org/WAI/ARIA/apg/)
 - [React Accessibility](https://reactjs.org/docs/accessibility.html)
-- [Web Accessibility by Google](https://www.udacity.com/course/web-accessibility--ud891)
+- [Web Accessibility by Google](https://web.dev/learn/accessibility)
 
 ## Améliorations Futures
 

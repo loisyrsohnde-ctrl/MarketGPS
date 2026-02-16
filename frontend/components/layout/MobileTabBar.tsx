@@ -8,7 +8,7 @@ import {
   Search,
   Star,
   Newspaper,
-  Settings,
+  GraduationCap,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -49,10 +49,10 @@ const tabs: TabItem[] = [
     matchPaths: ['/news'],
   },
   {
-    href: '/settings',
-    icon: Settings,
-    label: 'Réglages',
-    matchPaths: ['/settings'],
+    href: '/academy',
+    icon: GraduationCap,
+    label: 'Academy',
+    matchPaths: ['/academy'],
   },
 ];
 
