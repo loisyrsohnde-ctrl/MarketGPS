@@ -129,6 +129,22 @@ export function AcademyVideoPlayer({
   };
 
   useEffect(() => {
+    if (videoRef.current) {
+      const tracks = videoRef.current.textTracks;
+      for (let i = 0; i < tracks.length; i++) {
+        tracks[i].mode = showSubtitles ? 'showing' : 'hidden';
+      }
+    }
+  }, [showSubtitles]);
+
+  // Enable subtitles by default when available
+  useEffect(() => {
+    if (subtitles.length > 0) {
+      setShowSubtitles(true);
+    }
+  }, [subtitles]);
+
+  useEffect(() => {
     return () => {
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
@@ -252,7 +268,7 @@ export function AcademyVideoPlayer({
               <button
                 onClick={() => setShowSettings(!showSettings)}
                 className="p-2 rounded-lg bg-transparent text-white/70 hover:text-white transition-all"
-                aria-label="Paramètres"
+                aria-label="ParamÃ¨tres"
               >
                 <Settings className="w-5 h-5" />
               </button>
@@ -279,7 +295,7 @@ export function AcademyVideoPlayer({
             <button
               onClick={toggleFullscreen}
               className="p-2 rounded-lg bg-transparent text-white/70 hover:text-white transition-all"
-              aria-label="Plein écran"
+              aria-label="Plein Ã©cran"
             >
               <Maximize className="w-5 h-5" />
             </button>
