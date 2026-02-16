@@ -128,6 +128,7 @@ export async function fetchLesson(lessonId: string): Promise<AcademyLesson | nul
       title_fr: (lessonData as any).title_fr,
       description_fr: (lessonData as any).description_fr,
       video_url: videoContent?.video_url || undefined,
+      vtt_url: videoContent?.vtt_url || undefined,
       content_html: combinedHtml || undefined,
       duration_minutes: undefined,
       order: (lessonData as any).order_index,
