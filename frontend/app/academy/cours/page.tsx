@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -16,6 +16,14 @@ import { fetchParts, fetchUserProgress } from '@/lib/academy-api';
 import { AcademyPart, AcademyUserProgress } from '@/lib/academy-types';
 
 export default function CoursPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-text-primary/60">Chargement des cours...</p></div>}>
+      <CoursPageContent />
+    </Suspense>
+  );
+}
+
+function CoursPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const partParam = searchParams.get('part');
