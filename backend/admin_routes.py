@@ -13,6 +13,7 @@ Il se connecte aux sources de données existantes sans les affecter.
 
 import os
 import logging
+import sqlite3
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Header, Query

@@ -1,37 +1,134 @@
 'use client';
 
-import { useState } from 'react';
-import { Settings, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, Save, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { getApiBaseUrl } from '@/lib/config';
+
+interface AdminSettings {
+  editorial: {
+    virality_threshold_2x: number;
+    virality_threshold_5x: number;
+    virality_threshold_10x: number;
+    min_editorial_score: number;
+    rewrite_model: 'openai' | 'gemini';
+    rewrite_temperature: number;
+    editorial_line: string;
+  };
+  notifications: {
+    alert_on_viral_break: boolean;
+    viral_threshold: number;
+    alert_channels: string[];
+    webhook_url: string;
+  };
+  maintenance: {
+    is_under_maintenance: boolean;
+    maintenance_message: string;
+    api_rate_limit: number;
+  };
+  scraping: {
+    enable_automatic_ingestion: boolean;
+    max_articles_per_source: number;
+    daily_ingest_times: string[];
+  };
+}
+
+const DEFAULT_SETTINGS: AdminSettings = {
+  editorial: {
+    virality_threshold_2x: 2,
+    virality_threshold_5x: 5,
+    virality_threshold_10x: 10,
+    min_editorial_score: 60,
+    rewrite_model: 'openai',
+    rewrite_temperature: 0.7,
+    editorial_line: 'Éveil des consciences et développement de l\'Afrique',
+  },
+  notifications: {
+    alert_on_viral_break: true,
+    viral_threshold: 5,
+    alert_channels: [],
+    webhook_url: '',
+  },
+  maintenance: {
+    is_under_maintenance: false,
+    maintenance_message: '',
+    api_rate_limit: 1000,
+  },
+  scraping: {
+    enable_automatic_ingestion: true,
+    max_articles_per_source: 50,
+    daily_ingest_times: ['08:00', '14:00', '20:00'],
+  },
+};
+
+const API_BASE = getApiBaseUrl();
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState({
-    minViralityScore: 2,
-    maxArticlesPerDay: 1000,
-    scriptGenerationModel: 'gpt-4',
-    notificationsEnabled: true,
-    maintenanceMode: false,
-  });
-
+  const [settings, setSettings] = useState<AdminSettings>(DEFAULT_SETTINGS);
+  const [originalSettings, setOriginalSettings] = useState<AdminSettings>(DEFAULT_SETTINGS);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const handleChange = (key: string, value: any) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        setIsLoading(true);
+        const adminKey = localStorage.getItem('adminKey') || '';
+        const response = await fetch(`${API_BASE}/api/admin/settings`, {
+          headers: { 'X-Admin-Key': adminKey },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setSettings(data.settings || DEFAULT_SETTINGS);
+          setOriginalSettings(data.settings || DEFAULT_SETTINGS);
+        } else {
+          setSettings(DEFAULT_SETTINGS);
+          setOriginalSettings(DEFAULT_SETTINGS);
+        }
+      } catch (error) {
+        console.warn('Could not fetch settings, using defaults:', error);
+        setSettings(DEFAULT_SETTINGS);
+        setOriginalSettings(DEFAULT_SETTINGS);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSettings();
+  }, []);
+
+  const handleChange = (path: string, value: any) => {
+    const keys = path.split('.');
+    setSettings((prev) => {
+      const newSettings = JSON.parse(JSON.stringify(prev));
+      let current = newSettings;
+      for (let i = 0; i < keys.length - 1; i++) {
+        current = current[keys[i]];
+      }
+      current[keys[keys.length - 1]] = value;
+      return newSettings;
+    });
   };
 
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      const response = await fetch('/api/admin/settings', {
+      const adminKey = localStorage.getItem('adminKey') || '';
+      const response = await fetch(`${API_BASE}/api/admin/settings`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Key': adminKey,
+        },
+        body: JSON.stringify({ settings }),
       });
 
       if (!response.ok) {
         throw new Error('Erreur lors de la sauvegarde des paramètres');
       }
 
+      setOriginalSettings(JSON.parse(JSON.stringify(settings)));
       setMessage({
         type: 'success',
         text: 'Paramètres sauvegardés avec succès',
@@ -47,8 +144,26 @@ export default function SettingsPage() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="space-y-8 max-w-4xl">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Paramètres Administrateur
+          </h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
+            Configurez le comportement du système MarketGPS
+          </p>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <Loader className="h-6 w-6 animate-spin text-blue-600" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8 max-w-2xl">
+    <div className="space-y-8 max-w-4xl">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -89,141 +204,248 @@ export default function SettingsPage() {
 
       {/* Settings Sections */}
       <div className="space-y-6">
-        {/* Scraping Settings */}
+        {/* Scraping & Pipeline */}
         <div className="rounded-lg border border-gray-200 p-6 dark:border-gray-800">
-          <div className="mb-4 flex items-center gap-2">
+          <div className="mb-6 flex items-center gap-2">
             <Settings className="h-5 w-5 text-gray-600 dark:text-gray-400" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Paramètres de Scraping
+              Scraping & Pipeline
             </h3>
           </div>
 
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Score de Viralité Minimum
+                Score de Viralité Minimum (2x)
               </label>
               <input
                 type="number"
                 min="0"
                 step="0.5"
-                value={settings.minViralityScore}
+                value={settings.editorial.virality_threshold_2x}
                 onChange={(e) =>
-                  handleChange('minViralityScore', parseFloat(e.target.value))
+                  handleChange('editorial.virality_threshold_2x', parseFloat(e.target.value))
                 }
                 className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Nombre Maximum d'Articles par Source
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={settings.scraping.max_articles_per_source}
+                onChange={(e) =>
+                  handleChange('scraping.max_articles_per_source', parseInt(e.target.value))
+                }
+                className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.scraping.enable_automatic_ingestion}
+                  onChange={(e) =>
+                    handleChange('scraping.enable_automatic_ingestion', e.target.checked)
+                  }
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Ingestion automatique
+                </span>
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Horaires d'ingestion (séparés par des virgules)
+              </label>
+              <input
+                type="text"
+                value={settings.scraping.daily_ingest_times?.join(', ') || ''}
+                onChange={(e) =>
+                  handleChange('scraping.daily_ingest_times', e.target.value.split(',').map(t => t.trim()))
+                }
+                placeholder="08:00, 14:00, 20:00"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Rédaction & IA */}
+        <div className="rounded-lg border border-gray-200 p-6 dark:border-gray-800">
+          <div className="mb-6 flex items-center gap-2">
+            <Settings className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Rédaction & IA
+            </h3>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Modèle IA pour Réécriture
+              </label>
+              <select
+                value={settings.editorial.rewrite_model}
+                onChange={(e) =>
+                  handleChange('editorial.rewrite_model', e.target.value as 'openai' | 'gemini')
+                }
+                className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              >
+                <option value="openai">OpenAI (GPT-4)</option>
+                <option value="gemini">Google Gemini</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Température ({settings.editorial.rewrite_temperature.toFixed(2)})
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={settings.editorial.rewrite_temperature}
+                onChange={(e) =>
+                  handleChange('editorial.rewrite_temperature', parseFloat(e.target.value))
+                }
+                className="mt-2 w-full"
+              />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Les articles avec un score inférieur seront ignorés
+                Plus élevé = plus créatif, Plus bas = plus factuel
               </p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Nombre Maximum d'Articles par Jour
+                Ligne Éditoriale
               </label>
-              <input
-                type="number"
-                min="1"
-                value={settings.maxArticlesPerDay}
+              <textarea
+                value={settings.editorial.editorial_line}
                 onChange={(e) =>
-                  handleChange('maxArticlesPerDay', parseInt(e.target.value))
+                  handleChange('editorial.editorial_line', e.target.value)
                 }
+                rows={4}
                 className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Limite le nombre d'articles traités chaque jour
-              </p>
             </div>
           </div>
         </div>
 
-        {/* Script Generation Settings */}
+        {/* Notifications */}
         <div className="rounded-lg border border-gray-200 p-6 dark:border-gray-800">
-          <div className="mb-4 flex items-center gap-2">
-            <Settings className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Génération de Scripts
-            </h3>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Modèle IA
-            </label>
-            <select
-              value={settings.scriptGenerationModel}
-              onChange={(e) =>
-                handleChange('scriptGenerationModel', e.target.value)
-              }
-              className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="gpt-4">GPT-4 (Meilleure qualité)</option>
-              <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Rapide)</option>
-              <option value="claude">Claude (Créatif)</option>
-            </select>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Sélectionnez le modèle IA pour générer les scripts
-            </p>
-          </div>
-        </div>
-
-        {/* Notification Settings */}
-        <div className="rounded-lg border border-gray-200 p-6 dark:border-gray-800">
-          <div className="mb-4 flex items-center gap-2">
+          <div className="mb-6 flex items-center gap-2">
             <Settings className="h-5 w-5 text-gray-600 dark:text-gray-400" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Notifications
             </h3>
           </div>
 
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
+          <div className="space-y-4">
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.notifications.alert_on_viral_break}
+                  onChange={(e) =>
+                    handleChange('notifications.alert_on_viral_break', e.target.checked)
+                  }
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Activer les alertes
+                </span>
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Seuil de Viralité pour Alerte
+              </label>
               <input
-                type="checkbox"
-                checked={settings.notificationsEnabled}
+                type="number"
+                min="0"
+                step="0.5"
+                value={settings.notifications.viral_threshold}
                 onChange={(e) =>
-                  handleChange('notificationsEnabled', e.target.checked)
+                  handleChange('notifications.viral_threshold', parseFloat(e.target.value))
                 }
-                className="h-4 w-4 rounded border-gray-300"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Activer les notifications
-              </span>
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Recevez des alertes pour les événements importants
-            </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                URL Webhook
+              </label>
+              <input
+                type="url"
+                value={settings.notifications.webhook_url}
+                onChange={(e) =>
+                  handleChange('notifications.webhook_url', e.target.value)
+                }
+                placeholder="https://example.com/webhook"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              />
+            </div>
           </div>
         </div>
 
-        {/* System Settings */}
+        {/* Système */}
         <div className="rounded-lg border border-gray-200 p-6 dark:border-gray-800">
-          <div className="mb-4 flex items-center gap-2">
+          <div className="mb-6 flex items-center gap-2">
             <Settings className="h-5 w-5 text-gray-600 dark:text-gray-400" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Système
             </h3>
           </div>
 
-          <div className="flex items-center gap-4 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">
-            <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-            <div className="flex-1">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.maintenanceMode}
-                  onChange={(e) =>
-                    handleChange('maintenanceMode', e.target.checked)
-                  }
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <span className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
-                  Mode Maintenance
-                </span>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">
+              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+              <div className="flex-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.maintenance.is_under_maintenance}
+                    onChange={(e) =>
+                      handleChange('maintenance.is_under_maintenance', e.target.checked)
+                    }
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  <span className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                    Mode Maintenance
+                  </span>
+                </label>
+                <p className="mt-1 text-xs text-yellow-700 dark:text-yellow-400">
+                  Désactiver l'accès des utilisateurs pendant la maintenance
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Limite de Taux API
               </label>
-              <p className="mt-1 text-xs text-yellow-700 dark:text-yellow-400">
-                Désactiver l'accès des utilisateurs pendant la maintenance
+              <input
+                type="number"
+                min="1"
+                value={settings.maintenance.api_rate_limit}
+                onChange={(e) =>
+                  handleChange('maintenance.api_rate_limit', parseInt(e.target.value))
+                }
+                className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Requêtes par minute
               </p>
             </div>
           </div>

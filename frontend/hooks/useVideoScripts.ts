@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { VideoScript } from '@/types/admin';
+import { getApiBaseUrl } from '@/lib/config';
+
+const API_BASE = getApiBaseUrl();
 
 interface UseVideoScriptsParams {
   status?: VideoScript['status'];
@@ -33,10 +36,12 @@ export function useVideoScripts(params?: UseVideoScriptsParams): UseVideoScripts
       if (params?.page) queryParams.append('page', params.page.toString());
       if (params?.limit) queryParams.append('limit', params.limit.toString());
 
-      const url = `/api/admin/scripts?${queryParams.toString()}`;
-      console.log('Fetching scripts from:', url);
+      const adminKey = localStorage.getItem('adminKey') || '';
+      const url = `${API_BASE}/api/admin/scripts?${queryParams.toString()}`;
 
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: { 'X-Admin-Key': adminKey },
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch scripts: ${response.status}`);
@@ -64,10 +69,14 @@ export function useVideoScripts(params?: UseVideoScriptsParams): UseVideoScripts
 
   const createScript = useCallback(
     async (articleId: string, data: Partial<VideoScript>): Promise<VideoScript> => {
-      const response = await fetch('/api/admin/scripts', {
+      const adminKey = localStorage.getItem('adminKey') || '';
+      const response = await fetch(`${API_BASE}/api/admin/scripts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ articleId, ...data }),
+        headers: {
+          'X-Admin-Key': adminKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ article_id: articleId, ...data }),
       });
 
       if (!response.ok) {
@@ -83,9 +92,13 @@ export function useVideoScripts(params?: UseVideoScriptsParams): UseVideoScripts
 
   const updateScript = useCallback(
     async (id: string, data: Partial<VideoScript>): Promise<VideoScript> => {
-      const response = await fetch(`/api/admin/scripts/${id}`, {
+      const adminKey = localStorage.getItem('adminKey') || '';
+      const response = await fetch(`${API_BASE}/api/admin/scripts/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'X-Admin-Key': adminKey,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(data),
       });
 
@@ -104,8 +117,10 @@ export function useVideoScripts(params?: UseVideoScriptsParams): UseVideoScripts
 
   const deleteScript = useCallback(
     async (id: string): Promise<void> => {
-      const response = await fetch(`/api/admin/scripts/${id}`, {
+      const adminKey = localStorage.getItem('adminKey') || '';
+      const response = await fetch(`${API_BASE}/api/admin/scripts/${id}`, {
         method: 'DELETE',
+        headers: { 'X-Admin-Key': adminKey },
       });
 
       if (!response.ok) {

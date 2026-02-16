@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { AdminHeader } from '@/components/admin/AdminHeader';
 import { getApiBaseUrl } from '@/lib/config';
 
 const API_BASE = getApiBaseUrl();
@@ -16,6 +17,8 @@ export default function AdminLayout({
   const [adminKey, setAdminKey] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const checkAuth = useCallback(async (key: string) => {
     try {
@@ -47,6 +50,14 @@ export default function AdminLayout({
     }
   }, [checkAuth]);
 
+  // Load collapsed state from localStorage
+  useEffect(() => {
+    const savedState = localStorage.getItem('adminSidebarCollapsed');
+    if (savedState !== null) {
+      setIsCollapsed(JSON.parse(savedState));
+    }
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -64,6 +75,19 @@ export default function AdminLayout({
     } finally {
       setLoginLoading(false);
     }
+  };
+
+  const handleMenuToggle = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  const handleSidebarToggle = (isOpen: boolean) => {
+    setSidebarOpen(isOpen);
+  };
+
+  const handleSearch = (query: string) => {
+    // Search functionality will be implemented later
+    console.log('Search query:', query);
   };
 
   if (isLoading) {
@@ -126,13 +150,22 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="flex h-screen bg-white dark:bg-gray-950">
-      <AdminSidebar />
-      <main className="ml-64 flex-1 overflow-auto">
-        <div className="p-8">
-          {children}
-        </div>
-      </main>
+    <div className="flex flex-col h-screen bg-white dark:bg-gray-950">
+      {/* Header */}
+      <AdminHeader onMenuToggle={handleMenuToggle} onSearch={handleSearch} />
+
+      {/* Main container */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <AdminSidebar isOpen={sidebarOpen} onToggle={handleSidebarToggle} />
+
+        {/* Main content */}
+        <main className="flex-1 overflow-auto transition-all duration-300">
+          <div className="p-8">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

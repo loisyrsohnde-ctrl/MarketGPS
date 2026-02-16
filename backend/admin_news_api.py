@@ -3,6 +3,8 @@ Unified Admin News API Router
 
 Provides consolidated admin endpoints for news and video script management:
 - GET /api/admin/news - List articles with filters
+- GET /api/admin/editorial-scores - Get articles ranked by editorial intelligence
+- POST /api/admin/rescore-articles - Manually trigger editorial scoring
 - GET /api/admin/scripts - List all scripts
 - GET /api/admin/scripts/{id} - Get script details
 - POST /api/admin/scripts - Generate script from article
@@ -122,6 +124,54 @@ class NewsListResponse(BaseModel):
     limit: int
 
 
+class EditorialComponentScores(BaseModel):
+    """Component breakdown of editorial score."""
+    source_diversity: float = 0.0
+    verified_engagement: float = 0.0
+    topic_importance: float = 0.0
+    freshness: float = 0.0
+    geo_relevance: float = 0.0
+
+
+class EditorialScoreItem(BaseModel):
+    """Single article with editorial score data."""
+    article_id: int
+    title: Optional[str] = None
+    source_name: Optional[str] = None
+    editorial_score: float
+    reasons: List[str] = []
+    component_scores: EditorialComponentScores = EditorialComponentScores()
+    cluster_id: Optional[str] = None
+    cluster_size: int = 1
+    cluster_sources: List[str] = []
+    scored_at: Optional[str] = None
+    country: Optional[str] = None
+    language: Optional[str] = None
+    published_at: Optional[str] = None
+    url: Optional[str] = None
+    total_interactions: Optional[int] = None
+
+
+class EditorialScoresResponse(BaseModel):
+    """Response for editorial scores endpoint."""
+    articles: List[EditorialScoreItem]
+    total: int
+    updated_at: str
+
+
+class RescoreRequest(BaseModel):
+    """Request to trigger manual rescoring."""
+    days_back: int = 7
+    top_k: int = 100
+
+
+class RescoreResponse(BaseModel):
+    """Response after rescoring articles."""
+    message: str
+    total_scored: int
+    top_score: float
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # GET /api/admin/news - List news articles with filters
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -191,6 +241,146 @@ async def list_news_articles(
 
     except Exception as e:
         logger.error(f"Error listing news articles: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GET /api/admin/editorial-scores - Get articles ranked by editorial intelligence
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/editorial-scores", response_model=EditorialScoresResponse)
+async def get_editorial_scores(
+    top_k: int = Query(50, ge=1, le=200, description="Number of top articles to return"),
+    days_back: int = Query(3, ge=1, le=30, description="Days of articles to analyze"),
+    min_score: float = Query(25.0, ge=0, le=100, description="Minimum editorial score"),
+):
+    """
+    Get articles ranked by editorial intelligence score.
+
+    Uses the EditorialScorer pipeline to cluster articles by topic,
+    evaluate source diversity, engagement, importance, freshness,
+    and geographic relevance.
+
+    Query params:
+    - top_k: Number of top articles to return (default: 50)
+    - days_back: Days of articles to analyze (default: 3)
+    - min_score: Minimum editorial score threshold (default: 25)
+    """
+    try:
+        from pipeline.news.editorial_scorer import EditorialScorer
+
+        scorer = EditorialScorer(get_db_conn=db._get_conn)
+        scored_articles = scorer.score_and_rank(
+            top_k=top_k,
+            min_score=min_score,
+            days_back=days_back,
+        )
+
+        # Enrich with article metadata from DB
+        enriched = []
+        conn = db._get_conn()
+        cursor = conn.cursor()
+
+        for score_obj in scored_articles:
+            # Fetch article title, source, etc.
+            cursor.execute(
+                """SELECT title, source_name, country, language, published_at,
+                          canonical_url, total_interactions
+                   FROM news_articles WHERE id = ?""",
+                (score_obj.article_id,),
+            )
+            row = cursor.fetchone()
+
+            item = EditorialScoreItem(
+                article_id=score_obj.article_id,
+                title=row[0] if row else None,
+                source_name=row[1] if row else None,
+                editorial_score=score_obj.editorial_score,
+                reasons=score_obj.reasons,
+                component_scores=EditorialComponentScores(
+                    **score_obj.component_scores
+                ),
+                cluster_id=score_obj.cluster_id,
+                cluster_size=score_obj.cluster_size,
+                cluster_sources=score_obj.cluster_sources,
+                scored_at=score_obj.scored_at,
+                country=row[2] if row else None,
+                language=row[3] if row else None,
+                published_at=row[4] if row else None,
+                url=row[5] if row else None,
+                total_interactions=row[6] if row else None,
+            )
+            enriched.append(item)
+
+        conn.close()
+
+        return EditorialScoresResponse(
+            articles=enriched,
+            total=len(enriched),
+            updated_at=datetime.utcnow().isoformat(),
+        )
+
+    except ImportError:
+        logger.error("EditorialScorer module not found in pipeline.news")
+        raise HTTPException(
+            status_code=501,
+            detail="Editorial Scorer module not available. Check pipeline/news/editorial_scorer.py",
+        )
+    except Exception as e:
+        logger.error(f"Error getting editorial scores: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# POST /api/admin/rescore-articles - Manually trigger editorial scoring
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.post("/rescore-articles", response_model=RescoreResponse)
+async def rescore_articles(request: RescoreRequest = RescoreRequest()):
+    """
+    Manually trigger editorial scoring for recent articles.
+
+    Body (optional):
+    - days_back: Number of days to analyze (default: 7)
+    - top_k: Number of top articles to score (default: 100)
+    """
+    try:
+        from pipeline.news.editorial_scorer import EditorialScorer
+
+        scorer = EditorialScorer(get_db_conn=db._get_conn)
+        results = scorer.score_and_rank(
+            days_back=request.days_back,
+            top_k=request.top_k,
+        )
+
+        # Persist scores to database
+        saved_count = scorer.save_scores(results)
+
+        top_score = max(
+            [r.editorial_score for r in results], default=0
+        )
+
+        logger.info(
+            f"Rescored {saved_count} articles (days_back={request.days_back}, "
+            f"top_k={request.top_k}, top_score={top_score:.1f})"
+        )
+
+        return RescoreResponse(
+            message=f"Rescored {saved_count} articles successfully",
+            total_scored=saved_count,
+            top_score=round(top_score, 1),
+        )
+
+    except ImportError:
+        logger.error("EditorialScorer module not found in pipeline.news")
+        raise HTTPException(
+            status_code=501,
+            detail="Editorial Scorer module not available. Check pipeline/news/editorial_scorer.py",
+        )
+    except Exception as e:
+        logger.error(f"Error rescoring articles: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

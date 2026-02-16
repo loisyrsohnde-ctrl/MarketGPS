@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { User } from '@/types/admin';
+import { getApiBaseUrl } from '@/lib/config';
 import { Mail, Calendar, Activity, Filter } from 'lucide-react';
+
+const API_BASE = getApiBaseUrl();
 
 type PlanFilter = 'all' | 'pro' | 'free' | 'enterprise';
 
@@ -18,21 +21,43 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      const adminKey = localStorage.getItem('adminKey') || '';
       const params = new URLSearchParams();
-      if (plan !== 'all') params.append('plan', plan);
+      if (plan !== 'all') params.append('filter', plan);
       if (searchEmail) params.append('search', searchEmail);
-      params.append('page', page.toString());
-      params.append('limit', '20');
+      const limit = 20;
+      const offset = (page - 1) * limit;
+      params.append('limit', limit.toString());
+      params.append('offset', offset.toString());
 
-      const response = await fetch(`/api/admin/users?${params.toString()}`);
+      const response = await fetch(`${API_BASE}/admin/users?${params.toString()}`, {
+        headers: { 'X-Admin-Key': adminKey },
+      });
 
       if (!response.ok) {
         throw new Error('Erreur lors du chargement des utilisateurs');
       }
 
       const data = await response.json();
-      setUsers(data.users || []);
-      setTotal(data.total || 0);
+
+      // Backend returns UserSummary[] directly (not wrapped in {users, total})
+      const rawUsers = Array.isArray(data) ? data : (data.users || []);
+
+      // Map backend fields to frontend User type
+      const mappedUsers: User[] = rawUsers.map((u: any) => ({
+        id: u.id,
+        email: u.email || '',
+        name: u.full_name || u.email?.split('@')[0] || 'N/A',
+        plan: u.is_pro ? 'pro' : (u.plan === 'enterprise' ? 'enterprise' : 'free'),
+        createdAt: u.created_at || new Date().toISOString(),
+        lastLogin: u.last_sign_in || u.created_at || new Date().toISOString(),
+        isActive: u.last_sign_in
+          ? (Date.now() - new Date(u.last_sign_in).getTime()) < 30 * 24 * 60 * 60 * 1000
+          : false,
+      }));
+
+      setUsers(mappedUsers);
+      setTotal(Array.isArray(data) ? data.length : (data.total || mappedUsers.length));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');

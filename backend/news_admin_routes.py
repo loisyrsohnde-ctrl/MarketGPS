@@ -10,10 +10,12 @@ Endpoints admin pour gérer le scraping d'actualités économiques africaines:
 """
 
 import os
+import json
 import logging
 import asyncio
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Header, Query, BackgroundTasks
 from pydantic import BaseModel
@@ -77,8 +79,12 @@ async def list_scraped_articles(
     status: Optional[str] = Query(None, description="Filter: pending, published, rejected"),
     trending: bool = Query(False, description="Only trending articles (100+ interactions)"),
     source: Optional[str] = Query(None, description="Filter by source name"),
+    country: Optional[str] = Query(None, description="Filter by country code (DE, FR, US, etc.)"),
+    language: Optional[str] = Query(None, description="Filter by language (fr, en, de, etc.)"),
+    is_breaking: Optional[bool] = Query(None, description="Filter breaking news only"),
     category: Optional[str] = Query(None, description="Filter by category"),
     min_interactions: int = Query(0, description="Minimum interactions"),
+    sort_by: Optional[str] = Query(None, description="Sort: interactions, freshness, breaking"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
@@ -111,6 +117,17 @@ async def list_scraped_articles(
                 query += " AND source_name LIKE ?"
                 params.append(f"%{source}%")
 
+            if country:
+                query += " AND country = ?"
+                params.append(country)
+
+            if language:
+                query += " AND language = ?"
+                params.append(language)
+
+            if is_breaking:
+                query += " AND is_breaking_news = 1"
+
             if category:
                 query += " AND category = ?"
                 params.append(category)
@@ -119,7 +136,13 @@ async def list_scraped_articles(
                 query += " AND total_interactions >= ?"
                 params.append(min_interactions)
 
-            query += " ORDER BY total_interactions DESC, scraped_at DESC"
+            # Sorting
+            if sort_by == "freshness":
+                query += " ORDER BY scraped_at DESC, total_interactions DESC"
+            elif sort_by == "breaking":
+                query += " ORDER BY is_breaking_news DESC, importance_level DESC, total_interactions DESC"
+            else:
+                query += " ORDER BY total_interactions DESC, scraped_at DESC"
             query += " LIMIT ? OFFSET ?"
             params.extend([limit, offset])
 
@@ -139,6 +162,14 @@ async def list_scraped_articles(
             if source:
                 count_query += " AND source_name LIKE ?"
                 count_params.append(f"%{source}%")
+            if country:
+                count_query += " AND country = ?"
+                count_params.append(country)
+            if language:
+                count_query += " AND language = ?"
+                count_params.append(language)
+            if is_breaking:
+                count_query += " AND is_breaking_news = 1"
             if category:
                 count_query += " AND category = ?"
                 count_params.append(category)
@@ -779,6 +810,156 @@ async def get_pipeline_status(
         
     except Exception as e:
         logger.error(f"Error getting pipeline status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/pipeline/freshness")
+async def check_pipeline_freshness(
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+):
+    """
+    Diagnostic endpoint: check WHY articles aren't refreshing.
+    Returns detailed freshness data including last article dates,
+    articles per day, and source health.
+    """
+    require_admin(admin_key)
+
+    try:
+        result = {
+            "diagnosis": [],
+            "articles_per_day": [],
+            "newest_articles": [],
+            "source_health": [],
+            "raw_items_stats": {},
+        }
+
+        with db._get_conn() as conn:
+            # 1. Most recent articles
+            try:
+                cursor = conn.execute("""
+                    SELECT id, title, source_name, country, total_interactions,
+                           created_at, scraped_at, published_at, status
+                    FROM news_articles
+                    ORDER BY created_at DESC
+                    LIMIT 10
+                """)
+                cols = [d[0] for d in cursor.description]
+                result["newest_articles"] = [dict(zip(cols, r)) for r in cursor.fetchall()]
+            except Exception as e:
+                result["diagnosis"].append(f"Error reading articles: {e}")
+
+            # 2. Articles per day (last 14 days)
+            try:
+                cursor = conn.execute("""
+                    SELECT date(created_at) as day, COUNT(*) as count
+                    FROM news_articles
+                    WHERE created_at > datetime('now', '-14 days')
+                    GROUP BY day
+                    ORDER BY day DESC
+                """)
+                result["articles_per_day"] = [
+                    {"date": r[0], "count": r[1]} for r in cursor.fetchall()
+                ]
+            except Exception as e:
+                result["diagnosis"].append(f"Error reading articles per day: {e}")
+
+            # 3. Raw items stats
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM news_raw_items WHERE processed = 0")
+                pending = cursor.fetchone()[0]
+
+                cursor = conn.execute("SELECT COUNT(*) FROM news_raw_items WHERE processed = 1")
+                processed = cursor.fetchone()[0]
+
+                cursor = conn.execute("SELECT COUNT(*) FROM news_raw_items WHERE process_error IS NOT NULL")
+                errors = cursor.fetchone()[0]
+
+                cursor = conn.execute("SELECT MAX(created_at) FROM news_raw_items")
+                last_raw = cursor.fetchone()[0]
+
+                result["raw_items_stats"] = {
+                    "pending": pending,
+                    "processed": processed,
+                    "errors": errors,
+                    "last_raw_item_at": last_raw,
+                }
+
+                if pending == 0 and processed > 0:
+                    result["diagnosis"].append(
+                        "ISSUE: 0 pending raw items — all have been processed. "
+                        "The RSS feeds are returning the same URLs (already in DB). "
+                        "New content will appear when sources publish new articles."
+                    )
+                elif pending > 0:
+                    result["diagnosis"].append(
+                        f"OK: {pending} pending raw items waiting to be processed. "
+                        "Run the publish step to process them."
+                    )
+            except Exception as e:
+                result["diagnosis"].append(f"Error reading raw items: {e}")
+
+            # 4. Source health (last fetch)
+            try:
+                cursor = conn.execute("""
+                    SELECT name, last_fetched_at, fetch_error,
+                           (SELECT COUNT(*) FROM news_raw_items ri WHERE ri.source_id = ns.id) as total_items
+                    FROM news_sources ns
+                    WHERE enabled = 1
+                    ORDER BY last_fetched_at DESC
+                    LIMIT 20
+                """)
+                cols = [d[0] for d in cursor.description]
+                result["source_health"] = [dict(zip(cols, r)) for r in cursor.fetchall()]
+
+                # Count sources with errors
+                error_sources = [s for s in result["source_health"] if s.get("fetch_error")]
+                if error_sources:
+                    result["diagnosis"].append(
+                        f"WARNING: {len(error_sources)} sources have fetch errors. "
+                        f"Examples: {', '.join(s['name'] for s in error_sources[:3])}"
+                    )
+            except Exception as e:
+                result["diagnosis"].append(f"Error reading sources: {e}")
+
+            # 5. Check last pipeline metrics
+            metrics_path = Path(__file__).parent.parent / "data" / "news_metrics.json"
+            if metrics_path.exists():
+                try:
+                    with open(metrics_path, 'r') as f:
+                        metrics = json.load(f)
+                    result["last_pipeline_run"] = metrics.get("last_run")
+                    result["last_pipeline_success"] = metrics.get("last_success")
+                    result["pipeline_history"] = metrics.get("history", [])[:5]
+                except Exception:
+                    pass
+            else:
+                result["diagnosis"].append(
+                    "WARNING: No news_metrics.json found — the scheduler may not be running. "
+                    "Check: docker logs marketgps-news-scheduler"
+                )
+
+            # 6. Summary diagnosis
+            if not result["articles_per_day"]:
+                result["diagnosis"].insert(0,
+                    "CRITICAL: No articles in the last 14 days. "
+                    "The pipeline is NOT running or NOT producing articles."
+                )
+            elif result["articles_per_day"][0]["date"] != datetime.now().strftime("%Y-%m-%d"):
+                last_date = result["articles_per_day"][0]["date"]
+                result["diagnosis"].insert(0,
+                    f"STALE: Last article was on {last_date}. "
+                    "No new articles today. Check the scheduler container."
+                )
+            else:
+                today_count = result["articles_per_day"][0]["count"]
+                result["diagnosis"].insert(0,
+                    f"OK: {today_count} articles published today."
+                )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error in pipeline freshness check: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

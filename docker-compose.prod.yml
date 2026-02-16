@@ -142,6 +142,9 @@ services:
       # News scheduler settings
       - NEWS_INTERVAL_MINUTES=30
       - NEWS_RUN_ON_START=true
+      # Use Docker internal network for API push (not external URL)
+      - BACKEND_API_URL=http://backend:8000
+      - INTERNAL_API_KEY=mgps-internal-pipeline-2026
     command: python -m pipeline.news.news_scheduler
     networks:
       - marketgps-network

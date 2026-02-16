@@ -4,24 +4,72 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ViralArticle } from '@/types/admin';
 import { ViralityBadge } from './ViralityBadge';
-import { ChevronRight, Zap, ExternalLink, Eye, Copy, Check } from 'lucide-react';
+import { ChevronRight, Zap, ExternalLink, Eye, Copy, Check, CheckCircle, XCircle, Workflow } from 'lucide-react';
 
 interface NewsTableProps {
   articles: ViralArticle[];
   isLoading?: boolean;
   onGenerateScript?: (articleId: string) => void;
+  onPublish?: (articleId: string) => Promise<boolean>;
+  onReject?: (articleId: string) => Promise<boolean>;
   viewMode?: 'table' | 'cards';
+  selectedIds?: Set<string>;
+  onSelectionChange?: (ids: Set<string>) => void;
 }
 
 export function NewsTable({
   articles,
   isLoading = false,
   onGenerateScript,
+  onPublish,
+  onReject,
   viewMode = 'table',
+  selectedIds = new Set<string>(),
+  onSelectionChange,
 }: NewsTableProps) {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<ViralArticle | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleToggleSelection = (articleId: string) => {
+    if (!onSelectionChange) return;
+    const newSelection = new Set(selectedIds);
+    if (newSelection.has(articleId)) {
+      newSelection.delete(articleId);
+    } else {
+      newSelection.add(articleId);
+    }
+    onSelectionChange(newSelection);
+  };
+
+  const handleSelectAll = () => {
+    if (!onSelectionChange) return;
+    const allIds = new Set(articles.map((a) => a.id));
+    onSelectionChange(allIds);
+  };
+
+  const handleDeselectAll = () => {
+    if (!onSelectionChange) return;
+    onSelectionChange(new Set());
+  };
+
+  const isAllSelected = articles.length > 0 && articles.every((a) => selectedIds.has(a.id));
+  const isSomeSelected = articles.some((a) => selectedIds.has(a.id));
+
+  const handlePublish = async (articleId: string) => {
+    if (!onPublish) return;
+    setPublishingId(articleId);
+    await onPublish(articleId);
+    setPublishingId(null);
+  };
+
+  const handleReject = async (articleId: string) => {
+    if (!onReject) return;
+    setPublishingId(articleId);
+    await onReject(articleId);
+    setPublishingId(null);
+  };
 
   const handleGenerateScript = async (articleId: string) => {
     setGeneratingId(articleId);
@@ -72,8 +120,22 @@ export function NewsTable({
           {articles.map((article) => (
             <div
               key={article.id}
-              className="rounded-lg border border-gray-200 bg-white p-5 hover:shadow-lg transition-shadow dark:border-gray-800 dark:bg-gray-900/50"
+              className={`rounded-lg border transition-all ${
+                selectedIds.has(article.id)
+                  ? 'border-blue-500 bg-blue-50 dark:border-blue-500 dark:bg-blue-950/30'
+                  : 'border-gray-200 bg-white hover:shadow-lg dark:border-gray-800 dark:bg-gray-900/50'
+              } p-5`}
             >
+              {/* Checkbox */}
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(article.id)}
+                  onChange={() => handleToggleSelection(article.id)}
+                  className="mt-1 w-4 h-4 rounded border-gray-300 cursor-pointer dark:bg-gray-700 dark:border-gray-600"
+                  title="Sélectionner cet article"
+                />
+              </div>
               {/* Thumbnail */}
               {article.thumbnail && (
                 <div className="mb-4 h-40 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
@@ -91,9 +153,14 @@ export function NewsTable({
               {/* Header */}
               <div className="mb-3 flex items-start justify-between gap-2">
                 <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2">
-                    {article.title}
-                  </h3>
+                  <button
+                    onClick={() => setSelectedArticle(article)}
+                    className="text-left hover:opacity-75 transition-opacity w-full"
+                  >
+                    <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2">
+                      {article.title}
+                    </h3>
+                  </button>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {new Date(article.publishedAt).toLocaleDateString('fr-FR')}
                   </p>
@@ -137,7 +204,7 @@ export function NewsTable({
               </div>
 
               {/* Actions */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <button
                   onClick={() => handleCopyTitle(article.title, article.id)}
                   className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -160,6 +227,15 @@ export function NewsTable({
                   <span className="hidden sm:inline">Aperçu</span>
                 </button>
 
+                <Link
+                  href={`/admin/news/${article.id}`}
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                  title="Workflow"
+                >
+                  <Workflow className="h-3 w-3" />
+                  <span className="hidden sm:inline">Workflow</span>
+                </Link>
+
                 {article.url && (
                   <button
                     onClick={() => openArticle(article.url)}
@@ -171,7 +247,7 @@ export function NewsTable({
                   </button>
                 )}
 
-                <div className="col-span-3">
+                <div className="col-span-4">
                   {!article.hasScript ? (
                     <button
                       onClick={() => handleGenerateScript(article.id)}
@@ -214,6 +290,20 @@ export function NewsTable({
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/80">
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  onChange={() => (isAllSelected ? handleDeselectAll() : handleSelectAll())}
+                  className="w-4 h-4 rounded border-gray-300 cursor-pointer dark:bg-gray-700 dark:border-gray-600"
+                  title={isAllSelected ? 'Désélectionner tous' : 'Sélectionner tous'}
+                  ref={(el) => {
+                    if (el) {
+                      (el as any).indeterminate = isSomeSelected && !isAllSelected;
+                    }
+                  }}
+                />
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
                 Titre
               </th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
@@ -240,8 +330,21 @@ export function NewsTable({
             {articles.map((article) => (
               <tr
                 key={article.id}
-                className="border-b border-gray-200 hover:bg-gray-50 transition-colors dark:border-gray-800 dark:hover:bg-gray-900/50"
+                className={`border-b transition-colors ${
+                  selectedIds.has(article.id)
+                    ? 'bg-blue-50 dark:bg-blue-950/30'
+                    : 'border-gray-200 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900/50'
+                }`}
               >
+                <td className="px-6 py-4">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(article.id)}
+                    onChange={() => handleToggleSelection(article.id)}
+                    className="w-4 h-4 rounded border-gray-300 cursor-pointer dark:bg-gray-700 dark:border-gray-600"
+                    title="Sélectionner cet article"
+                  />
+                </td>
                 <td className="px-6 py-4">
                   <button
                     onClick={() => setSelectedArticle(article)}
@@ -283,7 +386,37 @@ export function NewsTable({
                   )}
                 </td>
                 <td className="px-6 py-4">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    {onPublish && (
+                      <button
+                        onClick={() => handlePublish(article.id)}
+                        disabled={publishingId === article.id}
+                        className="inline-flex items-center gap-1 rounded-lg bg-green-100 px-2 py-1 text-xs font-medium text-green-800 hover:bg-green-200 disabled:opacity-50 transition-colors dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
+                        title="Publier"
+                      >
+                        <CheckCircle className="h-3 w-3" />
+                        Publier
+                      </button>
+                    )}
+                    {onReject && (
+                      <button
+                        onClick={() => handleReject(article.id)}
+                        disabled={publishingId === article.id}
+                        className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-2 py-1 text-xs font-medium text-red-800 hover:bg-red-200 disabled:opacity-50 transition-colors dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+                        title="Rejeter"
+                      >
+                        <XCircle className="h-3 w-3" />
+                        Rejeter
+                      </button>
+                    )}
+                    <Link
+                      href={`/admin/news/${article.id}`}
+                      className="inline-flex items-center gap-1 rounded-lg bg-purple-100 px-2 py-1 text-xs font-medium text-purple-800 hover:bg-purple-200 transition-colors dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
+                      title="Workflow"
+                    >
+                      <Workflow className="h-3 w-3" />
+                      Workflow
+                    </Link>
                     {article.url && (
                       <button
                         onClick={() => openArticle(article.url)}

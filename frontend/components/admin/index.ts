@@ -1,5 +1,15 @@
 export { AdminSidebar } from './AdminSidebar';
+export { AdminHeader } from './AdminHeader';
 export { StatsCard } from './StatsCard';
 export { ViralityBadge } from './ViralityBadge';
 export { NewsTable } from './NewsTable';
 export { ScriptEditor } from './ScriptEditor';
+export { CountryFilterSelector } from './CountryFilterSelector';
+export { BatchActionBar } from './BatchActionBar';
+export { NotificationCenter } from './NotificationCenter';
+export { default as StepIndicator } from './StepIndicator';
+export { default as ProgressBar } from './ProgressBar';
+export { DashboardChart } from './DashboardChart';
+export { EditorialTable } from './EditorialTable';
+export { EditorialScoreBadge } from './EditorialScoreBadge';
+export { default as MarkdownRenderer } from './MarkdownRenderer';

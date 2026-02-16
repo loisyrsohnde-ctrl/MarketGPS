@@ -2,18 +2,40 @@
 
 import { useState } from 'react';
 import { useViralNews } from '@/hooks/useViralNews';
+import { useEditorialScores } from '@/hooks/useEditorialScores';
 import { NewsTable } from '@/components/admin/NewsTable';
-import { Filter, RefreshCw, LayoutGrid, List } from 'lucide-react';
+import { EditorialTable } from '@/components/admin/EditorialTable';
+import { CountryFilterSelector, BatchActionBar } from '@/components/admin';
+import { getApiBaseUrl } from '@/lib/config';
+import type { ViralArticle } from '@/types/admin';
+import {
+  Filter,
+  RefreshCw,
+  LayoutGrid,
+  List,
+  Flame,
+  Award,
+  Loader2,
+} from 'lucide-react';
+
+type TabType = 'viral' | 'editorial';
 
 export default function NewsPage() {
+  // ── Shared state ──────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<TabType>('viral');
   const [region, setRegion] = useState<string>();
   const [language, setLanguage] = useState<string>();
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [countries, setCountries] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
+
+  // ── Viral News state ──────────────────────────────────────────────────────
   const [minViralityScore, setMinViralityScore] = useState<number>();
   const [page, setPage] = useState(1);
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [generatingId, setGeneratingId] = useState<string | null>(null);
 
-  const { articles, total, loading, error, refetch } = useViralNews({
+  const { articles, total, loading, error, refetch, publishArticle, rejectArticle } = useViralNews({
     region,
     language,
     minViralityScore,
@@ -21,43 +43,209 @@ export default function NewsPage() {
     limit: 20,
   });
 
+  // ── Editorial state ───────────────────────────────────────────────────────
+  const [topK, setTopK] = useState(50);
+  const [daysBack, setDaysBack] = useState(3);
+  const [minScore, setMinScore] = useState(25);
+
+  const {
+    articles: editorialArticles,
+    total: editorialTotal,
+    updatedAt,
+    loading: editorialLoading,
+    error: editorialError,
+    refetch: editorialRefetch,
+    rescore,
+    rescoring,
+  } = useEditorialScores({ topK, daysBack, minScore });
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleGenerateScript = async (articleId: string) => {
     setGeneratingId(articleId);
     try {
-      const response = await fetch('/api/admin/scripts/generate', {
+      const { getApiBaseUrl } = await import('@/lib/config');
+      const API_BASE = getApiBaseUrl();
+      const adminKey = localStorage.getItem('adminKey') || '';
+      const response = await fetch(`${API_BASE}/api/admin/scripts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ articleId }),
+        headers: {
+          'X-Admin-Key': adminKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ article_id: articleId }),
       });
 
       if (response.ok) {
-        const data = await response.json();
-        console.log('Script generated:', data);
-        // Refetch to update the hasScript status
         await refetch();
       } else {
         const errorData = await response.json();
         console.error('Error generating script:', errorData);
       }
-    } catch (error) {
-      console.error('Erreur lors de la génération du script:', error);
+    } catch (err) {
+      console.error('Erreur lors de la g\u00e9n\u00e9ration du script:', err);
     } finally {
       setGeneratingId(null);
     }
   };
 
+  const handleRescore = async () => {
+    const result = await rescore(daysBack, topK);
+    if (!result.success) {
+      console.error('Rescore failed:', result.message);
+    }
+  };
+
+  // ── Batch Operations ──────────────────────────────────────────────────────
+  const handleBatchPublish = async () => {
+    if (selectedIds.size === 0) return;
+    setBatchLoading(true);
+    try {
+      const API_BASE = getApiBaseUrl();
+      const adminKey = localStorage.getItem('adminKey') || '';
+      const response = await fetch(`${API_BASE}/api/admin/articles/batch`, {
+        method: 'POST',
+        headers: {
+          'X-Admin-Key': adminKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'publish',
+          article_ids: Array.from(selectedIds),
+        }),
+      });
+
+      if (response.ok) {
+        setSelectedIds(new Set());
+        await refetch();
+      } else {
+        const errorData = await response.json();
+        console.error('Error publishing articles:', errorData);
+      }
+    } catch (err) {
+      console.error('Erreur lors de la publication en masse:', err);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  const handleBatchReject = async () => {
+    if (selectedIds.size === 0) return;
+    setBatchLoading(true);
+    try {
+      const API_BASE = getApiBaseUrl();
+      const adminKey = localStorage.getItem('adminKey') || '';
+      const response = await fetch(`${API_BASE}/api/admin/articles/batch`, {
+        method: 'POST',
+        headers: {
+          'X-Admin-Key': adminKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'reject',
+          article_ids: Array.from(selectedIds),
+        }),
+      });
+
+      if (response.ok) {
+        setSelectedIds(new Set());
+        await refetch();
+      } else {
+        const errorData = await response.json();
+        console.error('Error rejecting articles:', errorData);
+      }
+    } catch (err) {
+      console.error('Erreur lors du rejet en masse:', err);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  const handleBatchExport = () => {
+    if (selectedIds.size === 0) return;
+
+    const selectedArticles = articles.filter((a) => selectedIds.has(a.id));
+    const csv = generateCSV(selectedArticles);
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `articles_${new Date().toISOString()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const generateCSV = (articles: ViralArticle[]): string => {
+    const headers = [
+      'ID',
+      'Titre',
+      'Source',
+      'Région',
+      'Interactions',
+      'Viralité',
+      'URL',
+      'Date Publiée',
+    ];
+    const rows = articles.map((article: ViralArticle) => [
+      article.id,
+      `"${article.title.replace(/"/g, '""')}"`,
+      article.source,
+      article.region,
+      article.interactions,
+      article.viralityScore,
+      article.url || '',
+      new Date(article.publishedAt).toISOString(),
+    ] as string[]);
+
+    return [
+      headers.join(','),
+      ...rows.map((row: string[]) => row.join(',')),
+    ].join('\n');
+  };
+
   const totalPages = Math.ceil(total / 20);
+  const currentLoading = activeTab === 'viral' ? loading : editorialLoading;
+  const currentError = activeTab === 'viral' ? error : editorialError;
+  const currentTotal = activeTab === 'viral' ? total : editorialTotal;
 
   return (
-    <div className="space-y-8">
+    <div className={`space-y-8 ${selectedIds.size > 0 ? 'pb-24' : ''}`}>
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Actualités Virales
+          Actualit\u00e9s
         </h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Gérez les actualités virales et générez des scripts vidéo
+          G\u00e9rez les actualit\u00e9s virales et le classement \u00e9ditorial
         </p>
+      </div>
+
+      {/* Tab Switcher */}
+      <div className="flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
+        <button
+          onClick={() => setActiveTab('viral')}
+          className={`flex items-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all ${
+            activeTab === 'viral'
+              ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
+              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+          }`}
+        >
+          <Flame className="h-4 w-4" />
+          Actualit\u00e9s Virales
+        </button>
+        <button
+          onClick={() => setActiveTab('editorial')}
+          className={`flex items-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all ${
+            activeTab === 'editorial'
+              ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
+              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+          }`}
+        >
+          <Award className="h-4 w-4" />
+          Intelligence \u00c9ditoriale
+        </button>
       </div>
 
       {/* Filters */}
@@ -70,28 +258,21 @@ export default function NewsPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
-          {/* Region Filter */}
+          {/* Countries Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Région
+              Pays
             </label>
-            <select
-              value={region || ''}
-              onChange={(e) => {
-                setRegion(e.target.value || undefined);
+            <CountryFilterSelector
+              selected={countries}
+              onChange={(selectedCountries) => {
+                setCountries(selectedCountries);
                 setPage(1);
               }}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="">Toutes les régions</option>
-              <option value="FR">France</option>
-              <option value="US">États-Unis</option>
-              <option value="EU">Europe</option>
-              <option value="ASIA">Asie</option>
-            </select>
+            />
           </div>
 
-          {/* Language Filter */}
+          {/* Language Filter (shared) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Langue
@@ -105,72 +286,139 @@ export default function NewsPage() {
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             >
               <option value="">Toutes les langues</option>
-              <option value="fr">Français</option>
+              <option value="fr">Fran\u00e7ais</option>
               <option value="en">Anglais</option>
               <option value="de">Allemand</option>
               <option value="es">Espagnol</option>
             </select>
           </div>
 
-          {/* Min Virality Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Viralité Min
-            </label>
-            <select
-              value={minViralityScore || ''}
-              onChange={(e) => {
-                setMinViralityScore(e.target.value ? Number(e.target.value) : undefined);
-                setPage(1);
-              }}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="">Tous les niveaux</option>
-              <option value="2">2x</option>
-              <option value="5">5x</option>
-              <option value="10">10x</option>
-            </select>
-          </div>
+          {/* Tab-specific filters */}
+          {activeTab === 'viral' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Viralit\u00e9 Min
+              </label>
+              <select
+                value={minViralityScore || ''}
+                onChange={(e) => {
+                  setMinViralityScore(
+                    e.target.value ? Number(e.target.value) : undefined
+                  );
+                  setPage(1);
+                }}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              >
+                <option value="">Tous les niveaux</option>
+                <option value="2">2x</option>
+                <option value="5">5x</option>
+                <option value="10">10x</option>
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Score Min
+              </label>
+              <select
+                value={minScore}
+                onChange={(e) => setMinScore(Number(e.target.value))}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              >
+                <option value={0}>Tous</option>
+                <option value={25}>25+</option>
+                <option value={40}>40+</option>
+                <option value={60}>60+</option>
+                <option value={80}>80+</option>
+              </select>
+            </div>
+          )}
 
-          {/* Refresh Button */}
-          <div className="flex items-end">
+          {/* Action Button */}
+          <div className="flex items-end gap-2">
             <button
-              onClick={() => refetch()}
-              className="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 flex items-center justify-center gap-2"
+              onClick={() =>
+                activeTab === 'viral' ? refetch() : editorialRefetch()
+              }
+              className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 flex items-center justify-center gap-2"
             >
               <RefreshCw className="h-4 w-4" />
               Actualiser
             </button>
+            {activeTab === 'editorial' && (
+              <button
+                onClick={handleRescore}
+                disabled={rescoring}
+                className="rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-500 dark:hover:bg-emerald-600 flex items-center justify-center gap-2"
+                title="Relancer le scoring \u00e9ditorial sur les articles r\u00e9cents"
+              >
+                {rescoring ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Award className="h-4 w-4" />
+                )}
+                {rescoring ? 'Scoring...' : 'Rescorer'}
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Editorial-specific: days back selector */}
+        {activeTab === 'editorial' && (
+          <div className="mt-4 flex items-center gap-4 text-sm">
+            <span className="text-gray-600 dark:text-gray-400">
+              P\u00e9riode :
+            </span>
+            {[1, 3, 7, 14].map((d) => (
+              <button
+                key={d}
+                onClick={() => setDaysBack(d)}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                  daysBack === d
+                    ? 'bg-blue-600 text-white dark:bg-blue-500'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                }`}
+              >
+                {d}j
+              </button>
+            ))}
+            {updatedAt && (
+              <span className="ml-auto text-xs text-gray-500 dark:text-gray-500">
+                Mis \u00e0 jour :{' '}
+                {new Date(updatedAt).toLocaleString('fr-FR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Error Message */}
-      {error && (
+      {currentError && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/30 dark:bg-red-900/20">
           <p className="text-sm text-red-800 dark:text-red-300">
-            Erreur: {error}
+            Erreur: {currentError}
           </p>
         </div>
       )}
 
       {/* View Controls & Stats */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        {/* Stats */}
-        {!loading && (
+        {!currentLoading && (
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            {total > 0 ? (
+            {currentTotal > 0 ? (
               <>
-                Affichage de <strong>1-{Math.min(20, total)}</strong> sur{' '}
-                <strong>{total}</strong> actualités
+                <strong>{currentTotal}</strong>{' '}
+                {activeTab === 'viral' ? 'actualit\u00e9s' : 'articles class\u00e9s'}
               </>
             ) : (
-              'Aucune actualité trouvée'
+              'Aucun r\u00e9sultat'
             )}
           </div>
         )}
 
-        {/* View Mode Toggle */}
         <div className="flex gap-2">
           <button
             onClick={() => setViewMode('cards')}
@@ -197,23 +445,45 @@ export default function NewsPage() {
         </div>
       </div>
 
-      {/* News Table/Cards */}
-      <NewsTable
-        articles={articles}
-        isLoading={loading}
-        onGenerateScript={handleGenerateScript}
-        viewMode={viewMode}
-      />
+      {/* Content */}
+      {activeTab === 'viral' ? (
+        <>
+          <NewsTable
+            articles={articles}
+            isLoading={loading}
+            onGenerateScript={handleGenerateScript}
+            onPublish={publishArticle}
+            onReject={rejectArticle}
+            viewMode={viewMode}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+          />
+          <BatchActionBar
+            selectedCount={selectedIds.size}
+            onPublish={handleBatchPublish}
+            onReject={handleBatchReject}
+            onExport={handleBatchExport}
+            onClear={() => setSelectedIds(new Set())}
+            loading={batchLoading}
+          />
+        </>
+      ) : (
+        <EditorialTable
+          articles={editorialArticles}
+          isLoading={editorialLoading}
+          viewMode={viewMode}
+        />
+      )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
+      {/* Pagination (viral only) */}
+      {activeTab === 'viral' && totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <button
             onClick={() => setPage(Math.max(1, page - 1))}
             disabled={page === 1}
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
           >
-            Précédent
+            Pr\u00e9c\u00e9dent
           </button>
 
           {Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -223,7 +493,9 @@ export default function NewsPage() {
             .map((p, i, arr) => (
               <div key={p}>
                 {i > 0 && arr[i - 1] !== p - 1 && (
-                  <span className="px-2 text-gray-600 dark:text-gray-400">...</span>
+                  <span className="px-2 text-gray-600 dark:text-gray-400">
+                    ...
+                  </span>
                 )}
                 <button
                   onClick={() => setPage(p)}

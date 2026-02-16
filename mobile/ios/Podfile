@@ -59,5 +59,17 @@ target 'MarketGPS' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
+
+    # Disable User Script Sandboxing to fix Xcode 15.3+/16+ rsync "Operation not permitted" errors
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+      end
+    end
+
+    # Also disable it on the main project if possible
+    installer.pods_project.build_configurations.each do |config|
+      config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+    end
   end
 end

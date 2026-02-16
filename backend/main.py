@@ -51,6 +51,9 @@ from portfolio_routes import router as portfolio_router
 from gamification_routes import router as gamification_router
 from viral_news_routes import router as viral_news_router
 from admin_news_api import router as admin_news_router
+from admin_search_service import router as admin_search_router
+from admin_settings_service import router as admin_settings_router
+from admin_workflow_service import router as admin_workflow_router
 
 # Middleware imports (v15 institutional stack)
 from middleware import (
@@ -427,6 +430,9 @@ app.include_router(notifications_router)  # Notifications & Alerts (ADD-ON)
 app.include_router(portfolio_router)  # Portfolio Sync (ADD-ON) - Read-only, no trading
 app.include_router(viral_news_router)  # Viral news & video scripts (ADD-ON)
 app.include_router(admin_news_router)  # Unified admin news API (ADD-ON)
+app.include_router(admin_search_router)  # Admin search service (ADD-ON)
+app.include_router(admin_settings_router)  # Admin settings service (ADD-ON)
+app.include_router(admin_workflow_router)  # Admin editorial workflow service (ADD-ON)
 
 
 # ============================================================================
