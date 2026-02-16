@@ -41,6 +41,7 @@ export interface AcademyLesson {
   title_fr: string;
   description_fr?: string;
   video_url?: string;
+  vtt_url?: string;
   content_html?: string;
   duration_minutes?: number;
   order: number;
