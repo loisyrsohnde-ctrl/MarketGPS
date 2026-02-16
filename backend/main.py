@@ -51,9 +51,18 @@ from portfolio_routes import router as portfolio_router
 from gamification_routes import router as gamification_router
 from viral_news_routes import router as viral_news_router
 from admin_news_api import router as admin_news_router
-from admin_search_service import router as admin_search_router
-from admin_settings_service import router as admin_settings_router
-from admin_workflow_service import router as admin_workflow_router
+# Optional admin add-on services (safe import - won't crash server if missing deps)
+admin_search_router = None
+admin_settings_router = None
+admin_workflow_router = None
+try:
+    from admin_search_service import router as admin_search_router
+    from admin_settings_service import router as admin_settings_router
+    from admin_workflow_service import router as admin_workflow_router
+except Exception as e:
+    import traceback
+    print(f"[WARNING] Admin add-on services failed to import: {e}")
+    traceback.print_exc()
 
 # Middleware imports (v15 institutional stack)
 from middleware import (
@@ -430,9 +439,13 @@ app.include_router(notifications_router)  # Notifications & Alerts (ADD-ON)
 app.include_router(portfolio_router)  # Portfolio Sync (ADD-ON) - Read-only, no trading
 app.include_router(viral_news_router)  # Viral news & video scripts (ADD-ON)
 app.include_router(admin_news_router)  # Unified admin news API (ADD-ON)
-app.include_router(admin_search_router)  # Admin search service (ADD-ON)
-app.include_router(admin_settings_router)  # Admin settings service (ADD-ON)
-app.include_router(admin_workflow_router)  # Admin editorial workflow service (ADD-ON)
+# Admin add-on services (conditionally loaded)
+if admin_search_router:
+    app.include_router(admin_search_router)
+if admin_settings_router:
+    app.include_router(admin_settings_router)
+if admin_workflow_router:
+    app.include_router(admin_workflow_router)
 
 
 # ============================================================================
