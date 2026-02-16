@@ -12,6 +12,8 @@ import {
   Loader,
   AlertCircle,
   CheckCircle,
+  Zap,
+  Upload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fetchAdminStats, AdminStats } from '@/lib/academy-admin-api';
