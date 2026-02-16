@@ -1,11 +1,12 @@
 import { supabase } from '@/lib/supabase';
-import {
-  AcademyPart,
+import type {
   AcademyModule,
   AcademyLesson,
   AcademyExercise,
   AcademyUserProgress,
 } from '@/lib/academy-types';
+export type { AcademyPart } from '@/lib/academy-types';
+import type { AcademyPart } from '@/lib/academy-types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN STATISTICS
