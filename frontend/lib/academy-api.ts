@@ -29,7 +29,6 @@ export async function fetchParts(): Promise<AcademyPart[]> {
             id,
             title_fr,
             description_fr,
-            estimated_duration_minutes,
             order_index
           )
         )
@@ -56,7 +55,6 @@ export async function fetchParts(): Promise<AcademyPart[]> {
             .map((lesson: any) => ({
               ...lesson,
               order: lesson.order_index,
-              duration_minutes: lesson.estimated_duration_minutes,
             })),
         })),
     }));
@@ -80,7 +78,6 @@ export async function fetchLesson(lessonId: string): Promise<AcademyLesson | nul
         id,
         title_fr,
         description_fr,
-        estimated_duration_minutes,
         order_index,
         module_id,
         academy_lesson_contents (
@@ -132,7 +129,7 @@ export async function fetchLesson(lessonId: string): Promise<AcademyLesson | nul
       description_fr: (lessonData as any).description_fr,
       video_url: videoContent?.video_url || undefined,
       content_html: combinedHtml || undefined,
-      duration_minutes: (lessonData as any).estimated_duration_minutes,
+      duration_minutes: undefined,
       order: (lessonData as any).order_index,
       contents: sortedContents.map((c: any) => ({
         id: c.id.toString(),
