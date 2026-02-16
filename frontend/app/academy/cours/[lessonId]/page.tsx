@@ -77,8 +77,8 @@ export default function LessonPage() {
     let nextLesson: string | null = null;
 
     for (const part of parts) {
-      for (const module of part.modules || []) {
-        for (const lesson of module.lessons || []) {
+      for (const mod of part.modules || []) {
+        for (const lesson of mod.lessons || []) {
           if (foundCurrent) {
             nextLesson = lesson.id;
             break;

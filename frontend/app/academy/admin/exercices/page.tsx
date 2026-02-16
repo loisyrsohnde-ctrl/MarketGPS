@@ -375,10 +375,10 @@ export default function ExerciseManagement() {
                   >
                     <option value="">Choisir une leçon...</option>
                     {parts.flatMap((part) =>
-                      (part.modules || []).flatMap((module) =>
-                        (module.lessons || []).map((lesson) => (
+                      (part.modules || []).flatMap((mod) =>
+                        (mod.lessons || []).map((lesson) => (
                           <option key={lesson.id} value={lesson.id}>
-                            {part.title_fr} > {module.title_fr} > {lesson.title_fr}
+                            {part.title_fr} {'>'} {mod.title_fr} {'>'} {lesson.title_fr}
                           </option>
                         ))
                       )
