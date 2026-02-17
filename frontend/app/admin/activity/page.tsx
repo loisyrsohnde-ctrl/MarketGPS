@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   CheckCircle,
   XCircle,
@@ -12,7 +12,7 @@ import {
   ChevronRight,
   Loader,
 } from 'lucide-react';
-import { getApiBaseUrl } from '@/lib/config';
+import { useAdminActivity } from '@/hooks/useAdminActivity';
 
 // Types
 interface ActivityLogEntry {
@@ -24,13 +24,6 @@ interface ActivityLogEntry {
   details?: string;
   changes_json?: string;
   created_at: string;
-}
-
-interface ActivityLogResponse {
-  entries: ActivityLogEntry[];
-  total: number;
-  limit: number;
-  offset: number;
 }
 
 // Action labels in French
@@ -133,10 +126,6 @@ function formatRelativeTime(dateString: string): string {
   });
 }
 
-// Parse date string to Date object
-function parseDate(dateString: string): Date {
-  return new Date(dateString);
-}
 
 // Activity Entry Component
 function ActivityEntry({ entry }: { entry: ActivityLogEntry }) {
@@ -185,10 +174,6 @@ function ActivityEntry({ entry }: { entry: ActivityLogEntry }) {
 }
 
 export default function AdminActivityLog() {
-  const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // Filters
   const [actionFilter, setActionFilter] = useState<string>('');
   const [resourceTypeFilter, setResourceTypeFilter] = useState<string>('');
@@ -196,113 +181,22 @@ export default function AdminActivityLog() {
 
   // Pagination
   const [page, setPage] = useState(0);
-  const [total, setTotal] = useState(0);
   const limit = 20;
 
-  // Fetch activity log
-  const fetchActivityLog = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  // Use the hook with current filters
+  const { entries, total, loading, error, refetch } = useAdminActivity({
+    limit,
+    offset: page * limit,
+    action: actionFilter && actionFilter !== 'all' ? actionFilter : undefined,
+    resourceType: resourceTypeFilter && resourceTypeFilter !== 'all' ? resourceTypeFilter : undefined,
+    dateFilter,
+  });
 
-    try {
-      const adminKey = localStorage.getItem('adminKey');
-      if (!adminKey) {
-        setError('Clé d\'administration non trouvée');
-        setLoading(false);
-        return;
-      }
-
-      const baseUrl = getApiBaseUrl();
-      const params = new URLSearchParams({
-        limit: limit.toString(),
-        offset: (page * limit).toString(),
-      });
-
-      if (actionFilter && actionFilter !== 'all') {
-        params.append('action', actionFilter);
-      }
-
-      if (resourceTypeFilter && resourceTypeFilter !== 'all') {
-        params.append('resource_type', resourceTypeFilter);
-      }
-
-      // Handle date filter
-      if (dateFilter !== 'all') {
-        const now = new Date();
-        let cutoffDate = new Date();
-
-        if (dateFilter === 'today') {
-          cutoffDate.setHours(0, 0, 0, 0);
-        } else if (dateFilter === '7days') {
-          cutoffDate.setDate(cutoffDate.getDate() - 7);
-        } else if (dateFilter === '30days') {
-          cutoffDate.setDate(cutoffDate.getDate() - 30);
-        }
-
-        // Note: This filtering happens client-side since the API doesn't support date filters
-        // In a production system, you'd add this to the backend
-      }
-
-      const response = await fetch(
-        `${baseUrl}/api/admin/activity?${params}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Admin-Key': adminKey,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
-      }
-
-      const data: ActivityLogResponse = await response.json();
-
-      // Client-side date filtering
-      let filteredEntries = data.entries;
-      if (dateFilter !== 'all') {
-        const now = new Date();
-        let cutoffDate = new Date();
-
-        if (dateFilter === 'today') {
-          cutoffDate.setHours(0, 0, 0, 0);
-        } else if (dateFilter === '7days') {
-          cutoffDate.setDate(cutoffDate.getDate() - 7);
-        } else if (dateFilter === '30days') {
-          cutoffDate.setDate(cutoffDate.getDate() - 30);
-        }
-
-        filteredEntries = filteredEntries.filter(
-          (entry) => parseDate(entry.created_at) >= cutoffDate
-        );
-      }
-
-      setEntries(filteredEntries);
-      setTotal(data.total);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Erreur lors du chargement du journal'
-      );
-      setEntries([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, limit, actionFilter, resourceTypeFilter, dateFilter]);
-
-  // Fetch on mount and when filters change
-  useEffect(() => {
+  // Reset to page 0 when filters change
+  const handleFilterChange = useCallback((filterSetter: (value: string) => void, value: string) => {
+    filterSetter(value);
     setPage(0);
-  }, [actionFilter, resourceTypeFilter, dateFilter]);
-
-  useEffect(() => {
-    fetchActivityLog();
-  }, [fetchActivityLog]);
-
-  const maxPages = Math.ceil(total / limit);
-  const hasPrevious = page > 0;
-  const hasNext = page < maxPages - 1;
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -326,7 +220,7 @@ export default function AdminActivityLog() {
             </label>
             <select
               value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
+              onChange={(e) => handleFilterChange(setActionFilter, e.target.value)}
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
             >
               <option value="">Tous</option>
@@ -349,7 +243,7 @@ export default function AdminActivityLog() {
             </label>
             <select
               value={resourceTypeFilter}
-              onChange={(e) => setResourceTypeFilter(e.target.value)}
+              onChange={(e) => handleFilterChange(setResourceTypeFilter, e.target.value)}
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
             >
               <option value="">Tous</option>
@@ -367,7 +261,7 @@ export default function AdminActivityLog() {
             </label>
             <select
               value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
+              onChange={(e) => handleFilterChange(setDateFilter, e.target.value)}
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
             >
               <option value="all">Tout</option>
@@ -410,13 +304,13 @@ export default function AdminActivityLog() {
       {!loading && entries.length > 0 && (
         <div className="flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-800">
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            Page {page + 1} de {maxPages} ({total} entrées)
+            Page {page + 1} de {Math.ceil(total / limit)} ({total} entrées)
           </div>
 
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={!hasPrevious}
+              disabled={page === 0}
               className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:disabled:opacity-50"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -424,8 +318,8 @@ export default function AdminActivityLog() {
             </button>
 
             <button
-              onClick={() => setPage((p) => Math.min(maxPages - 1, p + 1))}
-              disabled={!hasNext}
+              onClick={() => setPage((p) => Math.min(Math.ceil(total / limit) - 1, p + 1))}
+              disabled={page >= Math.ceil(total / limit) - 1}
               className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:disabled:opacity-50"
             >
               Suivant

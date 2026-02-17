@@ -593,29 +593,36 @@ async def trigger_rss_pipeline(
     ingest_limit: Optional[int] = Query(None, description="Limit sources to ingest"),
     publish_limit: int = Query(100, description="Limit articles to publish"),
     sync: bool = Query(False, description="Run synchronously (wait for result)"),
+    include_scoring: bool = Query(True, description="Include editorial & viral scoring"),
 ):
     """
-    Trigger the modern RSS news pipeline.
-    
-    This is the recommended pipeline that:
+    Trigger the complete MarketGPS news pipeline.
+
+    This unified orchestrator runs all pipeline stages:
     1. Ingests from 50+ RSS sources
     2. Processes with LLM for French rewriting
     3. Publishes to news_articles table
-    
+    4. Editorial scoring (source diversity, engagement, importance)
+    5. Viral scoring (virality potential, trends, impact)
+
     Use sync=true to wait for result, or false for background execution.
+    Set include_scoring=false to skip editorial and viral scoring stages.
     """
     require_admin(admin_key)
-    
+
     try:
-        # Import the pipeline
-        from pipeline.news.publish import run_full_pipeline
-        
+        # Import the unified orchestrator
+        from backend.pipeline_orchestrator import run_full_pipeline
+
         if sync:
             # Run synchronously
-            logger.info("Starting RSS pipeline (sync mode)...")
-            result = run_full_pipeline(
+            logger.info("Starting unified news pipeline (sync mode)...")
+            result = await run_full_pipeline(
                 ingest_limit=ingest_limit,
-                publish_limit=publish_limit
+                publish_limit=publish_limit,
+                scrape=True,
+                score=include_scoring,
+                viral_score=include_scoring,
             )
             return {
                 "success": True,
@@ -624,28 +631,31 @@ async def trigger_rss_pipeline(
             }
         else:
             # Run in background
-            def run_pipeline_task():
+            async def run_pipeline_task():
                 try:
-                    result = run_full_pipeline(
+                    result = await run_full_pipeline(
                         ingest_limit=ingest_limit,
-                        publish_limit=publish_limit
+                        publish_limit=publish_limit,
+                        scrape=True,
+                        score=include_scoring,
+                        viral_score=include_scoring,
                     )
                     logger.info(f"Background pipeline complete: {result}")
                 except Exception as e:
                     logger.error(f"Background pipeline failed: {e}")
-            
+
             background_tasks.add_task(run_pipeline_task)
-            
+
             return {
                 "success": True,
                 "mode": "background",
                 "message": "Pipeline started in background. Check /news-admin/pipeline/status for results.",
             }
-            
+
     except ImportError as e:
         logger.error(f"Pipeline import error: {e}")
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=f"Pipeline not available: {str(e)}. Ensure feedparser is installed."
         )
     except Exception as e:
@@ -1141,6 +1151,111 @@ async def update_article_interactions(
 # Viral Scorer V2 Endpoints
 # ═══════════════════════════════════════════════════════════════════════════
 
+@router.post("/pipeline/score-editorial")
+async def run_editorial_score(
+    background_tasks: BackgroundTasks,
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+    top_k: int = Query(30, ge=5, le=100, description="Number of top articles to return"),
+    days_back: int = Query(3, ge=1, le=30, description="Days to look back"),
+    sync: bool = Query(False, description="Run synchronously (wait for result)"),
+):
+    """
+    Run editorial scoring on recent articles.
+
+    Editorial scoring combines:
+    - Source diversity (40%): how many sources cover the topic
+    - Verified engagement (25%): interaction counts
+    - Topic importance (15%): keywords, entities
+    - Freshness (10%): article age
+    - Geographic relevance (10%): audience targeting
+
+    Feature flag: ENABLE_EDITORIAL_SCORER (default: true)
+    """
+    require_admin(admin_key)
+
+    try:
+        from backend.pipeline_orchestrator import run_score
+
+        if sync:
+            result = await run_score(top_k=top_k, days_back=days_back)
+            return {
+                "success": True,
+                "mode": "sync",
+                "result": result,
+            }
+        else:
+            async def run_task():
+                try:
+                    result = await run_score(top_k=top_k, days_back=days_back)
+                    logger.info(f"Editorial scoring complete: {result}")
+                except Exception as e:
+                    logger.error(f"Editorial scoring failed: {e}")
+
+            background_tasks.add_task(run_task)
+            return {
+                "success": True,
+                "mode": "background",
+                "message": f"Editorial scoring started. Will score articles from last {days_back} days.",
+            }
+
+    except Exception as e:
+        logger.error(f"Error running editorial scoring: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/pipeline/score-viral")
+async def run_viral_score(
+    background_tasks: BackgroundTasks,
+    admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+    top_k: int = Query(40, ge=5, le=200, description="Number of top articles to return"),
+    days_back: int = Query(3, ge=1, le=30, description="Days to look back"),
+    sync: bool = Query(False, description="Run synchronously (wait for result)"),
+):
+    """
+    Run Viral Scorer V2 on recent articles.
+
+    Viral scoring considers:
+    - Social engagement (35%): verified interactions
+    - Early trend velocity (20%): how fast it's trending
+    - Controversy (15%): debate potential
+    - Impact (15%): economic/geopolitical importance
+    - Geographic relevance (10%): target audience fit
+    - Headline power (5%): title quality
+
+    Feature flag: ENABLE_VIRAL_FILTER_V2 (default: true)
+    """
+    require_admin(admin_key)
+
+    try:
+        from backend.pipeline_orchestrator import run_viral_score as run_viral
+
+        if sync:
+            result = await run_viral(top_k=top_k, days_back=days_back)
+            return {
+                "success": True,
+                "mode": "sync",
+                "result": result,
+            }
+        else:
+            async def run_task():
+                try:
+                    result = await run_viral(top_k=top_k, days_back=days_back)
+                    logger.info(f"Viral scoring complete: {result}")
+                except Exception as e:
+                    logger.error(f"Viral scoring failed: {e}")
+
+            background_tasks.add_task(run_task)
+            return {
+                "success": True,
+                "mode": "background",
+                "message": f"Viral scoring started. Will score articles from last {days_back} days.",
+            }
+
+    except Exception as e:
+        logger.error(f"Error running viral scoring: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/score-v2")
 async def run_score_v2(
     admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
@@ -1149,7 +1264,9 @@ async def run_score_v2(
     min_score: float = Query(25, ge=0, le=100, description="Minimum score to keep"),
 ):
     """
-    Run Viral Scorer V2 on recent articles.
+    Run Viral Scorer V2 on recent articles (legacy endpoint).
+
+    Use POST /news-admin/pipeline/score-viral instead for the new orchestrator.
 
     Scores all articles from last `days_back` days, deduplicates,
     clusters, and returns top-K with reasons.

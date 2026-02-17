@@ -92,6 +92,14 @@ class DashboardStats(BaseModel):
     active_subscriptions: int
     total_feedbacks: int
     feedbacks_today: int
+    # News & Pipeline stats
+    articles_today: int = 0
+    viral_count: int = 0
+    scripts_generated: int = 0
+    sources_active: int = 0
+    last_pipeline_run: Optional[str] = None
+    llm_provider: str = "openai"
+    data_warnings: List[str] = []
 
 
 class FeedbackSummary(BaseModel):
@@ -193,6 +201,11 @@ async def get_dashboard_stats(
         # Get Supabase users
         supabase_users = await get_supabase_users()
         total_users = len(supabase_users)
+        data_warnings: List[str] = []
+
+        # Track warning if Supabase is not available
+        if not supabase_users and (SUPABASE_URL and SUPABASE_SERVICE_KEY):
+            data_warnings.append("Supabase non disponible - données utilisateurs incomplètes")
 
         # Calculate date thresholds
         now = datetime.utcnow()
@@ -256,6 +269,68 @@ async def get_dashboard_stats(
 
         free_users = total_users - pro_users if total_users > pro_users else 0
 
+        # ── News & Pipeline stats ─────────────────────────────────
+        articles_today = 0
+        viral_count = 0
+        scripts_generated = 0
+        sources_active = 0
+        last_pipeline_run = None
+        llm_provider = os.environ.get("LLM_PROVIDER", "openai")
+
+        with db._get_conn() as conn:
+            # Articles scraped today
+            try:
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM news_articles WHERE date(created_at) = date('now')"
+                )
+                articles_today = cursor.fetchone()[0] or 0
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.debug(f"Error querying news_articles for today count: {e}")
+
+            # Viral articles count (editorial_score >= 70 or virality_score >= 3)
+            try:
+                cursor = conn.execute(
+                    """SELECT COUNT(*) FROM news_articles
+                       WHERE editorial_score >= 70 OR virality_score >= 3"""
+                )
+                viral_count = cursor.fetchone()[0] or 0
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.debug(f"Error querying viral count: {e}")
+
+            # Scripts generated (stored in video_scripts table)
+            try:
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM video_scripts"
+                )
+                scripts_generated = cursor.fetchone()[0] or 0
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                logger.debug(f"Error querying scripts count: {e}")
+
+        # Sources active (from sources registry)
+        try:
+            import json
+            from pathlib import Path
+            sources_file = Path(__file__).parent.parent / "pipeline" / "news" / "sources_registry.json"
+            if sources_file.exists():
+                with open(sources_file, 'r') as f:
+                    sources_data = json.load(f)
+                    enabled_sources = [s for s in sources_data.get("sources", []) if s.get("enabled", True)]
+                    sources_active = len(enabled_sources)
+        except Exception as e:
+            logger.debug(f"Error reading sources registry: {e}")
+
+        # Last pipeline run (from metrics file)
+        try:
+            import json
+            from pathlib import Path
+            metrics_file = Path(__file__).parent / "data" / "news_metrics.json"
+            if metrics_file.exists():
+                with open(metrics_file, 'r') as f:
+                    metrics = json.load(f)
+                    last_pipeline_run = metrics.get("last_run")
+        except Exception as e:
+            logger.debug(f"Error reading pipeline metrics: {e}")
+
         return DashboardStats(
             total_users=total_users,
             pro_users=pro_users,
@@ -265,6 +340,13 @@ async def get_dashboard_stats(
             active_subscriptions=active_subscriptions,
             total_feedbacks=total_feedbacks,
             feedbacks_today=feedbacks_today,
+            articles_today=articles_today,
+            viral_count=viral_count,
+            scripts_generated=scripts_generated,
+            sources_active=sources_active,
+            last_pipeline_run=last_pipeline_run,
+            llm_provider=llm_provider,
+            data_warnings=data_warnings,
         )
 
     except Exception as e:

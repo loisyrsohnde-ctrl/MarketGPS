@@ -64,6 +64,7 @@ export function useViralNews(params?: UseViralNewsParams): UseViralNewsResult {
 
       const response = await fetch(url, {
         headers: { 'X-Admin-Key': adminKey },
+        cache: 'no-store',
       });
 
       if (!response.ok) {

@@ -332,10 +332,18 @@ import asyncio
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     logger.info("Starting MarketGPS Backend API...")
-    
+
+    # Initialize database schema on startup
+    try:
+        from db_init import initialize_database
+        initialize_database()
+        logger.info("✓ Database initialization complete")
+    except Exception as e:
+        logger.error(f"Database initialization error: {e}")
+
     # Run seed in background to not block startup
     asyncio.create_task(run_startup_seed())
-    
+
     yield
     logger.info("Shutting down MarketGPS Backend API...")
 

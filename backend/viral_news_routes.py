@@ -175,68 +175,6 @@ class MarkFeaturedRequest(BaseModel):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@router.get("/viral", response_model=List[ViralArticleResponse])
-async def get_viral_articles(
-    limit: int = Query(20, ge=1, le=100, description="Nombre d'articles à retourner"),
-    francophone_only: bool = Query(False, description="Inclure seulement les sources francophones"),
-    min_virality: float = Query(1.0, ge=0.5, description="Score de viralité minimum"),
-    days: int = Query(7, ge=1, le=30, description="Nombre de jours à considérer"),
-):
-    """
-    Récupère les articles viraux selon les règles.
-
-    Règles:
-    - Afrique francophone sub-saharienne: inclus si > seuil minimum
-    - Autres: inclus si viralité >= 10x moyenne de la source
-
-    Query params:
-    - limit: Nombre max d'articles (défaut: 20, max: 100)
-    - francophone_only: Si True, seulement les sources francophones
-    - min_virality: Score de viralité minimum (défaut: 1.0)
-    - days: Nombre de jours à analyser (défaut: 7)
-
-    Returns:
-        List[ViralArticleResponse]
-    """
-    try:
-        virality_svc, _, _ = get_services()
-
-        viral_articles = virality_svc.get_viral_articles(
-            limit=limit,
-            include_francophone_priority=not francophone_only,
-            virality_multiplier=10.0,
-            days=days,
-        )
-
-        # Filtrer par score minimum
-        filtered = [
-            a for a in viral_articles
-            if a.virality_score >= min_virality
-        ]
-
-        # Filtrer par francophone si demandé
-        if francophone_only:
-            filtered = [a for a in filtered if a.language == 'fr']
-
-        # Convertir en réponse
-        return [
-            ViralArticleResponse(
-                article_id=a.article_id,
-                title=a.title,
-                source_name=a.source_name,
-                interactions=a.interactions,
-                virality_score=a.virality_score,
-                region=a.region,
-                language=a.language,
-                published_at=a.published_at,
-                url=a.url,
-            )
-            for a in filtered[:limit]
-        ]
-
-    except Exception as e:
-        logger.error(f"Error getting viral articles: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/source-stats", response_model=dict)
@@ -289,17 +227,16 @@ async def generate_video_script(
         _, video_svc, _ = get_services()
 
         # Récupérer l'article
-        conn = db._get_conn()
-        cursor = conn.cursor()
+        with db._get_conn() as conn:
+            cursor = conn.cursor()
 
-        cursor.execute("""
-            SELECT id, title, content_md, summary, source_name, published_at
-            FROM news_articles
-            WHERE id = ?
-        """, (request.article_id,))
+            cursor.execute("""
+                SELECT id, title, content_md, summary, source_name, published_at
+                FROM news_articles
+                WHERE id = ?
+            """, (request.article_id,))
 
-        article = cursor.fetchone()
-        conn.close()
+            article = cursor.fetchone()
 
         if not article:
             raise HTTPException(status_code=404, detail="Article not found")
@@ -563,17 +500,16 @@ async def auto_process_viral(
 
         for article in viral_articles:
             # Récupérer le contenu complet de l'article
-            conn = db._get_conn()
-            cursor = conn.cursor()
+            with db._get_conn() as conn:
+                cursor = conn.cursor()
 
-            cursor.execute("""
-                SELECT id, title, summary, source_name, published_at
-                FROM news_articles
-                WHERE id = ?
-            """, (article.article_id,))
+                cursor.execute("""
+                    SELECT id, title, summary, source_name, published_at
+                    FROM news_articles
+                    WHERE id = ?
+                """, (article.article_id,))
 
-            article_row = cursor.fetchone()
-            conn.close()
+                article_row = cursor.fetchone()
 
             if not article_row:
                 continue
