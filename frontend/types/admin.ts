@@ -14,6 +14,7 @@ export interface AdminStats {
   system: {
     lastPipelineRun: string;
     sourcesActive: number;
+    llm_provider?: string;
   };
 }
 

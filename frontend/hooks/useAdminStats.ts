@@ -42,6 +42,7 @@ export function useAdminStats() {
         system: {
           lastPipelineRun: data.last_pipeline_run || '',
           sourcesActive: data.sources_active || 0,
+          llm_provider: data.llm_provider || 'OpenAI',
         },
       });
       setError(null);
