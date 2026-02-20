@@ -29,7 +29,6 @@ export async function fetchParts(): Promise<AcademyPart[]> {
             id,
             title_fr,
             description_fr,
-            estimated_duration_minutes,
             order_index
           )
         )
@@ -56,7 +55,6 @@ export async function fetchParts(): Promise<AcademyPart[]> {
             .map((lesson: any) => ({
               ...lesson,
               order: lesson.order_index,
-              duration_minutes: lesson.estimated_duration_minutes,
             })),
         })),
     }));
@@ -80,7 +78,6 @@ export async function fetchLesson(lessonId: string): Promise<AcademyLesson | nul
         id,
         title_fr,
         description_fr,
-        estimated_duration_minutes,
         order_index,
         module_id,
         academy_lesson_contents (
@@ -131,8 +128,9 @@ export async function fetchLesson(lessonId: string): Promise<AcademyLesson | nul
       title_fr: (lessonData as any).title_fr,
       description_fr: (lessonData as any).description_fr,
       video_url: videoContent?.video_url || undefined,
+      vtt_url: videoContent?.vtt_url || undefined,
       content_html: combinedHtml || undefined,
-      duration_minutes: (lessonData as any).estimated_duration_minutes,
+      duration_minutes: undefined,
       order: (lessonData as any).order_index,
       contents: sortedContents.map((c: any) => ({
         id: c.id.toString(),
@@ -356,7 +354,7 @@ export async function fetchProgressStats(userId: string): Promise<AcademyProgres
       totalLessons && totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
     // Estimate time remaining (assuming ~30 minutes per lesson average)
-    const estimatedMinutesRemaining = (totalLessons || 0 - completedLessons) * 30;
+    const estimatedMinutesRemaining = ((totalLessons || 0) - completedLessons) * 30;
 
     return {
       total_lessons: totalLessons || 0,

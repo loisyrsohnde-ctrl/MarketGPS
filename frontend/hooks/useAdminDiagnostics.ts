@@ -21,8 +21,8 @@ export function useAdminDiagnostics() {
       const headers = { 'X-Admin-Key': adminKey };
 
       const [diagRes, pipeRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/diagnostics`, { headers }),
-        fetch(`${API_BASE}/admin/news-pipeline-status`, { headers }),
+        fetch(`${API_BASE}/admin/diagnostics`, { headers, cache: 'no-store' as RequestCache }),
+        fetch(`${API_BASE}/admin/news-pipeline-status`, { headers, cache: 'no-store' as RequestCache }),
       ]);
 
       if (!diagRes.ok) {
@@ -47,7 +47,7 @@ export function useAdminDiagnostics() {
 
   useEffect(() => {
     fetchAll();
-    const interval = setInterval(fetchAll, 5 * 60 * 1000);
+    const interval = setInterval(fetchAll, 2 * 60 * 1000);
     return () => clearInterval(interval);
   }, [fetchAll]);
 

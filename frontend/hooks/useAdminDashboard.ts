@@ -18,9 +18,11 @@ export function useAdminDashboard() {
       const [statsRes, diagRes] = await Promise.all([
         fetch(`${API_BASE}/admin/stats`, {
           headers: { 'X-Admin-Key': adminKey },
+          cache: 'no-store',
         }),
         fetch(`${API_BASE}/admin/diagnostics`, {
           headers: { 'X-Admin-Key': adminKey },
+          cache: 'no-store',
         }),
       ]);
 
@@ -36,7 +38,7 @@ export function useAdminDashboard() {
 
       const computed: DashboardMetrics = {
         pipeline: {
-          articles_today: statsData.articles_today || 0,
+          articles_today: diagData.news?.articles_today || statsData.articles_today || 0,
           articles_week: diagData.news?.articles_this_week || 0,
           viral_count: statsData.viral_count || 0,
           published_count: diagData.news?.articles_today || 0,
@@ -94,8 +96,8 @@ export function useAdminDashboard() {
   useEffect(() => {
     fetchMetrics();
 
-    // Refresh every 5 minutes
-    const interval = setInterval(fetchMetrics, 5 * 60 * 1000);
+    // Refresh every 2 minutes
+    const interval = setInterval(fetchMetrics, 2 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, []);

@@ -32,6 +32,30 @@ db = SQLiteStore()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Database Initialization
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _ensure_app_settings_table():
+    """Create app_settings table if it doesn't exist."""
+    try:
+        with db._get_conn() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+            logger.info("app_settings table initialized")
+    except Exception as e:
+        logger.error(f"Error creating app_settings table: {e}")
+
+# Initialize table on module load
+_ensure_app_settings_table()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Admin Key Verification
 # ═══════════════════════════════════════════════════════════════════════════════
 

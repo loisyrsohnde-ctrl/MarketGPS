@@ -13,14 +13,23 @@ import {
   Zap,
   Clock,
   Server,
+  RefreshCw,
 } from 'lucide-react';
+import { useState } from 'react';
 
 export default function AdminDashboard() {
-  const { stats, loading: statsLoading, error: statsError } = useAdminStats();
-  const { metrics, loading: metricsLoading, error: metricsError } = useAdminDashboard();
+  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats, lastUpdated } = useAdminStats();
+  const { metrics, loading: metricsLoading, error: metricsError, refetch: refetchMetrics } = useAdminDashboard();
+  const [refreshing, setRefreshing] = useState(false);
 
   const loading = statsLoading || metricsLoading;
   const error = statsError || metricsError;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([refetchStats(), refetchMetrics()]);
+    setRefreshing(false);
+  };
 
   if (loading) {
     return (
@@ -62,13 +71,28 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Tableau de Bord
-        </h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Vue d'ensemble de votre système MarketGPS
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Tableau de Bord
+          </h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
+            Vue d&apos;ensemble de votre système MarketGPS
+            {lastUpdated && (
+              <span className="ml-2 text-xs text-gray-400">
+                · Mis à jour à {lastUpdated.toLocaleTimeString('fr-FR')}
+              </span>
+            )}
+          </p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          Rafraîchir
+        </button>
       </div>
 
       {/* Stats Grid */}
@@ -231,7 +255,7 @@ export default function AdminDashboard() {
                 </span>
               </div>
               <span className="text-sm font-bold text-gray-900 dark:text-white">
-                OpenAI
+                {stats?.system.llm_provider || 'OpenAI'}
               </span>
             </div>
             <div className="flex items-center justify-between">

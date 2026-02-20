@@ -1,36 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Settings, Save, AlertCircle, CheckCircle, Loader } from 'lucide-react';
-import { getApiBaseUrl } from '@/lib/config';
-
-interface AdminSettings {
-  editorial: {
-    virality_threshold_2x: number;
-    virality_threshold_5x: number;
-    virality_threshold_10x: number;
-    min_editorial_score: number;
-    rewrite_model: 'openai' | 'gemini';
-    rewrite_temperature: number;
-    editorial_line: string;
-  };
-  notifications: {
-    alert_on_viral_break: boolean;
-    viral_threshold: number;
-    alert_channels: string[];
-    webhook_url: string;
-  };
-  maintenance: {
-    is_under_maintenance: boolean;
-    maintenance_message: string;
-    api_rate_limit: number;
-  };
-  scraping: {
-    enable_automatic_ingestion: boolean;
-    max_articles_per_source: number;
-    daily_ingest_times: string[];
-  };
-}
+import { useAdminSettings } from '@/hooks/useAdminSettings';
+import { AdminSettings } from '@/types/admin';
 
 const DEFAULT_SETTINGS: AdminSettings = {
   editorial: {
@@ -60,43 +33,18 @@ const DEFAULT_SETTINGS: AdminSettings = {
   },
 };
 
-const API_BASE = getApiBaseUrl();
-
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<AdminSettings>(DEFAULT_SETTINGS);
-  const [originalSettings, setOriginalSettings] = useState<AdminSettings>(DEFAULT_SETTINGS);
+  const { settings: loadedSettings, loading: isLoading, error, updateSettings: saveSettings, refetch } = useAdminSettings();
+  const [settings, setSettings] = useState<AdminSettings>(loadedSettings || DEFAULT_SETTINGS);
+  const [originalSettings, setOriginalSettings] = useState<AdminSettings>(loadedSettings || DEFAULT_SETTINGS);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        setIsLoading(true);
-        const adminKey = localStorage.getItem('adminKey') || '';
-        const response = await fetch(`${API_BASE}/api/admin/settings`, {
-          headers: { 'X-Admin-Key': adminKey },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setSettings(data.settings || DEFAULT_SETTINGS);
-          setOriginalSettings(data.settings || DEFAULT_SETTINGS);
-        } else {
-          setSettings(DEFAULT_SETTINGS);
-          setOriginalSettings(DEFAULT_SETTINGS);
-        }
-      } catch (error) {
-        console.warn('Could not fetch settings, using defaults:', error);
-        setSettings(DEFAULT_SETTINGS);
-        setOriginalSettings(DEFAULT_SETTINGS);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchSettings();
-  }, []);
+  // Update local settings when loaded settings change
+  if (loadedSettings && JSON.stringify(loadedSettings) !== JSON.stringify(settings)) {
+    setSettings(loadedSettings);
+    setOriginalSettings(loadedSettings);
+  }
 
   const handleChange = (path: string, value: any) => {
     const keys = path.split('.');
@@ -114,30 +62,27 @@ export default function SettingsPage() {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      const adminKey = localStorage.getItem('adminKey') || '';
-      const response = await fetch(`${API_BASE}/api/admin/settings`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Key': adminKey,
-        },
-        body: JSON.stringify({ settings }),
-      });
+      const success = await saveSettings(settings);
 
-      if (!response.ok) {
-        throw new Error('Erreur lors de la sauvegarde des paramètres');
+      if (success) {
+        setOriginalSettings(JSON.parse(JSON.stringify(settings)));
+        setMessage({
+          type: 'success',
+          text: 'Paramètres sauvegardés avec succès',
+        });
+        setTimeout(() => setMessage(null), 3000);
+        // Refresh settings after save
+        refetch();
+      } else {
+        setMessage({
+          type: 'error',
+          text: error || 'Une erreur est survenue',
+        });
       }
-
-      setOriginalSettings(JSON.parse(JSON.stringify(settings)));
-      setMessage({
-        type: 'success',
-        text: 'Paramètres sauvegardés avec succès',
-      });
-      setTimeout(() => setMessage(null), 3000);
-    } catch (error) {
+    } catch (err) {
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Une erreur est survenue',
+        text: err instanceof Error ? err.message : 'Une erreur est survenue',
       });
     } finally {
       setIsSaving(false);

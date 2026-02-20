@@ -1,11 +1,12 @@
 import { supabase } from '@/lib/supabase';
-import {
+import type {
   AcademyPart,
   AcademyModule,
   AcademyLesson,
   AcademyExercise,
   AcademyUserProgress,
 } from '@/lib/academy-types';
+export type { AcademyPart };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN STATISTICS
@@ -774,20 +775,20 @@ export async function seedAcademyData(): Promise<SeedResult> {
 
         // Create modules for each part
         for (let j = 1; j <= sampleModulesPerPart; j++) {
-          const module = await createModule(
+          const mod = await createModule(
             part.id,
             `Module ${j}: Concepts Clés`,
             `Explorez les concepts clés dans le module ${j}`,
             j
           );
 
-          if (module) {
+          if (mod) {
             modulesCreated++;
 
             // Create lessons for each module
             for (let k = 1; k <= sampleLessonsPerModule; k++) {
               const lesson = await createLesson(
-                module.id,
+                mod.id,
                 `Leçon ${k}: Introduction`,
                 `Leçon introductive ${k} de ce module`,
                 30,

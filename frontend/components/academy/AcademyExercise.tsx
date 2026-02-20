@@ -42,7 +42,7 @@ export function AcademyExercise({ exercise, onComplete }: AcademyExerciseProps) 
     if (exercise.exercise_type !== 'qcm' || !exercise.questions) return 0;
 
     let correct = 0;
-    exercise.questions.forEach((q: QCMQuestion) => {
+        (exercise.questions as QCMQuestion[]).forEach((q) => {
       const answer = answers[q.id];
       if (q.type === 'single' && answer === q.correct_answer) {
         correct++;
@@ -81,7 +81,7 @@ export function AcademyExercise({ exercise, onComplete }: AcademyExerciseProps) 
         <h3 className="text-lg font-semibold text-text-primary mb-6">{exercise.title_fr}</h3>
 
         <div className="space-y-8">
-          {exercise.questions?.map((question: QCMQuestion, idx: number) => (
+          {(exercise.questions as QCMQuestion[])?.map((question, idx) => (
             <div key={question.id} className="space-y-4">
               <div className="flex gap-3">
                 <span className="text-accent font-semibold flex-shrink-0">
@@ -271,3 +271,4 @@ def solution():
 
   return null;
 }
+
