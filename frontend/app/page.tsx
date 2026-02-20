@@ -148,9 +148,9 @@ export default function LandingPage() {
                 Des notes claires. Des explications simples. Des données de niveau institutionnel — sans bruit.
               </p>
               <div className="mt-10 flex flex-wrap gap-4">
-                <Link href="/signup">
+                <Link href="/dashboard">
                   <Button size="lg">
-                    Commencer gratuitement
+                    Explorer gratuitement
                   </Button>
                 </Link>
                 <Link href="/pricing">
@@ -315,13 +315,20 @@ export default function LandingPage() {
             Prêt à naviguer les marchés ?
           </h2>
           <p className="text-text-secondary text-lg mb-10">
-            Rejoignez des milliers d&apos;investisseurs qui utilisent MarketGPS pour prendre des décisions éclairées.
+            Explorez les marchés librement. Créez un compte pour sauvegarder vos préférences et accéder à plus de fonctionnalités.
           </p>
-          <Link href="/signup">
-            <Button size="xl" rightIcon={<ArrowRight className="w-5 h-5" />}>
-              Créer mon compte gratuit
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-4 justify-center">
+            <Link href="/dashboard">
+              <Button size="xl" rightIcon={<ArrowRight className="w-5 h-5" />}>
+                Explorer les marchés
+              </Button>
+            </Link>
+            <Link href="/signup">
+              <Button variant="outline" size="xl">
+                Créer un compte
+              </Button>
+            </Link>
+          </div>
         </motion.div>
       </section>
 
