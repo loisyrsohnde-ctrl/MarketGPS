@@ -12,7 +12,7 @@ import { useAccessLevel, AccessLevel } from '@/hooks/useAccessLevel';
 // ACCESS GATE
 // Flexible content gating component with 3 access levels:
 // - guest: Not logged in → Show signup prompt
-// - free: Logged in, no subscription → Show upgrade prompt  
+// - free: Logged in, no subscription → Show upgrade prompt
 // - subscriber: Paid user → Full access
 //
 // Inspired by TradingView, Coursera, and Binance Academy patterns
@@ -118,6 +118,14 @@ function FullGate({ level, requiredLevel, feature, message }: GateProps) {
   const isGuestNeedsFree = level === 'guest' && requiredLevel === 'free';
   const needsSubscription = requiredLevel === 'subscriber';
 
+  const defaultMessage = isGuestNeedsFree
+    ? feature
+      ? `Créez un compte gratuit pour accéder à ${feature} et découvrir MarketGPS.`
+      : 'Créez un compte gratuit pour débloquer cette fonctionnalité et bien plus encore.'
+    : feature
+      ? `Passez à Pro pour accéder à ${feature} et profiter de toutes les fonctionnalités avancées.`
+      : 'Cette fonctionnalité est réservée aux abonnés Pro.';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -138,14 +146,7 @@ function FullGate({ level, requiredLevel, feature, message }: GateProps) {
         </h3>
 
         <p className="text-text-secondary mb-6 max-w-md mx-auto">
-          {message || (isGuestNeedsFree
-            ? feature
-              ? \`Créez un compte gratuit pour accéder à \${feature} et découvrir MarketGPS.\`
-              : 'Créez un compte gratuit pour débloquer cette fonctionnalité et bien plus encore.'
-            : feature
-              ? \`Passez à Pro pour accéder à \${feature} et profiter de toutes les fonctionnalités avancées.\`
-              : 'Cette fonctionnalité est réservée aux abonnés Pro.'
-          )}
+          {message || defaultMessage}
         </p>
 
         {/* Benefits */}
@@ -217,6 +218,12 @@ function FullGate({ level, requiredLevel, feature, message }: GateProps) {
 function InlineGate({ level, requiredLevel, feature, message }: GateProps) {
   const isGuestNeedsFree = level === 'guest' && requiredLevel === 'free';
 
+  const titleText = isGuestNeedsFree
+    ? 'Créez un compte gratuit pour continuer'
+    : feature
+      ? `${feature} — réservé aux abonnés Pro`
+      : 'Fonctionnalité Pro';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -233,12 +240,7 @@ function InlineGate({ level, requiredLevel, feature, message }: GateProps) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-text-primary">
-            {isGuestNeedsFree
-              ? 'Créez un compte gratuit pour continuer'
-              : feature
-                ? \`\${feature} — réservé aux abonnés Pro\`
-                : 'Fonctionnalité Pro'
-            }
+            {titleText}
           </p>
           <p className="text-xs text-text-muted mt-0.5">
             {message || (isGuestNeedsFree
@@ -261,6 +263,10 @@ function InlineGate({ level, requiredLevel, feature, message }: GateProps) {
 function BlurOverlayGate({ level, requiredLevel, feature, message }: GateProps) {
   const isGuestNeedsFree = level === 'guest' && requiredLevel === 'free';
 
+  const defaultOverlayMessage = feature
+    ? `${feature} nécessite ${isGuestNeedsFree ? 'un compte gratuit' : 'un abonnement Pro'}`
+    : `${isGuestNeedsFree ? 'Créez un compte' : 'Passez à Pro'} pour accéder au contenu complet`;
+
   return (
     <div className="absolute inset-0 flex items-center justify-center z-10">
       <div className="text-center p-6 rounded-2xl bg-bg-primary/80 backdrop-blur-sm border border-glass-border shadow-xl max-w-sm mx-4">
@@ -271,10 +277,7 @@ function BlurOverlayGate({ level, requiredLevel, feature, message }: GateProps) 
           {isGuestNeedsFree ? 'Aperçu limité' : 'Contenu Pro'}
         </h4>
         <p className="text-sm text-text-secondary mb-4">
-          {message || (feature
-            ? \`\${feature} nécessite \${isGuestNeedsFree ? 'un compte gratuit' : 'un abonnement Pro'}\`
-            : \`\${isGuestNeedsFree ? 'Créez un compte' : 'Passez à Pro'} pour accéder au contenu complet\`
-          )}
+          {message || defaultOverlayMessage}
         </p>
         <Link href={isGuestNeedsFree ? '/signup' : '/pricing'}>
           <Button size="sm" leftIcon={isGuestNeedsFree ? <UserPlus className="w-4 h-4" /> : <Crown className="w-4 h-4" />}>
