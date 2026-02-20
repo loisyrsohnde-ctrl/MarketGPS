@@ -3,10 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Lock, Crown, UserPlus } from 'lucide-react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { AcademyProgress } from '@/components/academy/AcademyProgress';
 import { AcademyLockOverlay } from '@/components/academy/AcademyLockOverlay';
+import { useAccessLevel } from '@/hooks/useAccessLevel';
 import { fetchParts, fetchUserProgress } from '@/lib/academy-api';
 import { AcademyPart, AcademyUserProgress } from '@/lib/academy-types';
 
@@ -25,6 +28,7 @@ const PART_TITLES_FR = [
 
 export default function AcademyPage() {
   const router = useRouter();
+  const { isGuest, isFree, isSubscriber, isAuthenticated } = useAccessLevel();
   const [parts, setParts] = useState<AcademyPart[]>([]);
   const [userProgress, setUserProgress] = useState<AcademyUserProgress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +63,7 @@ export default function AcademyPage() {
     const partLessons = userProgress.filter((p) => {
       // Filter lessons belonging to this part
       const partNum = partIndex + 1;
-      return p.lesson_id.toString().startsWith(partNum);
+      return p.lesson_id.toString().startsWith(String(partNum));
     });
 
     if (partLessons.length === 0) return 0;
@@ -74,6 +78,15 @@ export default function AcademyPage() {
   };
 
   const handlePartClick = (partIndex: number) => {
+    if (isGuest) {
+      router.push('/signup');
+      return;
+    }
+    if (!isSubscriber) {
+      // Free users can access first 2 lessons preview, redirect to pricing for full access
+      router.push(`/academy/cours?part=${partIndex + 1}`);
+      return;
+    }
     router.push(`/academy/cours?part=${partIndex + 1}`);
   };
 
@@ -116,7 +129,7 @@ export default function AcademyPage() {
           </div>
 
           {/* Overall Progress */}
-          {overallProgress > 0 && (
+          {overallProgress > 0 && isAuthenticated && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -128,6 +141,55 @@ export default function AcademyPage() {
                 label="Progression globale"
                 showPercentage={true}
               />
+            </motion.div>
+          )}
+
+          {/* CTA for guests/free users */}
+          {!isSubscriber && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.25 }}
+              className="max-w-lg p-6 rounded-lg bg-accent/5 border border-accent/30"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
+                  {isGuest ? <UserPlus className="w-5 h-5 text-accent" /> : <Crown className="w-5 h-5 text-accent" />}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-text-primary mb-1">
+                    {isGuest 
+                      ? 'Accédez à la formation en trading algorithmique'
+                      : 'Débloquez la formation complète'
+                    }
+                  </h3>
+                  <p className="text-sm text-text-secondary mb-3">
+                    {isGuest
+                      ? 'Créez un compte gratuit pour prévisualiser les premières leçons, ou souscrivez pour un accès complet.'
+                      : 'Passez à Pro pour accéder à tous les modules, exercices et certifications.'
+                    }
+                  </p>
+                  <div className="flex gap-2">
+                    {isGuest ? (
+                      <>
+                        <Link href="/signup">
+                          <Button size="sm">Créer un compte</Button>
+                        </Link>
+                        <Link href="/pricing">
+                          <Button variant="secondary" size="sm">Voir les offres</Button>
+                        </Link>
+                      </>
+                    ) : (
+                      <Link href="/pricing">
+                        <Button size="sm">
+                          <Crown className="w-4 h-4 mr-2" />
+                          Passer à Pro — 9,99€/mois
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
             </motion.div>
           )}
         </div>
@@ -142,7 +204,11 @@ export default function AcademyPage() {
             const part = parts[index];
             const progress = getPartProgress(index);
             const lessonCount = part ? getPartLessonCount(part) : 0;
-            const isLocked = index > 0 && getPartProgress(index - 1) < 100;
+            const isLocked = isGuest 
+              ? true 
+              : !isSubscriber 
+                ? index > 1  // Free users can preview first 2 modules
+                : index > 0 && getPartProgress(index - 1) < 100;
 
             return (
               <motion.button
@@ -163,9 +229,23 @@ export default function AcademyPage() {
                 <div className="space-y-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <span className="inline-block px-3 py-1 rounded-full bg-accent/20 text-accent text-xs font-semibold mb-3">
-                        Module {index + 1}
-                      </span>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="inline-block px-3 py-1 rounded-full bg-accent/20 text-accent text-xs font-semibold">
+                          Module {index + 1}
+                        </span>
+                        {isGuest && (
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-surface text-text-muted text-xs">
+                            <Lock className="w-3 h-3 inline mr-1" />
+                            Inscription requise
+                          </span>
+                        )}
+                        {!isGuest && !isSubscriber && index > 1 && (
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-xs">
+                            <Crown className="w-3 h-3 inline mr-1" />
+                            Pro
+                          </span>
+                        )}
+                      </div>
                       <h3 className="text-lg font-bold text-text-primary group-hover:text-accent transition-colors">
                         {title}
                       </h3>

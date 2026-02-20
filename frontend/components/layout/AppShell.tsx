@@ -17,20 +17,50 @@ import { Paywall } from '@/components/Paywall';
 // Phase 4 - AI Concierge FAB
 import ConciergeFAB from '@/components/wealth/ConciergeFAB';
 
+// Phase 5 - Guest Conversion Banner
+import { GuestConversionBanner } from '@/components/GuestConversionBanner';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // APP SHELL
 // Responsive layout shell that handles:
 // - Desktop: Sidebar + Topbar
 // - Mobile: Compact Topbar + Bottom Tab Bar
+// - Guest access: Shows layout without auth redirect on allowed routes
 // ═══════════════════════════════════════════════════════════════════════════
+
+// Routes accessible without authentication (guest mode)
+const GUEST_ALLOWED_ROUTES = [
+  '/dashboard',
+  '/dashboard/explorer',
+  '/strategies',
+  '/news',
+  '/academy',
+  '/asset',
+  '/pricing',
+  '/barbell',
+];
+
+// Routes that require a paid subscription (not just free account)
+const SUBSCRIBER_ONLY_ROUTES = [
+  '/academy/cours',
+];
 
 interface AppShellProps {
   children: React.ReactNode;
   /** If true, bypass the paywall (for settings, profile, etc.) */
   bypassPaywall?: boolean;
+  /** If true, allow guest access (no auth redirect) */
+  allowGuest?: boolean;
 }
 
-export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
+function isGuestAllowedRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return GUEST_ALLOWED_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(route + '/')
+  );
+}
+
+export function AppShell({ children, bypassPaywall = false, allowGuest }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -42,8 +72,9 @@ export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
   const [scopeCounts, setScopeCounts] = useState({ US_EU: 0, AFRICA: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check if current route is public (e.g. news)
+  // Check if current route allows guest access
   const isPublicRoute = pathname?.startsWith('/news');
+  const guestAllowed = allowGuest !== undefined ? allowGuest : isGuestAllowedRoute(pathname);
 
   // Fetch scope counts on mount
   useEffect(() => {
@@ -73,12 +104,13 @@ export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
             display_name: session.user.user_metadata?.display_name,
             avatar_url: session.user.user_metadata?.avatar_url,
           });
-        } else if (!isPublicRoute) {
+        } else if (!isPublicRoute && !guestAllowed) {
+          // Only redirect to login if route doesn't allow guests
           router.push('/login');
         }
       } catch (error) {
         console.error('Auth error:', error);
-        if (!isPublicRoute) {
+        if (!isPublicRoute && !guestAllowed) {
           router.push('/login');
         }
       } finally {
@@ -94,7 +126,7 @@ export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         setUser(null);
-        if (!isPublicRoute) {
+        if (!isPublicRoute && !guestAllowed) {
           router.push('/login');
         }
       } else if (session?.user) {
@@ -109,7 +141,7 @@ export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [router, isPublicRoute]);
+  }, [router, isPublicRoute, guestAllowed]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -186,7 +218,7 @@ export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
         )}
       >
         <div className="p-4 md:p-6">
-          {bypassPaywall ? children : <Paywall>{children}</Paywall>}
+          {bypassPaywall || guestAllowed ? children : <Paywall>{children}</Paywall>}
         </div>
       </main>
 
@@ -195,6 +227,9 @@ export function AppShell({ children, bypassPaywall = false }: AppShellProps) {
 
       {/* Phase 4 - AI Concierge Floating Action Button */}
       <ConciergeFAB />
+
+      {/* Guest conversion banner */}
+      <GuestConversionBanner />
     </div>
   );
 }

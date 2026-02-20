@@ -32,6 +32,9 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 
+import { AccessGate } from '@/components/AccessGate';
+import { useAccessLevel } from '@/hooks/useAccessLevel';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════
@@ -423,6 +426,7 @@ export default function StrategiesPage() {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [riskFilter, setRiskFilter] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { isGuest, isFree, isSubscriber } = useAccessLevel();
 
   const {
     data: templates,
@@ -489,12 +493,21 @@ export default function StrategiesPage() {
             </p>
           </div>
           </div>
-          <Link href="/strategies/new">
-            <Button className="bg-accent hover:bg-accent/90">
-              <Sparkles className="w-4 h-4 mr-2" />
-              Créer ma stratégie
-            </Button>
-          </Link>
+          {isGuest ? (
+            <Link href="/signup">
+              <Button className="bg-accent hover:bg-accent/90">
+                <Sparkles className="w-4 h-4 mr-2" />
+                S'inscrire pour créer
+              </Button>
+            </Link>
+          ) : (
+            <Link href="/strategies/new">
+              <Button className="bg-accent hover:bg-accent/90">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Créer ma stratégie
+              </Button>
+            </Link>
+          )}
         </div>
       </motion.div>
 
@@ -644,7 +657,8 @@ export default function StrategiesPage() {
         </>
       )}
 
-      {/* My Strategies Section */}
+      {/* My Strategies Section - requires account */}
+      <AccessGate requiredLevel="free" feature="Mes Stratégies personnalisées" inline>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -772,6 +786,7 @@ export default function StrategiesPage() {
       </div>
         )}
       </motion.div>
+      </AccessGate>
     </div>
   );
 }

@@ -10,6 +10,8 @@ import {
   Newspaper,
   GraduationCap,
 } from 'lucide-react';
+import { useAccessLevel } from '@/hooks/useAccessLevel';
+import { CreditCard } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MOBILE TAB BAR
@@ -23,41 +25,77 @@ interface TabItem {
   matchPaths?: string[];
 }
 
-const tabs: TabItem[] = [
-  {
-    href: '/dashboard',
-    icon: LayoutDashboard,
-    label: 'Dashboard',
-    matchPaths: ['/dashboard'],
-  },
-  {
-    href: '/dashboard/explorer',
-    icon: Search,
-    label: 'Marchés',
-    matchPaths: ['/dashboard/explorer', '/dashboard/markets', '/asset'],
-  },
-  {
-    href: '/watchlist',
-    icon: Star,
-    label: 'Watchlist',
-    matchPaths: ['/watchlist'],
-  },
-  {
-    href: '/news',
-    icon: Newspaper,
-    label: 'News',
-    matchPaths: ['/news'],
-  },
-  {
-    href: '/academy',
-    icon: GraduationCap,
-    label: 'Academy',
-    matchPaths: ['/academy'],
-  },
-];
-
 export function MobileTabBar() {
   const pathname = usePathname();
+  const { isGuest } = useAccessLevel();
+
+  const authenticatedTabs: TabItem[] = [
+    {
+      href: '/dashboard',
+      icon: LayoutDashboard,
+      label: 'Dashboard',
+      matchPaths: ['/dashboard'],
+    },
+    {
+      href: '/dashboard/explorer',
+      icon: Search,
+      label: 'Marchés',
+      matchPaths: ['/dashboard/explorer', '/dashboard/markets', '/asset'],
+    },
+    {
+      href: '/watchlist',
+      icon: Star,
+      label: 'Watchlist',
+      matchPaths: ['/watchlist'],
+    },
+    {
+      href: '/news',
+      icon: Newspaper,
+      label: 'News',
+      matchPaths: ['/news'],
+    },
+    {
+      href: '/academy',
+      icon: GraduationCap,
+      label: 'Academy',
+      matchPaths: ['/academy'],
+    },
+  ];
+
+  const guestTabs: TabItem[] = [
+    {
+      href: '/dashboard',
+      icon: LayoutDashboard,
+      label: 'Dashboard',
+      matchPaths: ['/dashboard'],
+    },
+    {
+      href: '/dashboard/explorer',
+      icon: Search,
+      label: 'Marchés',
+      matchPaths: ['/dashboard/explorer', '/dashboard/markets', '/asset'],
+    },
+    {
+      href: '/news',
+      icon: Newspaper,
+      label: 'News',
+      matchPaths: ['/news'],
+    },
+    {
+      href: '/academy',
+      icon: GraduationCap,
+      label: 'Academy',
+      matchPaths: ['/academy'],
+    },
+    {
+      href: '/pricing',
+      icon: CreditCard,
+      label: 'Offres',
+      matchPaths: ['/pricing'],
+    },
+  ];
+
+  const tabs = isGuest ? guestTabs : authenticatedTabs;
 
   const isActive = (tab: TabItem): boolean => {
     // Exact match for dashboard home

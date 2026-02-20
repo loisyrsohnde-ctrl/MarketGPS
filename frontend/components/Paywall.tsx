@@ -100,8 +100,18 @@ export function Paywall({ children }: PaywallProps) {
     return <>{children}</>;
   }
 
-  // Not logged in - show login prompt
+  // Not logged in - if on a guest-allowed route, show children (AccessGate handles gating)
   if (!isAuthenticated) {
+    // Check if route allows guest access  
+    const guestAllowedRoutes = ['/dashboard', '/strategies', '/academy', '/news', '/asset', '/pricing', '/barbell'];
+    const isGuestRoute = guestAllowedRoutes.some(
+      route => pathname?.startsWith(route)
+    );
+    
+    if (isGuestRoute) {
+      return <>{children}</>;
+    }
+    
     return (
       <div className="py-8">
         <SubscriptionRequired 

@@ -31,6 +31,8 @@ import {
   Activity,
   Globe,
 } from 'lucide-react';
+import { AccessGate } from '@/components/AccessGate';
+import { useAccessLevel } from '@/hooks/useAccessLevel';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DASHBOARD PAGE
@@ -45,6 +47,7 @@ export default function DashboardPage() {
   const [marketScope, setMarketScope] = useState<'US_EU' | 'AFRICA'>('US_EU');
   const [userId] = useState('default'); // In production, get from auth
   const queryClient = useQueryClient();
+  const { isGuest, isFree } = useAccessLevel();
 
   // Determine market scope from filter
   useEffect(() => {
@@ -390,7 +393,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="p-2">
-                  {assets.slice(0, 20).map((asset, index) => (
+                  {assets.slice(0, isGuest ? 5 : 20).map((asset, index) => (
                     <motion.button
                       key={asset.asset_id}
                       initial={{ opacity: 0, x: -10 }}
@@ -420,11 +423,19 @@ export default function DashboardPage() {
             {/* See more */}
             {assets.length > 0 && (
               <div className="p-4 border-t border-glass-border">
-                <Link href="/dashboard/explorer">
-                  <Button variant="ghost" className="w-full" rightIcon={<ChevronRight className="w-4 h-4" />}>
-                    Voir les {assetsResponse?.total || assets.length} actifs
-                  </Button>
-                </Link>
+                {isGuest ? (
+                  <Link href="/signup">
+                    <Button variant="ghost" className="w-full text-accent" rightIcon={<ChevronRight className="w-4 h-4" />}>
+                      Créer un compte pour voir plus
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link href="/dashboard/explorer">
+                    <Button variant="ghost" className="w-full" rightIcon={<ChevronRight className="w-4 h-4" />}>
+                      Voir les {assetsResponse?.total || assets.length} actifs
+                    </Button>
+                  </Link>
+                )}
               </div>
             )}
           </GlassCardAccent>
@@ -458,15 +469,27 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Button 
-                      variant={isWatchlisted ? 'primary' : 'secondary'} 
-                      size="sm" 
-                      onClick={handleWatchlistToggle}
-                      disabled={watchlistMutation.isPending || !selectedAsset}
-                      leftIcon={<Star className={cn('w-4 h-4', isWatchlisted && 'fill-current')} />}
-                    >
-                      {watchlistMutation.isPending ? '...' : (isWatchlisted ? 'Suivi' : 'Suivre')}
-                    </Button>
+                    {isGuest ? (
+                      <Link href="/signup">
+                        <Button 
+                          variant="secondary" 
+                          size="sm"
+                          leftIcon={<Star className="w-4 h-4" />}
+                        >
+                          Suivre
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Button 
+                        variant={isWatchlisted ? 'primary' : 'secondary'} 
+                        size="sm" 
+                        onClick={handleWatchlistToggle}
+                        disabled={watchlistMutation.isPending || !selectedAsset}
+                        leftIcon={<Star className={cn('w-4 h-4', isWatchlisted && 'fill-current')} />}
+                      >
+                        {watchlistMutation.isPending ? '...' : (isWatchlisted ? 'Suivi' : 'Suivre')}
+                      </Button>
+                    )}
                     <Link
                       href={`https://finance.yahoo.com/quote/${selectedAsset.ticker}`}
                       target="_blank"
@@ -533,6 +556,17 @@ export default function DashboardPage() {
                   height={280}
                 />
               </GlassCard>
+
+              {/* Guest/Free upgrade prompt */}
+              {(isGuest || isFree) && (
+                <AccessGate
+                  requiredLevel="subscriber"
+                  feature="l'analyse détaillée"
+                  inline
+                >
+                  <div />
+                </AccessGate>
+              )}
 
               {/* Description */}
               <GlassCard>

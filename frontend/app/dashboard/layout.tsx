@@ -4,8 +4,8 @@ import { AppShell } from '@/components/layout/AppShell';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DASHBOARD LAYOUT
-// Authenticated layout with responsive shell (sidebar/topbar on desktop,
-// compact topbar + bottom tabs on mobile)
+// Authenticated layout with guest preview mode
+// Guests can view the dashboard with limited data
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface DashboardLayoutProps {
@@ -13,5 +13,5 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  return <AppShell>{children}</AppShell>;
+  return <AppShell allowGuest={true}>{children}</AppShell>;
 }

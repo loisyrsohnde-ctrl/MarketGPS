@@ -66,9 +66,29 @@ export function Sidebar({ scopeCounts, onLogout, isAuthenticated = true }: Sideb
     {
       section: 'Navigation',
       items: [
+        { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+        { href: '/dashboard/explorer', icon: Search, label: 'Explorer' },
         { href: '/news', icon: Newspaper, label: 'Actualités' },
       ],
-    }
+    },
+    {
+      section: 'Stratégies',
+      items: [
+        { href: '/strategies', icon: Briefcase, label: 'Stratégies' },
+      ],
+    },
+    {
+      section: 'Formation',
+      items: [
+        { href: '/academy', icon: GraduationCap, label: 'QuantAI Academy' },
+      ],
+    },
+    {
+      section: 'Abonnement',
+      items: [
+        { href: '/pricing', icon: CreditCard, label: 'Voir les offres' },
+      ],
+    },
   ] : [
       {
         section: 'Navigation',

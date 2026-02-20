@@ -4,7 +4,8 @@ import { AppShell } from '@/components/layout/AppShell';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // STRATEGIES LAYOUT
-// Uses the shared AppShell for consistent navigation across devices
+// Uses the shared AppShell with guest access enabled
+// Guests can browse strategy templates but not create/backtest
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface LayoutProps {
@@ -12,5 +13,5 @@ interface LayoutProps {
 }
 
 export default function StrategiesLayout({ children }: LayoutProps) {
-  return <AppShell>{children}</AppShell>;
+  return <AppShell allowGuest={true}>{children}</AppShell>;
 }
