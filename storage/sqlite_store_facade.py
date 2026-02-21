@@ -331,6 +331,9 @@ class SQLiteStore:
     def is_article_saved_by_user(self, user_id: str, article_id: int) -> bool:
         return self._news.is_article_saved_by_user(user_id, article_id)
 
+    def article_exists(self, source_url: str, title: str) -> bool:
+        return self._news.article_exists(source_url, title)
+
     def insert_news_article(self, article: Dict) -> Optional[int]:
         return self._news.insert_news_article(article)
 

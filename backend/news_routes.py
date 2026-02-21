@@ -626,6 +626,7 @@ async def ingest_articles(
         raise HTTPException(status_code=403, detail="Invalid internal API key")
 
     inserted = 0
+    duplicates = 0
     errors = 0
 
     for art in request.articles:
@@ -634,16 +635,25 @@ async def ingest_articles(
         article_dict["is_ai_processed"] = 1 if article_dict.get("is_ai_processed") else 0
         article_dict["is_breaking_news"] = 1 if article_dict.get("is_breaking_news") else 0
 
+        # Check for duplicates before insert
+        if db.article_exists(article_dict.get("source_url", ""), article_dict.get("title", "")):
+            duplicates += 1
+            continue
+
         article_id = db.insert_news_article(article_dict)
         if article_id:
             inserted += 1
         else:
             errors += 1
 
-    logger.info(f"Ingest complete: {inserted} inserted, {errors} errors out of {len(request.articles)}")
+    logger.info(
+        f"Ingest complete: {inserted} inserted, {duplicates} duplicates skipped, "
+        f"{errors} errors out of {len(request.articles)}"
+    )
     return {
         "status": "ok",
         "inserted": inserted,
+        "duplicates": duplicates,
         "errors": errors,
         "total": len(request.articles)
     }

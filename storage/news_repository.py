@@ -95,22 +95,32 @@ class NewsRepository(BaseRepository):
         count_sql = f"SELECT COUNT(*) FROM news_articles WHERE {where_clause}"
 
         # Build ORDER BY clause based on sort_by
+        # NOTE: Breaking news and francophone priority are only applied to
+        # articles published within the last 48 hours so that older articles
+        # don't permanently block the feed.
         if sort_by == "relevance":
             # Sort by engagement score first, then by freshness
             order_clause = """
                 ORDER BY
-                    is_breaking_news DESC,
+                    CASE WHEN is_breaking_news = 1
+                              AND published_at >= datetime('now', '-48 hours')
+                         THEN 0 ELSE 1 END,
                     engagement_score DESC,
                     published_at DESC
             """
         elif prioritize_francophone and not country and not region:
             # Priorité : CI & CM d'abord (Tier 1), puis autres francophones
             # uniquement si leur engagement dépasse le seuil, puis le reste.
+            # La priorisation ne s'applique qu'aux articles < 48h pour
+            # garantir que les articles récents remontent toujours.
             tier1 = ','.join([f"'{c}'" for c in self.TIER1_PRIORITY_COUNTRIES])
             tier2 = ','.join([f"'{c}'" for c in self.TIER2_FRANCOPHONE_COUNTRIES])
             order_clause = f"""
                 ORDER BY
-                    is_breaking_news DESC,
+                    CASE WHEN is_breaking_news = 1
+                              AND published_at >= datetime('now', '-48 hours')
+                         THEN 0 ELSE 1 END,
+                    DATE(published_at) DESC,
                     CASE
                         WHEN country IN ({tier1}) THEN 0
                         WHEN country IN ({tier2}) AND engagement_score >= 60 THEN 1
@@ -121,7 +131,13 @@ class NewsRepository(BaseRepository):
                     published_at DESC
             """
         else:
-            order_clause = "ORDER BY is_breaking_news DESC, published_at DESC"
+            order_clause = """
+                ORDER BY
+                    CASE WHEN is_breaking_news = 1
+                              AND published_at >= datetime('now', '-48 hours')
+                         THEN 0 ELSE 1 END,
+                    published_at DESC
+            """
 
         # Get paginated data with new scoring fields
         offset = (page - 1) * page_size
@@ -231,8 +247,46 @@ class NewsRepository(BaseRepository):
             """, (user_id, article_id)).fetchone()
             return result is not None
 
+    def article_exists(self, source_url: str, title: str) -> bool:
+        """Check if an article with the same source_url or very similar title already exists.
+
+        This prevents duplicate articles from being inserted when the same
+        story is picked up from multiple RSS sources or re-processed.
+        """
+        try:
+            with self._get_connection() as conn:
+                # 1. Exact source_url match
+                if source_url:
+                    row = conn.execute(
+                        "SELECT 1 FROM news_articles WHERE source_url = ? LIMIT 1",
+                        (source_url,)
+                    ).fetchone()
+                    if row:
+                        return True
+
+                # 2. Exact title match (catches same story from different sources)
+                if title:
+                    row = conn.execute(
+                        "SELECT 1 FROM news_articles WHERE title = ? LIMIT 1",
+                        (title,)
+                    ).fetchone()
+                    if row:
+                        return True
+
+                return False
+        except Exception as e:
+            logger.error(f"Dedup check failed: {e}")
+            return False  # Fail open — allow insert on error
+
     def insert_news_article(self, article: Dict) -> Optional[int]:
-        """Insert a new article. Returns the article ID."""
+        """Insert a new article. Returns the article ID, or None if duplicate."""
+        # Deduplication check before insert
+        source_url = article.get("source_url", "")
+        title = article.get("title", "")
+        if self.article_exists(source_url, title):
+            logger.info(f"⏩ Duplicate skipped: {title[:60]}...")
+            return None
+
         sql = """
             INSERT INTO news_articles (
                 slug, raw_item_id, title, excerpt, content_md, tldr_json,

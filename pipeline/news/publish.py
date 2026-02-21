@@ -8,6 +8,7 @@ Fallback mode: If no LLM is available, stores extracted content as-is.
 """
 
 import hashlib
+import html as html_lib
 import json
 import os
 import re
@@ -119,30 +120,56 @@ class NewsPublisher:
         return f"{slug}-{hash_suffix}"
     
     def _detect_country(self, content: str, source_country: Optional[str]) -> Optional[str]:
-        """Detect country from content or use source country."""
+        """Detect country from content or use source country.
+
+        Uses word-boundary matching and a scoring approach to avoid
+        false positives (e.g. 'coast' matching 'ivory coast').
+        """
         if source_country:
             return source_country
-        
-        # Simple keyword detection
+
+        # Keywords per country — use word-boundary regex to avoid
+        # substring collisions like 'coast' matching 'ivory coast'.
         country_keywords = {
-            'NG': ['nigeria', 'lagos', 'abuja', 'naira', 'cbn'],
-            'ZA': ['south africa', 'johannesburg', 'cape town', 'rand', 'sarb'],
-            'KE': ['kenya', 'nairobi', 'mpesa', 'shilling'],
+            'NG': ['nigeria', 'lagos', 'abuja', 'naira', r'\bcbn\b'],
+            'ZA': ['south africa', 'johannesburg', 'cape town', r'\brand\b', r'\bsarb\b'],
+            'KE': ['kenya', 'nairobi', 'mpesa', 'mombasa', r'\bksh\b'],
             'GH': ['ghana', 'accra', 'cedi'],
-            'EG': ['egypt', 'cairo', 'pound'],
-            'CI': ['ivory coast', "cote d'ivoire", 'abidjan', 'fcfa'],
-            'SN': ['senegal', 'dakar'],
+            'EG': [r'\begypt', 'cairo', r'\begyptian'],
+            'CI': ["cote d'ivoire", r"c[ôo]te d'ivoire", 'abidjan',
+                    'ivory coast', r'\bfcfa\b', r'\bbceao\b'],
+            'SN': ['senegal', r's[ée]n[ée]gal', 'dakar'],
             'MA': ['morocco', 'maroc', 'casablanca', 'rabat'],
+            'CM': ['cameroun', 'cameroon', 'douala', r'yaound[ée]'],
+            'TN': ['tunisia', 'tunisie', 'tunis'],
+            'RW': ['rwanda', 'kigali'],
         }
-        
+
         content_lower = content.lower() if content else ""
-        
+        if not content_lower:
+            return None
+
+        # Score each country by number of keyword hits
+        scores: Dict[str, int] = {}
         for country_code, keywords in country_keywords.items():
+            score = 0
             for keyword in keywords:
-                if keyword in content_lower:
-                    return country_code
-        
-        return None
+                # Use word boundaries for short keywords to avoid
+                # substring false positives
+                if keyword.startswith(r'\b') or len(keyword) <= 4:
+                    if re.search(keyword, content_lower):
+                        score += 1
+                else:
+                    if re.search(r'\b' + re.escape(keyword) + r'\b', content_lower):
+                        score += 1
+            if score > 0:
+                scores[country_code] = score
+
+        if not scores:
+            return None
+
+        # Return the country with the highest score
+        return max(scores, key=scores.get)
     
     def _extract_tags(self, content: str, raw_tags: List[str]) -> List[str]:
         """Extract tags from content and raw tags."""
@@ -279,14 +306,17 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
         """Fallback processing without LLM (extract and clean only)."""
         title = raw_payload.get("title", "Untitled")
         content = raw_payload.get("content") or raw_payload.get("summary", "")
-        
-        # Clean HTML if present
+
+        # Clean HTML tags and decode entities (&amp; -> &, etc.)
         content = re.sub(r'<[^>]+>', '', content)
+        content = html_lib.unescape(content)
         content = re.sub(r'\s+', ' ', content).strip()
-        
+
+        title = html_lib.unescape(title)
+
         # Create basic excerpt
         excerpt = content[:200] + "..." if len(content) > 200 else content
-        
+
         return {
             "title_fr": title,
             "excerpt_fr": excerpt,
@@ -304,7 +334,12 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
         try:
             raw_payload = json.loads(raw_item.get("raw_payload", "{}"))
             source_language = raw_item.get("source_language", "en")
-            
+
+            # Decode HTML entities in raw payload before processing
+            for key in ("title", "summary", "content"):
+                if raw_payload.get(key):
+                    raw_payload[key] = html_lib.unescape(raw_payload[key])
+
             # Try LLM rewrite first, fallback to basic processing
             rewritten = self._rewrite_with_llm(raw_payload, source_language)
             is_ai_processed = rewritten is not None
@@ -404,16 +439,18 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
                 "importance_level": scoring_result.get("importance_level", "normal")
             }
             
-            # Insert article locally
+            # Insert article locally (dedup check is inside insert_news_article)
             article_id = self.store.insert_news_article(article)
 
+            # Mark raw item as processed regardless (avoid infinite retry)
+            self.store.mark_raw_item_processed(raw_item["id"])
+
             if article_id:
-                # Mark raw item as processed
-                self.store.mark_raw_item_processed(raw_item["id"])
                 # Collect article for remote API push
                 self._pending_articles.append(article)
                 return article_id
             else:
+                # Duplicate or insert error — already logged in repository
                 return None
 
         except Exception as e:
