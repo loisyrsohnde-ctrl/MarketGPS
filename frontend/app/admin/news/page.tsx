@@ -123,7 +123,7 @@ export default function NewsPage() {
         console.error('Error generating script:', errorData);
       }
     } catch (err) {
-      console.error('Erreur lors de la g\u00e9n\u00e9ration du script:', err);
+      console.error('Erreur lors de la génération du script:', err);
     } finally {
       setGeneratingId(null);
     }
@@ -256,34 +256,34 @@ export default function NewsPage() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Actualit\u00e9s
+          Actualités
         </h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
-          G\u00e9rez les actualit\u00e9s virales et le classement \u00e9ditorial
+          Gérez les actualités virales et le classement éditorial
         </p>
       </div>
 
-      {/* URL Article Generator */}
+      {/* Article Generator (URL or Topic) */}
       <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-5 dark:border-emerald-900/40 dark:bg-emerald-900/10">
         <div className="flex items-center gap-2 mb-3">
           <Link2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
           <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-            G&eacute;n&eacute;rer un article depuis un lien
+            {"Générer un article"}
           </h3>
         </div>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-          Collez l&apos;URL d&apos;un article source. L&apos;IA va le lire, le r&eacute;&eacute;crire en fran&ccedil;ais, l&apos;enrichir et le publier directement.
+          {"Collez un lien (URL) ou saisissez un sujet. L'IA va rédiger un article complet en français et le publier directement."}
         </p>
         <div className="flex gap-3">
           <input
-            type="url"
+            type="text"
             value={articleUrl}
             onChange={(e) => {
               setArticleUrl(e.target.value);
               setUrlResult(null);
             }}
             onKeyDown={(e) => e.key === 'Enter' && handleGenerateFromUrl()}
-            placeholder="https://techcabal.com/2026/02/22/article-example..."
+            placeholder="https://example.com/article... ou un sujet : La fintech au Cameroun en 2026"
             className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
           />
           <button
@@ -294,12 +294,12 @@ export default function NewsPage() {
             {urlGenerating ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                G&eacute;n&eacute;ration...
+                {"Génération..."}
               </>
             ) : (
               <>
                 <Link2 className="h-4 w-4" />
-                G&eacute;n&eacute;rer
+                {"Générer"}
               </>
             )}
           </button>
@@ -336,7 +336,7 @@ export default function NewsPage() {
           }`}
         >
           <Flame className="h-4 w-4" />
-          Actualit\u00e9s Virales
+          {"Actualités Virales"}
         </button>
         <button
           onClick={() => setActiveTab('editorial')}
@@ -347,7 +347,7 @@ export default function NewsPage() {
           }`}
         >
           <Award className="h-4 w-4" />
-          Intelligence \u00c9ditoriale
+          {"Intelligence Éditoriale"}
         </button>
       </div>
 
@@ -389,7 +389,7 @@ export default function NewsPage() {
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             >
               <option value="">Toutes les langues</option>
-              <option value="fr">Fran\u00e7ais</option>
+              <option value="fr">{"Français"}</option>
               <option value="en">Anglais</option>
               <option value="de">Allemand</option>
               <option value="es">Espagnol</option>
@@ -400,7 +400,7 @@ export default function NewsPage() {
           {activeTab === 'viral' ? (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Viralit\u00e9 Min
+                {"Viralité Min"}
               </label>
               <select
                 value={minViralityScore || ''}
@@ -453,7 +453,7 @@ export default function NewsPage() {
                 onClick={handleRescore}
                 disabled={rescoring}
                 className="rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-500 dark:hover:bg-emerald-600 flex items-center justify-center gap-2"
-                title="Relancer le scoring \u00e9ditorial sur les articles r\u00e9cents"
+                title="Relancer le scoring éditorial sur les articles récents"
               >
                 {rescoring ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -470,7 +470,7 @@ export default function NewsPage() {
         {activeTab === 'editorial' && (
           <div className="mt-4 flex items-center gap-4 text-sm">
             <span className="text-gray-600 dark:text-gray-400">
-              P\u00e9riode :
+              {"Période :"}
             </span>
             {[1, 3, 7, 14].map((d) => (
               <button
@@ -487,7 +487,7 @@ export default function NewsPage() {
             ))}
             {updatedAt && (
               <span className="ml-auto text-xs text-gray-500 dark:text-gray-500">
-                Mis \u00e0 jour :{' '}
+                {"Mis à jour :"}{' '}
                 {new Date(updatedAt).toLocaleString('fr-FR', {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -514,10 +514,10 @@ export default function NewsPage() {
             {currentTotal > 0 ? (
               <>
                 <strong>{currentTotal}</strong>{' '}
-                {activeTab === 'viral' ? 'actualit\u00e9s' : 'articles class\u00e9s'}
+                {activeTab === 'viral' ? 'actualités' : 'articles classés'}
               </>
             ) : (
-              'Aucun r\u00e9sultat'
+              {"Aucun résultat"}
             )}
           </div>
         )}
@@ -586,7 +586,7 @@ export default function NewsPage() {
             disabled={page === 1}
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
           >
-            Pr\u00e9c\u00e9dent
+            {"Précédent"}
           </button>
 
           {Array.from({ length: totalPages }, (_, i) => i + 1)

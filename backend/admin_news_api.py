@@ -854,62 +854,247 @@ async def publish_script(script_id: str, request: PublishScriptRequest):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# POST /api/admin/generate-from-url - Generate & publish article from a URL
+# POST /api/admin/generate-from-url - Generate & publish article from URL or topic
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class GenerateFromURLRequest(BaseModel):
-    """Request to generate an article from a source URL."""
-    url: str
+    """Request to generate an article from a source URL or a topic."""
+    url: str  # Can be a URL or a topic/title text
 
 
 class GenerateFromURLResponse(BaseModel):
-    """Response after generating article from URL."""
+    """Response after generating article from URL or topic."""
     success: bool
     article_id: Optional[int] = None
     title: Optional[str] = None
     message: str
 
 
+def _is_url(text: str) -> bool:
+    """Check if text looks like a URL."""
+    import re
+    text = text.strip()
+    return bool(re.match(r'^https?://', text, re.I)) or bool(re.match(r'^www\.', text, re.I))
+
+
 @router.post("/generate-from-url", response_model=GenerateFromURLResponse)
 async def generate_article_from_url(request: GenerateFromURLRequest):
     """
-    Generate a full French article from a source URL and publish it immediately.
+    Generate a full French article and publish it immediately.
 
-    Flow:
-    1. Fetch full article text from the URL
-    2. Rewrite/translate to French via LLM (OpenAI or Gemini)
-    3. Fetch a relevant image
-    4. Insert into news_articles and publish
+    Supports two modes:
+    - URL mode: Paste a URL → fetches, translates, enriches, publishes
+    - Topic mode: Paste a subject/title → LLM writes a full article from scratch
 
     Body:
-    - url: Source article URL
+    - url: Source article URL or topic/title text
 
     Returns:
         GenerateFromURLResponse with article details
     """
     import asyncio
 
-    url = request.url.strip()
-    if not url:
-        raise HTTPException(status_code=400, detail="URL is required")
+    input_text = request.url.strip()
+    if not input_text:
+        raise HTTPException(status_code=400, detail="URL ou sujet requis")
 
     try:
-        result = await asyncio.to_thread(_generate_article_sync, url)
+        if _is_url(input_text):
+            # URL mode: fetch content from source
+            url = input_text if input_text.startswith("http") else f"https://{input_text}"
+            result = await asyncio.to_thread(_generate_from_url_sync, url)
+        else:
+            # Topic mode: generate article from topic/title
+            result = await asyncio.to_thread(_generate_from_topic_sync, input_text)
         return result
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error generating article from URL: {e}", exc_info=True)
+        logger.error(f"Error generating article: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _generate_article_sync(url: str) -> GenerateFromURLResponse:
-    """Synchronous article generation (runs in threadpool)."""
-    import hashlib
+def _generate_from_topic_sync(topic: str) -> GenerateFromURLResponse:
+    """Generate an article from a topic/title using LLM (no source URL needed)."""
     import json
     import re
-    import html as html_lib
+    from datetime import datetime
+
+    try:
+        from pipeline.news.publish import NewsPublisher
+    except ImportError as e:
+        logger.error(f"Cannot import NewsPublisher: {e}")
+        return GenerateFromURLResponse(
+            success=False,
+            message="Pipeline module not available on this server"
+        )
+
+    publisher = NewsPublisher(store=db)
+
+    if not publisher.llm_provider:
+        return GenerateFromURLResponse(
+            success=False,
+            message="Aucun LLM disponible. Configurez OPENAI_API_KEY ou GEMINI_API_KEY."
+        )
+
+    # Build a specific prompt for topic-based generation
+    prompt = f"""Tu es un Rédacteur en Chef senior pour "MarketGPS", un média économique et financier de référence couvrant l'Afrique et les marchés internationaux.
+
+SUJET À TRAITER : {topic}
+
+LANGUE OBLIGATOIRE : FRANÇAIS. L'article DOIT être intégralement en français.
+
+INSTRUCTIONS :
+Rédige un article journalistique complet, approfondi et professionnel sur ce sujet.
+
+1. STYLE : Journalistique premium (niveau Jeune Afrique / Les Échos).
+   - Commence par un LEAD percutant.
+   - INTERDIT : "Introduction", "Conclusion", "En résumé".
+   - Ton factuel, analytique et engageant.
+
+2. CONTENU (800-1200 mots) :
+   - Contextualise : historique, enjeux, pourquoi c'est important maintenant.
+   - Chiffres & données : intègre des données pertinentes, comparaisons.
+   - Acteurs clés : entreprises, dirigeants, institutions impliquées.
+   - Impact marché : conséquences économiques, financières, business.
+   - Perspectives : scénarios futurs, implications.
+   - Utilise le **gras** pour les noms d'entreprises et chiffres clés.
+   - Structure avec 2-3 sous-titres en ## markdown.
+
+3. IMAGE SEARCH : Génère une requête de recherche d'image précise en anglais.
+
+Réponds UNIQUEMENT en JSON valide :
+{{
+  "skip": false,
+  "title_fr": "Titre accrocheur en français (max 100 caractères)",
+  "excerpt_fr": "Résumé de 2-3 phrases en français",
+  "content_md": "Article complet en markdown (800-1200 mots, EN FRANÇAIS)",
+  "category": "Finance|Tech|Business|Startup|Régulation|Énergie|Marchés",
+  "sentiment": "positive|neutral|negative",
+  "image_search_query": "requête image en anglais",
+  "tldr": ["Point clé 1", "Point clé 2", "Point clé 3"]
+}}"""
+
+    try:
+        if publisher.llm_provider == "openai" and publisher.openai_client:
+            response = publisher.openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=6000,
+                temperature=0.7
+            )
+            text = response.choices[0].message.content
+        elif publisher.llm_provider == "gemini":
+            response = publisher.gemini_model.generate_content(prompt)
+            text = response.text
+        else:
+            return GenerateFromURLResponse(
+                success=False,
+                message="Aucun LLM configuré"
+            )
+
+        # Parse JSON response
+        json_str = text.strip()
+        if "```json" in json_str:
+            json_str = json_str.split("```json")[1].split("```")[0].strip()
+        elif "```" in json_str:
+            json_str = json_str.split("```")[1].split("```")[0].strip()
+
+        try:
+            rewritten = json.loads(json_str)
+        except json.JSONDecodeError:
+            json_match = re.search(r'\{[\s\S]*\}', text)
+            if json_match:
+                rewritten = json.loads(json_match.group())
+            else:
+                return GenerateFromURLResponse(
+                    success=False,
+                    message="Erreur de parsing de la réponse LLM"
+                )
+
+        if rewritten.get("skip"):
+            return GenerateFromURLResponse(
+                success=False,
+                message="Le LLM a estimé que ce sujet est hors-thème pour MarketGPS."
+            )
+
+        if not rewritten.get("title_fr") or not rewritten.get("content_md"):
+            return GenerateFromURLResponse(
+                success=False,
+                message="Réponse LLM incomplète (titre ou contenu manquant)"
+            )
+
+    except Exception as e:
+        logger.error(f"LLM generation failed for topic '{topic}': {e}")
+        return GenerateFromURLResponse(
+            success=False,
+            message=f"Erreur LLM : {str(e)[:200]}"
+        )
+
+    # Detect country and tags from generated content
+    content_for_detection = f"{rewritten.get('title_fr', '')} {rewritten.get('content_md', '')}"
+    country = publisher._detect_country(content_for_detection, None)
+    tags = publisher._extract_tags(content_for_detection, [])
+    category = rewritten.get("category") or (tags[0].capitalize() if tags else "Actualité")
+
+    # Fetch image
+    from pipeline.news.image_fetcher import fetch_article_image
+    image_url = fetch_article_image(
+        title=rewritten.get("title_fr", topic),
+        category=category,
+        country=country,
+        keywords=rewritten.get("image_search_query"),
+        existing_url=None
+    )
+
+    # Generate slug and insert
+    slug = publisher._generate_slug(rewritten.get("title_fr", "article"))
+
+    article = {
+        "slug": slug,
+        "title": rewritten.get("title_fr", topic),
+        "excerpt": rewritten.get("excerpt_fr", ""),
+        "content_md": rewritten.get("content_md", ""),
+        "tldr_json": json.dumps(rewritten.get("tldr")) if rewritten.get("tldr") else None,
+        "tags_json": json.dumps(tags) if tags else None,
+        "country": country,
+        "language": "fr",
+        "image_url": image_url,
+        "source_name": "MarketGPS Rédaction",
+        "source_url": None,
+        "canonical_url": None,
+        "published_at": datetime.utcnow().isoformat(),
+        "status": "published",
+        "category": category,
+        "sentiment": rewritten.get("sentiment", "neutral"),
+        "is_ai_processed": 1,
+        "engagement_score": 0.95,
+        "is_breaking_news": 0,
+        "importance_level": "high",
+    }
+
+    article_id = db.insert_news_article(article)
+
+    if article_id:
+        logger.info(f"✅ Article generated from topic: {rewritten.get('title_fr', '')[:60]}...")
+        return GenerateFromURLResponse(
+            success=True,
+            article_id=article_id,
+            title=rewritten.get("title_fr", topic),
+            message="Article généré depuis le sujet et publié avec succès"
+        )
+    else:
+        return GenerateFromURLResponse(
+            success=False,
+            message="Erreur lors de l'insertion (article peut-être dupliqué)"
+        )
+
+
+def _generate_from_url_sync(url: str) -> GenerateFromURLResponse:
+    """Synchronous article generation from URL (runs in threadpool)."""
+    import json
+    import re
     from datetime import datetime
 
     try:
@@ -928,10 +1113,10 @@ def _generate_article_sync(url: str) -> GenerateFromURLResponse:
     if not full_text or len(full_text.strip()) < 100:
         return GenerateFromURLResponse(
             success=False,
-            message=f"Impossible de récupérer le contenu de l'article depuis {url}"
+            message=f"Impossible de récupérer le contenu depuis cette URL. Vérifiez que le lien est accessible."
         )
 
-    logger.info(f"📄 Fetched {len(full_text)} chars from {url}")
+    logger.info(f"Fetched {len(full_text)} chars from {url}")
 
     # 2. Detect source language (simple heuristic)
     french_words = ['le', 'la', 'les', 'des', 'une', 'est', 'dans', 'pour', 'avec', 'sur']
@@ -940,7 +1125,6 @@ def _generate_article_sync(url: str) -> GenerateFromURLResponse:
     source_language = "fr" if fr_count > 10 else "en"
 
     # 3. Build a raw payload for the LLM
-    # Extract title from first line or first sentence
     lines = [l.strip() for l in full_text.split('\n') if l.strip()]
     raw_title = lines[0][:150] if lines else "Article"
 
@@ -997,7 +1181,7 @@ def _generate_article_sync(url: str) -> GenerateFromURLResponse:
         "category": category,
         "sentiment": rewritten.get("sentiment", "neutral"),
         "is_ai_processed": 1,
-        "engagement_score": 0.95,  # High score for manually curated articles
+        "engagement_score": 0.95,
         "is_breaking_news": 0,
         "importance_level": "high",
     }
@@ -1005,7 +1189,7 @@ def _generate_article_sync(url: str) -> GenerateFromURLResponse:
     article_id = db.insert_news_article(article)
 
     if article_id:
-        logger.info(f"✅ Article generated from URL: {rewritten.get('title_fr', '')[:60]}...")
+        logger.info(f"Article generated from URL: {rewritten.get('title_fr', '')[:60]}...")
         return GenerateFromURLResponse(
             success=True,
             article_id=article_id,
