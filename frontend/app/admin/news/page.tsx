@@ -16,6 +16,9 @@ import {
   Flame,
   Award,
   Loader2,
+  Link2,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 
 type TabType = 'viral' | 'editorial';
@@ -29,6 +32,11 @@ export default function NewsPage() {
   const [countries, setCountries] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
+
+  // ── URL Generator state ────────────────────────────────────────────────────
+  const [articleUrl, setArticleUrl] = useState('');
+  const [urlGenerating, setUrlGenerating] = useState(false);
+  const [urlResult, setUrlResult] = useState<{ success: boolean; message: string; title?: string } | null>(null);
 
   // ── Viral News state ──────────────────────────────────────────────────────
   const [minViralityScore, setMinViralityScore] = useState<number>();
@@ -58,6 +66,39 @@ export default function NewsPage() {
     rescore,
     rescoring,
   } = useEditorialScores({ topK, daysBack, minScore });
+
+  // ── URL Generator handler ────────────────────────────────────────────────
+  const handleGenerateFromUrl = async () => {
+    if (!articleUrl.trim()) return;
+    setUrlGenerating(true);
+    setUrlResult(null);
+    try {
+      const API_BASE = getApiBaseUrl();
+      const adminKey = localStorage.getItem('adminKey') || '';
+      const response = await fetch(`${API_BASE}/api/admin/generate-from-url`, {
+        method: 'POST',
+        headers: {
+          'X-Admin-Key': adminKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: articleUrl.trim() }),
+      });
+      const data = await response.json();
+      setUrlResult({
+        success: data.success,
+        message: data.message,
+        title: data.title,
+      });
+      if (data.success) {
+        setArticleUrl('');
+        await refetch();
+      }
+    } catch (err) {
+      setUrlResult({ success: false, message: 'Erreur de connexion au serveur' });
+    } finally {
+      setUrlGenerating(false);
+    }
+  };
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleGenerateScript = async (articleId: string) => {
@@ -220,6 +261,68 @@ export default function NewsPage() {
         <p className="mt-2 text-gray-600 dark:text-gray-400">
           G\u00e9rez les actualit\u00e9s virales et le classement \u00e9ditorial
         </p>
+      </div>
+
+      {/* URL Article Generator */}
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-5 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+        <div className="flex items-center gap-2 mb-3">
+          <Link2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+            G&eacute;n&eacute;rer un article depuis un lien
+          </h3>
+        </div>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Collez l&apos;URL d&apos;un article source. L&apos;IA va le lire, le r&eacute;&eacute;crire en fran&ccedil;ais, l&apos;enrichir et le publier directement.
+        </p>
+        <div className="flex gap-3">
+          <input
+            type="url"
+            value={articleUrl}
+            onChange={(e) => {
+              setArticleUrl(e.target.value);
+              setUrlResult(null);
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && handleGenerateFromUrl()}
+            placeholder="https://techcabal.com/2026/02/22/article-example..."
+            className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+          />
+          <button
+            onClick={handleGenerateFromUrl}
+            disabled={urlGenerating || !articleUrl.trim()}
+            className="rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-emerald-500 dark:hover:bg-emerald-600 flex items-center gap-2 whitespace-nowrap"
+          >
+            {urlGenerating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                G&eacute;n&eacute;ration...
+              </>
+            ) : (
+              <>
+                <Link2 className="h-4 w-4" />
+                G&eacute;n&eacute;rer
+              </>
+            )}
+          </button>
+        </div>
+        {urlResult && (
+          <div className={`mt-3 flex items-start gap-2 rounded-md px-3 py-2 text-sm ${
+            urlResult.success
+              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+          }`}>
+            {urlResult.success ? (
+              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+            ) : (
+              <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            )}
+            <div>
+              <p>{urlResult.message}</p>
+              {urlResult.title && (
+                <p className="font-medium mt-0.5">{urlResult.title}</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tab Switcher */}

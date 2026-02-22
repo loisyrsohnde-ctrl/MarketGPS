@@ -851,3 +851,169 @@ async def publish_script(script_id: str, request: PublishScriptRequest):
     except Exception as e:
         logger.error(f"Error publishing script: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# POST /api/admin/generate-from-url - Generate & publish article from a URL
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class GenerateFromURLRequest(BaseModel):
+    """Request to generate an article from a source URL."""
+    url: str
+
+
+class GenerateFromURLResponse(BaseModel):
+    """Response after generating article from URL."""
+    success: bool
+    article_id: Optional[int] = None
+    title: Optional[str] = None
+    message: str
+
+
+@router.post("/generate-from-url", response_model=GenerateFromURLResponse)
+async def generate_article_from_url(request: GenerateFromURLRequest):
+    """
+    Generate a full French article from a source URL and publish it immediately.
+
+    Flow:
+    1. Fetch full article text from the URL
+    2. Rewrite/translate to French via LLM (OpenAI or Gemini)
+    3. Fetch a relevant image
+    4. Insert into news_articles and publish
+
+    Body:
+    - url: Source article URL
+
+    Returns:
+        GenerateFromURLResponse with article details
+    """
+    import asyncio
+
+    url = request.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+
+    try:
+        result = await asyncio.to_thread(_generate_article_sync, url)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating article from URL: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _generate_article_sync(url: str) -> GenerateFromURLResponse:
+    """Synchronous article generation (runs in threadpool)."""
+    import hashlib
+    import json
+    import re
+    import html as html_lib
+    from datetime import datetime
+
+    try:
+        from pipeline.news.publish import NewsPublisher
+    except ImportError as e:
+        logger.error(f"Cannot import NewsPublisher: {e}")
+        return GenerateFromURLResponse(
+            success=False,
+            message="Pipeline module not available on this server"
+        )
+
+    publisher = NewsPublisher(store=db)
+
+    # 1. Fetch full article content
+    full_text = publisher._fetch_full_article(url)
+    if not full_text or len(full_text.strip()) < 100:
+        return GenerateFromURLResponse(
+            success=False,
+            message=f"Impossible de récupérer le contenu de l'article depuis {url}"
+        )
+
+    logger.info(f"📄 Fetched {len(full_text)} chars from {url}")
+
+    # 2. Detect source language (simple heuristic)
+    french_words = ['le', 'la', 'les', 'des', 'une', 'est', 'dans', 'pour', 'avec', 'sur']
+    words = full_text.lower().split()[:200]
+    fr_count = sum(1 for w in words if w in french_words)
+    source_language = "fr" if fr_count > 10 else "en"
+
+    # 3. Build a raw payload for the LLM
+    # Extract title from first line or first sentence
+    lines = [l.strip() for l in full_text.split('\n') if l.strip()]
+    raw_title = lines[0][:150] if lines else "Article"
+
+    raw_payload = {
+        "title": raw_title,
+        "content": full_text,
+        "summary": full_text[:500],
+    }
+
+    # 4. LLM rewrite to French
+    rewritten = publisher._rewrite_with_llm(raw_payload, source_language, full_article_text=full_text)
+
+    if not rewritten or rewritten.get("skip"):
+        return GenerateFromURLResponse(
+            success=False,
+            message="Le LLM a filtré cet article (hors-thème) ou n'est pas disponible. Vérifiez OPENAI_API_KEY / GEMINI_API_KEY."
+        )
+
+    # 5. Detect country and tags
+    content_for_detection = f"{rewritten.get('title_fr', '')} {rewritten.get('content_md', '')}"
+    country = publisher._detect_country(content_for_detection, None)
+    tags = publisher._extract_tags(content_for_detection, [])
+    category = rewritten.get("category") or (tags[0].capitalize() if tags else "Actualité")
+
+    # 6. Fetch image
+    from pipeline.news.image_fetcher import fetch_article_image
+    image_url = fetch_article_image(
+        title=rewritten.get("title_fr", raw_title),
+        category=category,
+        country=country,
+        keywords=rewritten.get("image_search_query"),
+        existing_url=None
+    )
+
+    # 7. Generate slug
+    slug = publisher._generate_slug(rewritten.get("title_fr", "article"))
+
+    # 8. Build article and insert
+    article = {
+        "slug": slug,
+        "title": rewritten.get("title_fr", raw_title),
+        "excerpt": rewritten.get("excerpt_fr", ""),
+        "content_md": rewritten.get("content_md", full_text[:2000]),
+        "tldr_json": json.dumps(rewritten.get("tldr")) if rewritten.get("tldr") else None,
+        "tags_json": json.dumps(tags) if tags else None,
+        "country": country,
+        "language": "fr",
+        "image_url": image_url,
+        "source_name": "MarketGPS Rédaction",
+        "source_url": url,
+        "canonical_url": url,
+        "published_at": datetime.utcnow().isoformat(),
+        "status": "published",
+        "category": category,
+        "sentiment": rewritten.get("sentiment", "neutral"),
+        "is_ai_processed": 1,
+        "engagement_score": 0.95,  # High score for manually curated articles
+        "is_breaking_news": 0,
+        "importance_level": "high",
+    }
+
+    article_id = db.insert_news_article(article)
+
+    if article_id:
+        logger.info(f"✅ Article generated from URL: {rewritten.get('title_fr', '')[:60]}...")
+        return GenerateFromURLResponse(
+            success=True,
+            article_id=article_id,
+            title=rewritten.get("title_fr", raw_title),
+            message="Article généré et publié avec succès"
+        )
+    else:
+        return GenerateFromURLResponse(
+            success=False,
+            message="Erreur lors de l'insertion (article peut-être dupliqué)"
+        )
