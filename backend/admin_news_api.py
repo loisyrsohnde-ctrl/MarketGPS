@@ -1048,46 +1048,63 @@ Réponds UNIQUEMENT en JSON valide :
         existing_url=None
     )
 
-    # Generate slug and insert
-    slug = publisher._generate_slug(rewritten.get("title_fr", "article"))
+    # Generate slug with timestamp to avoid duplicates for admin-generated articles
+    import time
+    base_slug = publisher._generate_slug(rewritten.get("title_fr", "article"))
+    slug = f"{base_slug}-{int(time.time())}"
 
-    article = {
-        "slug": slug,
-        "title": rewritten.get("title_fr", topic),
-        "excerpt": rewritten.get("excerpt_fr", ""),
-        "content_md": rewritten.get("content_md", ""),
-        "tldr_json": json.dumps(rewritten.get("tldr")) if rewritten.get("tldr") else None,
-        "tags_json": json.dumps(tags) if tags else None,
-        "country": country,
-        "language": "fr",
-        "image_url": image_url,
-        "source_name": "MarketGPS Rédaction",
-        "source_url": None,
-        "canonical_url": None,
-        "published_at": datetime.utcnow().isoformat(),
-        "status": "published",
-        "category": category,
-        "sentiment": rewritten.get("sentiment", "neutral"),
-        "is_ai_processed": 1,
-        "engagement_score": 0.95,
-        "is_breaking_news": 0,
-        "importance_level": "high",
-    }
+    title_fr = rewritten.get("title_fr", topic)
+    now = datetime.utcnow().isoformat()
 
-    article_id = db.insert_news_article(article)
+    # Direct SQL insert — bypass dedup check for admin-generated articles
+    try:
+        conn = db._get_conn()
+        cursor = conn.execute("""
+            INSERT INTO news_articles (
+                slug, title, excerpt, content_md, tldr_json,
+                tags_json, country, language, image_url, source_name,
+                source_url, canonical_url, published_at, status,
+                category, sentiment, is_ai_processed,
+                engagement_score, is_breaking_news, importance_level
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            slug,
+            title_fr,
+            rewritten.get("excerpt_fr", ""),
+            rewritten.get("content_md", ""),
+            json.dumps(rewritten.get("tldr")) if rewritten.get("tldr") else None,
+            json.dumps(tags) if tags else None,
+            country,
+            "fr",
+            image_url,
+            "MarketGPS Rédaction",
+            None,  # source_url
+            None,  # canonical_url
+            now,
+            "published",
+            category,
+            rewritten.get("sentiment", "neutral"),
+            1,   # is_ai_processed
+            0.95,  # engagement_score
+            0,   # is_breaking_news
+            "high",  # importance_level
+        ))
+        conn.commit()
+        article_id = cursor.lastrowid
+        conn.close()
 
-    if article_id:
-        logger.info(f"✅ Article generated from topic: {rewritten.get('title_fr', '')[:60]}...")
+        logger.info(f"Article generated from topic: {title_fr[:60]}...")
         return GenerateFromURLResponse(
             success=True,
             article_id=article_id,
-            title=rewritten.get("title_fr", topic),
+            title=title_fr,
             message="Article généré depuis le sujet et publié avec succès"
         )
-    else:
+    except Exception as e:
+        logger.error(f"Failed to insert topic article: {e}")
         return GenerateFromURLResponse(
             success=False,
-            message="Erreur lors de l'insertion (article peut-être dupliqué)"
+            message=f"Erreur lors de l'insertion : {str(e)[:200]}"
         )
 
 
@@ -1159,45 +1176,61 @@ def _generate_from_url_sync(url: str) -> GenerateFromURLResponse:
         existing_url=None
     )
 
-    # 7. Generate slug
-    slug = publisher._generate_slug(rewritten.get("title_fr", "article"))
+    # 7. Generate slug with timestamp to avoid duplicates
+    import time
+    base_slug = publisher._generate_slug(rewritten.get("title_fr", "article"))
+    slug = f"{base_slug}-{int(time.time())}"
 
-    # 8. Build article and insert
-    article = {
-        "slug": slug,
-        "title": rewritten.get("title_fr", raw_title),
-        "excerpt": rewritten.get("excerpt_fr", ""),
-        "content_md": rewritten.get("content_md", full_text[:2000]),
-        "tldr_json": json.dumps(rewritten.get("tldr")) if rewritten.get("tldr") else None,
-        "tags_json": json.dumps(tags) if tags else None,
-        "country": country,
-        "language": "fr",
-        "image_url": image_url,
-        "source_name": "MarketGPS Rédaction",
-        "source_url": url,
-        "canonical_url": url,
-        "published_at": datetime.utcnow().isoformat(),
-        "status": "published",
-        "category": category,
-        "sentiment": rewritten.get("sentiment", "neutral"),
-        "is_ai_processed": 1,
-        "engagement_score": 0.95,
-        "is_breaking_news": 0,
-        "importance_level": "high",
-    }
+    title_fr = rewritten.get("title_fr", raw_title)
+    now = datetime.utcnow().isoformat()
 
-    article_id = db.insert_news_article(article)
+    # 8. Direct SQL insert — bypass dedup for admin-generated articles
+    try:
+        conn = db._get_conn()
+        cursor = conn.execute("""
+            INSERT INTO news_articles (
+                slug, title, excerpt, content_md, tldr_json,
+                tags_json, country, language, image_url, source_name,
+                source_url, canonical_url, published_at, status,
+                category, sentiment, is_ai_processed,
+                engagement_score, is_breaking_news, importance_level
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            slug,
+            title_fr,
+            rewritten.get("excerpt_fr", ""),
+            rewritten.get("content_md", full_text[:2000]),
+            json.dumps(rewritten.get("tldr")) if rewritten.get("tldr") else None,
+            json.dumps(tags) if tags else None,
+            country,
+            "fr",
+            image_url,
+            "MarketGPS Rédaction",
+            url,
+            url,
+            now,
+            "published",
+            category,
+            rewritten.get("sentiment", "neutral"),
+            1,
+            0.95,
+            0,
+            "high",
+        ))
+        conn.commit()
+        article_id = cursor.lastrowid
+        conn.close()
 
-    if article_id:
-        logger.info(f"Article generated from URL: {rewritten.get('title_fr', '')[:60]}...")
+        logger.info(f"Article generated from URL: {title_fr[:60]}...")
         return GenerateFromURLResponse(
             success=True,
             article_id=article_id,
-            title=rewritten.get("title_fr", raw_title),
+            title=title_fr,
             message="Article généré et publié avec succès"
         )
-    else:
+    except Exception as e:
+        logger.error(f"Failed to insert URL article: {e}")
         return GenerateFromURLResponse(
             success=False,
-            message="Erreur lors de l'insertion (article peut-être dupliqué)"
+            message=f"Erreur lors de l'insertion : {str(e)[:200]}"
         )
