@@ -19,6 +19,12 @@ from urllib.parse import urlparse
 
 import requests
 
+try:
+    from bs4 import BeautifulSoup
+    BS4_AVAILABLE = True
+except ImportError:
+    BS4_AVAILABLE = False
+
 from core.config import get_logger
 from storage.sqlite_store import SQLiteStore
 from pipeline.news.image_fetcher import fetch_article_image
@@ -202,59 +208,108 @@ class NewsPublisher:
         
         return list(tags)[:8]  # Limit to 8 tags
     
-    def _rewrite_with_llm(self, raw_payload: Dict, source_language: str) -> Optional[Dict]:
+    def _fetch_full_article(self, url: str) -> Optional[str]:
+        """Fetch full article text from source URL for richer LLM context."""
+        if not url or not BS4_AVAILABLE:
+            return None
+        try:
+            resp = requests.get(
+                url,
+                headers={"User-Agent": "MarketGPS/1.0 (+https://marketgps.online)"},
+                timeout=12,
+                allow_redirects=True,
+            )
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            # Remove non-content elements
+            for tag in soup.find_all(["script", "style", "nav", "header", "footer", "aside", "iframe", "noscript"]):
+                tag.decompose()
+
+            # Try common article containers
+            article = (
+                soup.find("article")
+                or soup.find("div", class_=re.compile(r"article|post|entry|content|story", re.I))
+                or soup.find("main")
+            )
+            target = article if article else soup.body
+            if not target:
+                return None
+
+            text = target.get_text(separator="\n", strip=True)
+            # Clean up excessive whitespace
+            text = re.sub(r'\n{3,}', '\n\n', text)
+            return text[:8000] if text else None
+        except Exception as e:
+            logger.debug(f"Could not fetch full article from {url}: {e}")
+            return None
+
+    def _rewrite_with_llm(self, raw_payload: Dict, source_language: str, full_article_text: Optional[str] = None) -> Optional[Dict]:
         """Use LLM to translate and rewrite content to French with premium editorial style."""
         if not self.llm_provider:
             return None
-        
+
         title = raw_payload.get("title", "")
         content = raw_payload.get("content") or raw_payload.get("summary", "")
-        
-        prompt = f"""Rôle : Tu es un Rédacteur en Chef pour "MarketGPS Afrique", un média économique de référence (type Jeune Afrique / Les Échos).
+
+        # Use full article text when available for much richer context
+        if full_article_text and len(full_article_text) > len(content):
+            content = full_article_text
+
+        prompt = f"""Rôle : Tu es un Rédacteur en Chef senior pour "MarketGPS", un média économique et financier de référence couvrant l'Afrique et les marchés internationaux (type Jeune Afrique / Les Échos / Financial Times).
+
+LANGUE OBLIGATOIRE : FRANÇAIS. Tout l'article DOIT être rédigé intégralement en français, quelle que soit la langue source ({source_language}). Aucun mot anglais sauf les noms propres (entreprises, personnes, technologies).
 
 TÂCHE 1 : FILTRAGE STRICT
-Le sujet de l'article est-il CLAIREMENT lié à l'un de ces thèmes ?
-- Économie / Finance / Bourse
-- Tech / Startups / Innovation / Fintech
-- Entreprises / Business / Entrepreneuriat
-- Régulation économique
+Le sujet est-il CLAIREMENT lié à l'un de ces thèmes ?
+- Économie / Finance / Bourse / Marchés
+- Tech / Startups / Innovation / Fintech / IA
+- Entreprises / Business / Entrepreneuriat / Levées de fonds
+- Régulation économique / Politique monétaire
+- Énergie / Matières premières / Agriculture (angle économique)
+- Immobilier / Infrastructures (angle business)
 
 SI NON (ex: Sport pur, Faits divers, Politique sans angle éco, People, Religion) :
 Réponds UNIQUEMENT : {{"skip": true}}
 
-SI OUI :
-Réécris l'article en suivant ces règles IMPÉRATIVES :
+SI OUI — Rédige un article COMPLET et APPROFONDI en suivant ces instructions :
 
-1. STYLE :
-- Journalistique, fluide, professionnel.
-- PAS DE STRUCTURE SCOLAIRE : Interdiction formelle d'écrire "Introduction", "Conclusion", "Développement".
-- Commence directement par l'information clé (Lead).
-- Ton factuel et analytique.
+1. STYLE ÉDITORIAL :
+- Journalistique premium, fluide, professionnel — niveau Jeune Afrique / Les Échos.
+- INTERDIT : "Introduction", "Conclusion", "Développement", "En résumé", "Pour conclure".
+- Commence par un LEAD percutant (l'information clé en 1-2 phrases).
+- Ton factuel, analytique et engageant.
 
-2. CONTENU (400-600 mots) :
-- Synthétise les faits, les chiffres et les enjeux.
-- Explique l'impact pour le marché ou l'écosystème africain.
-- Utilise le **gras** pour les noms d'entreprises et chiffres clés.
+2. CONTENU APPROFONDI (800-1200 mots) :
+- Ne te contente PAS de reformuler l'article source. ENRICHIS-le considérablement :
+  a) Contextualise : Explique le contexte historique et sectoriel. Pourquoi cette info est importante maintenant ?
+  b) Chiffres & données : Intègre tous les chiffres disponibles. Mets en perspective avec des comparaisons (YoY, par rapport aux concurrents, benchmarks sectoriels).
+  c) Acteurs clés : Identifie et présente les entreprises, dirigeants, investisseurs impliqués.
+  d) Impact marché : Analyse l'impact sur le marché africain, les investisseurs, l'écosystème concerné.
+  e) Perspectives : Quelles sont les implications futures ? Quels scénarios possibles ?
+  f) Enjeux régionaux : Si pertinent, comment cela affecte la zone UEMOA, CEMAC, EAC, ou l'Afrique du Sud.
+- Utilise le **gras** pour les noms d'entreprises, montants financiers et chiffres clés.
+- Structure avec des sous-titres en ## markdown (2-3 sous-titres max, pas de numérotation).
+- Paragraphes aérés de 3-5 phrases max.
 
 3. IMAGE SEARCH (IMPORTANT) :
-- Génère une requête de recherche d'image précise en ANGLAIS pour illustrer cet article spécifiquement.
-- Ex: Pour un article sur Dangote -> "Aliko Dangote cement factory nigeria"
-- Ex: Pour une levée de fonds -> "Flutterwave office lagos tech"
+- Génère une requête de recherche d'image précise en ANGLAIS pour illustrer cet article.
+- Exemples : "Aliko Dangote cement factory nigeria", "Flutterwave office lagos fintech"
 
-Article original ({source_language}):
-Titre: {title}
-Contenu: {content[:4000]}
+Article source ({source_language}) :
+Titre : {title}
+Contenu : {content[:7000]}
 
-Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown ```json ... ```) :
+Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown) :
 {{
   "skip": false,
-  "title_fr": "Titre percutant ici",
-  "excerpt_fr": "Résumé ici",
-  "content_md": "Contenu ici",
-  "category": "Tech",
-  "sentiment": "neutral",
-  "image_search_query": "requête image",
-  "tldr": ["point 1", "point 2"]
+  "title_fr": "Titre accrocheur en français (max 100 caractères)",
+  "excerpt_fr": "Résumé de 2-3 phrases en français captant l'essentiel de l'article",
+  "content_md": "Article complet en markdown (800-1200 mots, EN FRANÇAIS UNIQUEMENT)",
+  "category": "Finance|Tech|Business|Startup|Régulation|Énergie|Marchés",
+  "sentiment": "positive|neutral|negative",
+  "image_search_query": "requête image en anglais",
+  "tldr": ["Point clé 1 en français", "Point clé 2 en français", "Point clé 3 en français"]
 }}
 """
         
@@ -263,7 +318,7 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
                 response = self.openai_client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt}],
-                    max_tokens=4000,
+                    max_tokens=6000,
                     temperature=0.7
                 )
                 text = response.choices[0].message.content
@@ -340,8 +395,14 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown 
                 if raw_payload.get(key):
                     raw_payload[key] = html_lib.unescape(raw_payload[key])
 
+            # Fetch full article content from source URL for richer context
+            article_url = raw_item.get("url", "")
+            full_article_text = self._fetch_full_article(article_url) if article_url else None
+            if full_article_text:
+                logger.info(f"📄 Fetched full article ({len(full_article_text)} chars) from {article_url[:60]}...")
+
             # Try LLM rewrite first, fallback to basic processing
-            rewritten = self._rewrite_with_llm(raw_payload, source_language)
+            rewritten = self._rewrite_with_llm(raw_payload, source_language, full_article_text=full_article_text)
             is_ai_processed = rewritten is not None
             
             if rewritten:
