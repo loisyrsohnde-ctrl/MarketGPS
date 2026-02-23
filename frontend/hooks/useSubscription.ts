@@ -18,6 +18,7 @@ export interface SubscriptionState {
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   gracePeriodRemainingHours: number | null;
+  hasAcademy: boolean;  // True if user purchased QuantAI Academy
 }
 
 export function useSubscription() {
@@ -31,6 +32,7 @@ export function useSubscription() {
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
     gracePeriodRemainingHours: null,
+    hasAcademy: false,
   });
 
   const fetchSubscription = useCallback(async () => {
@@ -66,6 +68,7 @@ export function useSubscription() {
         currentPeriodEnd: data.current_period_end || null,
         cancelAtPeriodEnd: data.cancel_at_period_end || false,
         gracePeriodRemainingHours: data.grace_period_remaining_hours || null,
+        hasAcademy: data.has_academy || false,
       });
     } catch (error) {
       console.error('Error fetching subscription:', error);

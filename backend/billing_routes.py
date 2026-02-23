@@ -38,6 +38,8 @@ try:
         send_subscription_confirmed_email,
         send_subscription_canceled_email,
         send_payment_failed_email,
+        send_academy_discount_email,
+        send_academy_purchased_email,
     )
     EMAIL_SERVICE_AVAILABLE = True
 except ImportError:
@@ -63,6 +65,10 @@ STRIPE_PRICE_ID_ANNUAL = (
     os.environ.get("STRIPE_PRICE_YEARLY_ID") or
     ""
 )
+
+# Academy / QuantAI Trading formation
+STRIPE_PRICE_ID_ACADEMY = os.environ.get("STRIPE_PRICE_ID_ACADEMY", "")
+STRIPE_COUPON_ID_ACADEMY_ANNUAL = os.environ.get("STRIPE_COUPON_ID_ACADEMY_ANNUAL", "")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ROUTER
@@ -90,6 +96,7 @@ class SubscriptionResponse(BaseModel):
     cancel_at_period_end: bool = False
     is_active: bool = False  # True if user should have access
     grace_period_remaining_hours: Optional[int] = None
+    has_academy: bool = False  # True if user purchased QuantAI Academy
 
 
 class PortalResponse(BaseModel):
@@ -114,7 +121,17 @@ def _ensure_subscription_tables(store: SQLiteStore):
         tables = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('subscriptions', 'stripe_events')"
         ).fetchall()
-        
+
+        # Ensure academy_access column exists (additive migration for existing deployments)
+        if len(tables) >= 2:
+            try:
+                cols = [c[1] for c in conn.execute("PRAGMA table_info(subscriptions)").fetchall()]
+                if "academy_access" not in cols:
+                    conn.execute("ALTER TABLE subscriptions ADD COLUMN academy_access INTEGER DEFAULT 0")
+                    logger.info("Added academy_access column to subscriptions table")
+            except Exception as e:
+                logger.debug(f"academy_access column check: {e}")
+
         if len(tables) < 2:
             # Run migration
             migration_path = os.path.join(
@@ -139,6 +156,7 @@ def _ensure_subscription_tables(store: SQLiteStore):
                         cancel_at_period_end INTEGER DEFAULT 0,
                         canceled_at TEXT,
                         grace_period_end TEXT,
+                        academy_access INTEGER DEFAULT 0,
                         created_at TEXT DEFAULT (datetime('now')),
                         updated_at TEXT DEFAULT (datetime('now'))
                     );
@@ -510,6 +528,87 @@ async def create_checkout_session(
         raise HTTPException(status_code=500, detail=f"Stripe error: {str(e)}")
 
 
+@router.post("/academy/checkout-session", response_model=CheckoutResponse)
+async def create_academy_checkout_session(
+    user_id: str = Depends(get_current_user_id),
+):
+    """
+    Create Stripe Checkout Session for QuantAI Academy formation.
+
+    Price: 499 EUR (full price) or 199 EUR (annual subscribers get automatic discount).
+    """
+    stripe = get_stripe()
+    db = get_db()
+
+    if not STRIPE_PRICE_ID_ACADEMY:
+        raise HTTPException(status_code=500, detail="Academy price not configured")
+
+    try:
+        # Get or create Stripe customer
+        subscription = get_subscription(user_id, db)
+        stripe_customer_id = subscription.get("stripe_customer_id") if subscription else None
+
+        if not stripe_customer_id:
+            # Get user email from Supabase
+            try:
+                from supabase_admin import SupabaseAdmin
+                admin = SupabaseAdmin()
+                user_data = admin.get_user_profile(user_id)
+                email = user_data.get("email") if user_data else None
+            except Exception as e:
+                logger.warning(f"Failed to retrieve email: {e}")
+                email = None
+
+            customer = stripe.Customer.create(
+                email=email,
+                metadata={"supabase_user_id": user_id}
+            )
+            stripe_customer_id = customer.id
+            upsert_subscription(user_id, {"stripe_customer_id": stripe_customer_id}, db)
+
+        # Check if user has an active annual subscription → apply discount
+        discounts = []
+        is_annual_subscriber = False
+        if subscription:
+            plan = subscription.get("plan", "free")
+            status = subscription.get("status", "inactive")
+            if plan in ("annual", "yearly", "YEARLY") and status in ("active", "trialing"):
+                is_annual_subscriber = True
+                if STRIPE_COUPON_ID_ACADEMY_ANNUAL:
+                    discounts = [{"coupon": STRIPE_COUPON_ID_ACADEMY_ANNUAL}]
+
+        session_params = {
+            "customer": stripe_customer_id,
+            "mode": "payment",
+            "payment_method_types": ["card"],
+            "line_items": [{"price": STRIPE_PRICE_ID_ACADEMY, "quantity": 1}],
+            "success_url": f"{FRONTEND_URL}/academy?purchased=1",
+            "cancel_url": f"{FRONTEND_URL}/academy?canceled=1",
+            "client_reference_id": user_id,
+            "allow_promotion_codes": True,
+            "metadata": {
+                "user_id": user_id,
+                "product": "academy",
+                "is_annual_subscriber": str(is_annual_subscriber),
+            },
+        }
+
+        if discounts:
+            session_params["discounts"] = discounts
+
+        session = stripe.checkout.Session.create(**session_params)
+
+        logger.info(
+            f"Created Academy checkout session {session.id} for user {user_id}, "
+            f"annual_discount={'yes' if is_annual_subscriber else 'no'}"
+        )
+        return CheckoutResponse(url=session.url)
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error in academy checkout: {e}")
+        raise HTTPException(status_code=500, detail=f"Stripe error: {str(e)}")
+
+
 @router.get("/me", response_model=SubscriptionResponse)
 async def get_my_subscription(
     user_id: str = Depends(get_current_user_id),
@@ -531,6 +630,7 @@ async def get_my_subscription(
             plan="free",
             status="inactive",
             is_active=False,
+            has_academy=False,
         )
 
     # If source is user_entitlements (legacy), return directly
@@ -540,6 +640,7 @@ async def get_my_subscription(
             plan=subscription.get("plan", "free"),
             status=subscription.get("status", "active"),
             is_active=subscription.get("is_active", True),
+            has_academy=bool(subscription.get("academy_access", 0)),
         )
 
     # Calculate grace period remaining (Stripe subscriptions)
@@ -561,6 +662,7 @@ async def get_my_subscription(
         cancel_at_period_end=bool(subscription.get("cancel_at_period_end", 0)),
         is_active=is_subscription_active(subscription),
         grace_period_remaining_hours=grace_remaining,
+        has_academy=bool(subscription.get("academy_access", 0)),
     )
 
 
@@ -691,12 +793,48 @@ async def handle_checkout_completed(data: dict, db: SQLiteStore):
     user_id = data.get("client_reference_id") or data.get("metadata", {}).get("user_id")
     customer_id = data.get("customer")
     subscription_id = data.get("subscription")
-    plan = data.get("metadata", {}).get("plan", "monthly")
+    metadata = data.get("metadata", {})
+    product = metadata.get("product", "")
+    plan = metadata.get("plan", "monthly")
 
     if not user_id:
         logger.error(f"Checkout completed but no user_id found: {data}")
         return
 
+    # ── Academy purchase (one-time) ──────────────────────────────────────
+    if product == "academy":
+        upsert_subscription(user_id, {
+            "stripe_customer_id": customer_id,
+            "academy_access": 1,
+        }, db)
+
+        # Get user email for notification
+        user_email = _get_user_email(user_id)
+
+        if user_email:
+            try:
+                queue_systemeio_sync(user_id, user_email, "tag_add", "academy_purchased", db)
+            except Exception as e:
+                logger.warning(f"Failed to queue Systeme.io sync: {e}")
+
+        if EMAIL_SERVICE_AVAILABLE and user_email:
+            try:
+                amount_total = data.get("amount_total", 0)
+                currency = data.get("currency", "eur")
+                send_academy_purchased_email(
+                    user_email=user_email,
+                    amount_cents=amount_total,
+                    currency=currency,
+                    is_annual_discount=metadata.get("is_annual_subscriber") == "True",
+                )
+                logger.info(f"Sent academy purchased email to {user_email}")
+            except Exception as e:
+                logger.warning(f"Failed to send academy email: {e}")
+
+        logger.info(f"Academy purchased: user={user_id}")
+        return
+
+    # ── Subscription purchase ────────────────────────────────────────────
     upsert_subscription(user_id, {
         "stripe_customer_id": customer_id,
         "stripe_subscription_id": subscription_id,
@@ -705,15 +843,7 @@ async def handle_checkout_completed(data: dict, db: SQLiteStore):
     }, db)
 
     # Get user email for notifications
-    user_email = None
-    try:
-        from supabase_admin import SupabaseAdmin
-        admin = SupabaseAdmin()
-        user_data = admin.get_user_profile(user_id)
-        if user_data:
-            user_email = user_data.get("email")
-    except Exception as e:
-        logger.warning(f"Failed to get user profile: {e}")
+    user_email = _get_user_email(user_id)
 
     # Queue Systeme.io sync
     if user_email:
@@ -726,11 +856,9 @@ async def handle_checkout_completed(data: dict, db: SQLiteStore):
     # Send welcome email
     if EMAIL_SERVICE_AVAILABLE and user_email:
         try:
-            # Get amount from session
-            amount_total = data.get("amount_total", 0)  # in cents
+            amount_total = data.get("amount_total", 0)
             currency = data.get("currency", "eur")
 
-            # Try to get subscription period end if available
             period_end = None
             if subscription_id:
                 try:
@@ -750,6 +878,14 @@ async def handle_checkout_completed(data: dict, db: SQLiteStore):
             logger.info(f"Sent subscription confirmed email to {user_email}")
         except Exception as e:
             logger.warning(f"Failed to send subscription email: {e}")
+
+    # If annual plan → send Academy discount email
+    if plan in ("annual", "yearly") and EMAIL_SERVICE_AVAILABLE and user_email:
+        try:
+            send_academy_discount_email(user_email=user_email)
+            logger.info(f"Sent Academy discount email to annual subscriber {user_email}")
+        except Exception as e:
+            logger.warning(f"Failed to send academy discount email: {e}")
 
     logger.info(f"Checkout completed: user={user_id}, plan={plan}")
 
@@ -987,6 +1123,18 @@ async def handle_dispute_created(data: dict, db: SQLiteStore):
 # ═══════════════════════════════════════════════════════════════════════════════
 # HELPER FUNCTIONS
 # ═══════════════════════════════════════════════════════════════════════════════
+
+def _get_user_email(user_id: str) -> Optional[str]:
+    """Get user email from Supabase."""
+    try:
+        from supabase_admin import SupabaseAdmin
+        admin = SupabaseAdmin()
+        user_data = admin.get_user_profile(user_id)
+        return user_data.get("email") if user_data else None
+    except Exception as e:
+        logger.warning(f"Failed to get user profile for {user_id}: {e}")
+        return None
+
 
 def _find_user_by_customer(customer_id: str, db: SQLiteStore) -> Optional[str]:
     """Find user_id by Stripe customer ID."""

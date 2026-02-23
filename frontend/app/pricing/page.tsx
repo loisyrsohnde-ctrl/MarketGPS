@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   ArrowLeft,
   Sparkles,
+  GraduationCap,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -63,11 +64,11 @@ const plans = [
     badge: 'Économisez 58%',
     features: [
       'Tout le plan Pro',
-      'Économisez 70€/an',
-      'Accès anticipé nouvelles features',
-      'Support dédié',
-      'Webinaires exclusifs',
-      'API access (bientôt)',
+      '\u00c9conomisez 70\u20ac/an',
+      'QuantAI Academy \u00e0 199\u20ac au lieu de 499\u20ac',
+      'Acc\u00e8s anticip\u00e9 nouvelles features',
+      'Support d\u00e9di\u00e9',
+      'API access (bient\u00f4t)',
     ],
     cta: 'Meilleure offre',
     ctaHref: '/signup?plan=yearly',
@@ -244,6 +245,66 @@ export default function PricingPage() {
               </tbody>
             </table>
           </GlassCard>
+        </div>
+      </section>
+
+      {/* Academy Section */}
+      <section className="pb-20 px-6">
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <GlassCard className="border-purple-500/30 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-72 h-72 bg-purple-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="relative flex flex-col md:flex-row items-start gap-8 p-4">
+                <div className="flex-1 space-y-4">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 text-sm font-medium">
+                    <GraduationCap className="w-4 h-4" />
+                    Formation
+                  </div>
+                  <h2 className="text-2xl md:text-3xl font-bold text-text-primary">
+                    QuantAI Academy
+                  </h2>
+                  <p className="text-text-secondary leading-relaxed">
+                    Formation compl&egrave;te en Trading Algorithmique et Intelligence Artificielle.
+                    10 modules progressifs, du Python au Deep Learning appliqu&eacute; &agrave; la finance.
+                  </p>
+                  <ul className="space-y-2">
+                    {[
+                      'Trading quantitatif et algorithmique',
+                      'Python, Machine Learning, NLP',
+                      '10 modules avec exercices pratiques',
+                      'Acc\u00e8s \u00e0 vie et mises \u00e0 jour incluses',
+                    ].map((feature, i) => (
+                      <li key={i} className="flex items-center gap-2 text-sm text-text-secondary">
+                        <CheckCircle2 className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="flex-shrink-0 text-center space-y-4 md:pt-8">
+                  <div>
+                    <p className="text-4xl font-bold text-purple-400">499&nbsp;&euro;</p>
+                    <p className="text-sm text-text-muted mt-1">Paiement unique</p>
+                  </div>
+                  <div className="px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                    <p className="text-xs text-emerald-400 font-medium">
+                      <Crown className="w-3.5 h-3.5 inline mr-1" />
+                      199&nbsp;&euro; pour les abonn&eacute;s annuels
+                    </p>
+                  </div>
+                  <Link href="/academy">
+                    <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white">
+                      D&eacute;couvrir la formation
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </GlassCard>
+          </motion.div>
         </div>
       </section>
 

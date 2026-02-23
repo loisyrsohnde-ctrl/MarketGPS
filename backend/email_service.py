@@ -529,3 +529,256 @@ def send_payment_failed_email(
         text=template["text"],
         tags=[{"name": "type", "value": "payment_failed"}],
     )
+
+
+def send_academy_discount_email(user_email: str) -> bool:
+    """
+    Send Academy discount email to annual subscribers.
+    Informs them they can get QuantAI Academy for 199 EUR instead of 499 EUR.
+    """
+    subject = "Votre avantage exclusif : QuantAI Academy à 199 €"
+
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0a0a0a; color: #e5e5e5;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #141414; border-radius: 16px; overflow: hidden;">
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); padding: 40px; text-align: center;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">
+                                QuantAI Academy
+                            </h1>
+                            <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">
+                                Offre exclusive abonné annuel
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 40px;">
+                            <h2 style="margin: 0 0 20px; color: #ffffff; font-size: 24px; font-weight: 600;">
+                                Votre réduction exclusive : -60%
+                            </h2>
+
+                            <p style="margin: 0 0 20px; color: #a3a3a3; font-size: 16px; line-height: 1.6;">
+                                En tant qu'abonné Pro Annuel, vous bénéficiez d'un accès privilégié à la formation
+                                <strong style="color: #ffffff;">QuantAI Academy</strong> à un tarif exclusif.
+                            </p>
+
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1f1f1f; border-radius: 12px; margin: 20px 0;">
+                                <tr>
+                                    <td style="padding: 24px; text-align: center;">
+                                        <p style="margin: 0 0 8px; color: #a3a3a3; font-size: 14px; text-decoration: line-through;">
+                                            Prix public : 499 EUR
+                                        </p>
+                                        <p style="margin: 0; color: #8b5cf6; font-size: 36px; font-weight: 700;">
+                                            199 EUR
+                                        </p>
+                                        <p style="margin: 8px 0 0; color: #10b981; font-size: 14px; font-weight: 600;">
+                                            Vous économisez 300 EUR
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin: 20px 0 10px; color: #ffffff; font-size: 16px; font-weight: 600;">
+                                Ce que vous apprendrez :
+                            </p>
+                            <ul style="margin: 0; padding: 0 0 0 20px; color: #a3a3a3; font-size: 14px; line-height: 2;">
+                                <li>Trading quantitatif et algorithmique</li>
+                                <li>Intelligence Artificielle appliquée à la finance</li>
+                                <li>Python pour le trading</li>
+                                <li>Machine Learning et réseaux de neurones</li>
+                                <li>NLP pour l'analyse de sentiment</li>
+                                <li>10 modules complets avec exercices pratiques</li>
+                            </ul>
+
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{FRONTEND_URL}/academy" style="display: inline-block; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600;">
+                                            Accéder à la formation — 199 EUR
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin: 20px 0 0; color: #737373; font-size: 13px; line-height: 1.6;">
+                                Cette réduction est automatiquement appliquée lors du paiement grâce à votre abonnement annuel.
+                                Paiement unique, accès à vie.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 30px; background-color: #0f0f0f; text-align: center; border-top: 1px solid #262626;">
+                            <p style="margin: 0; color: #525252; font-size: 12px;">
+                                Des questions ? <a href="mailto:support@marketgps.online" style="color: #8b5cf6;">support@marketgps.online</a>
+                            </p>
+                            <p style="margin: 10px 0 0; color: #404040; font-size: 11px;">
+                                MarketGPS - Votre GPS des marchés financiers
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
+
+    text = f"""
+Votre avantage exclusif : QuantAI Academy à 199 EUR
+
+En tant qu'abonné Pro Annuel, vous bénéficiez d'un tarif exclusif sur la formation QuantAI Academy.
+
+Prix public : 499 EUR
+Votre prix : 199 EUR (vous économisez 300 EUR)
+
+Ce que vous apprendrez :
+- Trading quantitatif et algorithmique
+- Intelligence Artificielle appliquée à la finance
+- Python pour le trading
+- Machine Learning et réseaux de neurones
+- NLP pour l'analyse de sentiment
+- 10 modules complets avec exercices pratiques
+
+Accéder à la formation : {FRONTEND_URL}/academy
+
+La réduction est automatiquement appliquée lors du paiement.
+Paiement unique, accès à vie.
+
+---
+MarketGPS - Support: support@marketgps.online
+"""
+
+    return send_email(
+        to=user_email,
+        subject=subject,
+        html=html,
+        text=text,
+        tags=[{"name": "type", "value": "academy_discount"}],
+    )
+
+
+def send_academy_purchased_email(
+    user_email: str,
+    amount_cents: int = 0,
+    currency: str = "eur",
+    is_annual_discount: bool = False,
+) -> bool:
+    """
+    Send Academy purchase confirmation email.
+    """
+    amount = f"{amount_cents / 100:.2f}".replace(".", ",") + " " + currency.upper()
+    subject = "Bienvenue dans QuantAI Academy !"
+
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0a0a0a; color: #e5e5e5;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #141414; border-radius: 16px; overflow: hidden;">
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); padding: 40px; text-align: center;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">
+                                QuantAI Academy
+                            </h1>
+                            <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">
+                                Votre formation est prête
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 40px;">
+                            <h2 style="margin: 0 0 20px; color: #ffffff; font-size: 24px; font-weight: 600;">
+                                Bienvenue dans QuantAI Academy !
+                            </h2>
+
+                            <p style="margin: 0 0 20px; color: #a3a3a3; font-size: 16px; line-height: 1.6;">
+                                Votre achat a bien été enregistré. Vous avez désormais un accès complet et à vie
+                                à tous les modules de la formation.
+                            </p>
+
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1f1f1f; border-radius: 12px; margin: 20px 0;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <table width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td style="color: #a3a3a3; font-size: 14px;">Formation</td>
+                                                <td style="color: #ffffff; font-size: 14px; text-align: right; font-weight: 600;">QuantAI Academy</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding-top: 10px; color: #a3a3a3; font-size: 14px;">Montant</td>
+                                                <td style="padding-top: 10px; color: #8b5cf6; font-size: 14px; text-align: right; font-weight: 600;">{amount}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding-top: 10px; color: #a3a3a3; font-size: 14px;">Accès</td>
+                                                <td style="padding-top: 10px; color: #10b981; font-size: 14px; text-align: right; font-weight: 600;">À vie</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{FRONTEND_URL}/academy" style="display: inline-block; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600;">
+                                            Commencer la formation
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 30px; background-color: #0f0f0f; text-align: center; border-top: 1px solid #262626;">
+                            <p style="margin: 0; color: #525252; font-size: 12px;">
+                                Support : <a href="mailto:support@marketgps.online" style="color: #8b5cf6;">support@marketgps.online</a>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
+
+    text = f"""
+Bienvenue dans QuantAI Academy !
+
+Votre achat a bien été enregistré. Vous avez désormais un accès complet et à vie
+à tous les modules de la formation.
+
+Formation : QuantAI Academy
+Montant : {amount}
+Accès : À vie
+
+Commencer la formation : {FRONTEND_URL}/academy
+
+---
+MarketGPS - Support: support@marketgps.online
+"""
+
+    return send_email(
+        to=user_email,
+        subject=subject,
+        html=html,
+        text=text,
+        tags=[{"name": "type", "value": "academy_purchased"}],
+    )
