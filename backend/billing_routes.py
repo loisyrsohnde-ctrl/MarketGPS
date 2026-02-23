@@ -1175,6 +1175,7 @@ async def admin_list_academy_users(
 
     with db._get_connection() as conn:
         # Users with active subscriptions OR manually granted academy access
+        select_cols = ["user_id", "plan", "status", "academy_access", "updated_at"]
         rows = conn.execute("""
             SELECT user_id, plan, status, academy_access, updated_at
             FROM subscriptions
@@ -1182,11 +1183,9 @@ async def admin_list_academy_users(
             ORDER BY updated_at DESC
         """).fetchall()
 
-        cols = [c[1] for c in conn.execute("PRAGMA table_info(subscriptions)").fetchall()]
-
     users = []
     for row in rows:
-        user_dict = dict(zip(cols, row))
+        user_dict = dict(zip(select_cols, row))
         users.append({
             "user_id": user_dict.get("user_id"),
             "plan": user_dict.get("plan", "free"),
