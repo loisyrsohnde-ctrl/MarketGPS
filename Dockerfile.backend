@@ -13,9 +13,10 @@ ENV PYTHONPATH=/app:/app/backend
 
 WORKDIR /app
 
-# Install runtime dependencies and create non-root user
+# Install runtime dependencies, gosu (for entrypoint), and create non-root user
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    gosu \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system appuser && useradd --system --gid appuser appuser
 
@@ -63,12 +64,16 @@ COPY data/universe/ data/universe/
 # Scripts (expand_universe.py, etc.)
 COPY scripts/ scripts/
 
+# Entrypoint script (fixes bind-mount permissions, then drops to appuser)
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Create data/logs directories and set ownership
-RUN mkdir -p /app/data /app/logs /app/data/parquet && \
+RUN mkdir -p /app/data /app/logs /app/data/parquet /app/data/sqlite && \
     chown -R appuser:appuser /app
 
-# Switch to non-root user
-USER appuser
+# NOTE: Do NOT set USER here — entrypoint.sh runs as root to fix
+# bind-mount permissions, then drops to appuser via gosu
 
 # IMPORTANT: on se place dans backend
 WORKDIR /app/backend
@@ -78,6 +83,9 @@ EXPOSE 8000
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=90s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
+
+# Entrypoint fixes permissions then drops to appuser
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Production: 2 workers (adjust based on VPS CPU cores)
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
