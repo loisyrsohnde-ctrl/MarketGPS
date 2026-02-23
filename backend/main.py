@@ -55,6 +55,7 @@ from portfolio_routes import router as portfolio_router
 from gamification_routes import router as gamification_router
 from viral_news_routes import router as viral_news_router
 from admin_news_api import router as admin_news_router
+from academy_routes import router as academy_router
 # Optional admin add-on services (safe import - won't crash server if missing deps)
 admin_search_router = None
 admin_settings_router = None
@@ -489,6 +490,7 @@ app.include_router(notifications_router)  # Notifications & Alerts (ADD-ON)
 app.include_router(portfolio_router)  # Portfolio Sync (ADD-ON) - Read-only, no trading
 app.include_router(viral_news_router)  # Viral news & video scripts (ADD-ON)
 app.include_router(admin_news_router)  # Unified admin news API (ADD-ON)
+app.include_router(academy_router)  # Academy video streaming + admin (ADD-ON)
 # Admin add-on services (conditionally loaded)
 if admin_search_router:
     app.include_router(admin_search_router)

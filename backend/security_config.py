@@ -51,6 +51,7 @@ ALLOWED_REQUEST_HEADERS: List[str] = [
     "X-CSRF-Token",
     "X-Admin-Key",
     "Stripe-Signature",
+    "Range",  # For video streaming range requests
 ]
 
 # Headers to expose to clients
@@ -58,6 +59,8 @@ EXPOSED_HEADERS: List[str] = [
     "Content-Range",
     "X-Content-Range",
     "X-Total-Count",
+    "Accept-Ranges",  # For video streaming
+    "Content-Length",  # For video streaming
 ]
 
 # Preflight cache duration in seconds

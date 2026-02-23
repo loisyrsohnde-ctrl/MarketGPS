@@ -72,7 +72,7 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://api.marketgps.online https://api.afristocks.eu https://checkout.stripe.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://api.marketgps.online https://api.afristocks.eu https://checkout.stripe.com; media-src 'self' https://api.marketgps.online https://api.afristocks.eu blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
           },
         ],
       },

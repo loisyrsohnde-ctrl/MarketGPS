@@ -30,6 +30,7 @@ services:
       - ./data/parquet:/app/data/parquet:ro  # Read-only mount for parquet
       - ./data/sqlite:/app/data/sqlite  # SQLite database directory
       - ./data/logos:/app/data/logos:ro  # Logo images
+      - ./data/academy-videos:/app/data/academy-videos:ro  # Academy course videos
       # Logs
       - backend_logs:/app/logs
     env_file:
