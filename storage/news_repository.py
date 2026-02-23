@@ -109,10 +109,9 @@ class NewsRepository(BaseRepository):
                     published_at DESC
             """
         elif prioritize_francophone and not country and not region:
-            # Priorité : CI & CM d'abord (Tier 1), puis autres francophones
-            # uniquement si leur engagement dépasse le seuil, puis le reste.
-            # La priorisation ne s'applique qu'aux articles < 48h pour
-            # garantir que les articles récents remontent toujours.
+            # Priorité : CI & CM d'abord (Tier 1), puis TOUS les francophones
+            # (Tier 2), puis le reste. Les francophones passent TOUJOURS avant
+            # les anglophones, quel que soit leur engagement_score.
             tier1 = ','.join([f"'{c}'" for c in self.TIER1_PRIORITY_COUNTRIES])
             tier2 = ','.join([f"'{c}'" for c in self.TIER2_FRANCOPHONE_COUNTRIES])
             order_clause = f"""
@@ -123,8 +122,7 @@ class NewsRepository(BaseRepository):
                     DATE(published_at) DESC,
                     CASE
                         WHEN country IN ({tier1}) THEN 0
-                        WHEN country IN ({tier2}) AND engagement_score >= 60 THEN 1
-                        WHEN country IN ({tier2}) THEN 3
+                        WHEN country IN ({tier2}) THEN 1
                         ELSE 2
                     END,
                     engagement_score DESC,
@@ -353,14 +351,18 @@ class NewsRepository(BaseRepository):
             return None
 
     def get_unprocessed_raw_items(self, limit: int = 50) -> List[Dict]:
-        """Get raw items that haven't been processed yet."""
+        """Get raw items that haven't been processed yet.
+        Priority: French sources first, then francophone countries, then rest."""
         sql = """
             SELECT r.*, s.name as source_name, s.country as source_country,
-                   s.language as source_language
+                   s.language as source_language, s.trust_score as source_trust_score
             FROM news_raw_items r
             JOIN news_sources s ON r.source_id = s.id
             WHERE r.processed = 0 AND r.process_error IS NULL
-            ORDER BY r.fetched_at DESC
+            ORDER BY
+                CASE WHEN s.language = 'fr' THEN 0 ELSE 1 END,
+                CASE WHEN s.country IN ('CI','CM','SN','BJ','BF','TG','GA','ML','NE','GN','TD') THEN 0 ELSE 1 END,
+                r.fetched_at DESC
             LIMIT ?
         """
 

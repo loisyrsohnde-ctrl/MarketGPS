@@ -228,6 +228,12 @@ def fetch_article_image(
     category: Optional[str] = None,
     country: Optional[str] = None,
     keywords: Optional[str] = None,
-    existing_url: Optional[str] = None
+    existing_url: Optional[str] = None,
+    source_url: Optional[str] = None
 ) -> str:
-    return ImageFetcher().fetch_image_url(title, category, keywords=keywords, existing_url=existing_url)
+    return ImageFetcher().fetch_image_url(
+        title, category,
+        source_url=source_url,
+        keywords=keywords,
+        existing_url=existing_url
+    )

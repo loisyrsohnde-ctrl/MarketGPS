@@ -37,6 +37,27 @@ logger = get_logger(__name__)
 BACKEND_API_URL = os.getenv("BACKEND_API_URL", "").rstrip("/")
 INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 
+# ─── English article pre-filter: only process EN articles if they meet these criteria ───
+# Francophone sub-Saharan countries (articles ABOUT these countries always pass)
+FRANCOPHONE_COUNTRIES = {"CI", "CM", "SN", "BJ", "BF", "TG", "GA", "ML", "NE", "GN", "TD", "CG", "CD"}
+
+# Breaking / urgent keywords in English titles
+BREAKING_KEYWORDS_EN = {
+    "breaking", "urgent", "exclusive", "just in", "flash", "alert",
+    "breaking news", "developing", "confirmed"
+}
+
+# High-impact keywords that justify LLM token spend
+IMPACT_KEYWORDS_EN = {
+    "billion", "acquisition", "ipo", "merger", "crisis", "scandal", "record",
+    "first ever", "unprecedented", "collapsed", "shutdown", "default", "bailout",
+    "sanctions", "embargo", "crash", "surge", "plunge", "bankrupt", "fraud",
+    "central bank", "interest rate", "gdp", "inflation"
+}
+
+# Minimum trust score for English sources to be considered
+EN_MIN_TRUST_SCORE = float(os.getenv("EN_ARTICLE_MIN_TRUST", "0.85"))
+
 # Try to import LLM libraries
 try:
     import google.generativeai as genai
@@ -379,16 +400,61 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown)
             "tldr": None
         }
     
+    def _should_process_english(self, raw_item: Dict) -> bool:
+        """
+        Decide if an English article is worth spending LLM tokens on.
+        Returns True if the article should be processed (translated).
+
+        Criteria for accepting an English article:
+        1. Source country is francophone (e.g. "Business in Cameroon" in English)
+        2. Title contains breaking/urgent keywords
+        3. Title contains high-impact keywords (billion, acquisition, crisis...)
+        4. Source trust score >= threshold (high-quality source)
+        """
+        title = raw_item.get("title", "").lower()
+        source_country = (raw_item.get("source_country") or "").upper()
+        trust_score = float(raw_item.get("source_trust_score", 0) or 0)
+
+        # 1. Article about a francophone country → always process
+        if source_country in FRANCOPHONE_COUNTRIES:
+            logger.debug(f"EN article accepted (francophone country {source_country}): {title[:50]}")
+            return True
+
+        # 2. Breaking/urgent keywords in title
+        if any(kw in title for kw in BREAKING_KEYWORDS_EN):
+            logger.debug(f"EN article accepted (breaking keyword): {title[:50]}")
+            return True
+
+        # 3. High-impact keywords in title
+        if any(kw in title for kw in IMPACT_KEYWORDS_EN):
+            logger.debug(f"EN article accepted (impact keyword): {title[:50]}")
+            return True
+
+        # 4. High-trust source (Tier 1 quality)
+        if trust_score >= EN_MIN_TRUST_SCORE:
+            logger.debug(f"EN article accepted (trust={trust_score:.2f}): {title[:50]}")
+            return True
+
+        # None of the criteria met → skip this English article
+        return False
+
     def process_raw_item(self, raw_item: Dict) -> Optional[int]:
         """
         Process a single raw item and publish as article.
-        
+
         Returns:
             Article ID if successful, None otherwise
         """
         try:
             raw_payload = json.loads(raw_item.get("raw_payload", "{}"))
             source_language = raw_item.get("source_language", "en")
+
+            # ─── Pre-filter: skip low-priority English articles to save LLM tokens ───
+            if source_language != "fr" and not self._should_process_english(raw_item):
+                title_preview = raw_payload.get("title", raw_item.get("title", ""))[:60]
+                logger.info(f"⏭️  Skipped (low_priority_{source_language}): {title_preview}")
+                self.store.mark_raw_item_processed(raw_item["id"], error="low_priority_english")
+                return None
 
             # Decode HTML entities in raw payload before processing
             for key in ("title", "summary", "content"):
@@ -401,15 +467,22 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown)
             if full_article_text:
                 logger.info(f"📄 Fetched full article ({len(full_article_text)} chars) from {article_url[:60]}...")
 
-            # Try LLM rewrite first, fallback to basic processing
+            # Try LLM rewrite first, fallback only for French sources
             rewritten = self._rewrite_with_llm(raw_payload, source_language, full_article_text=full_article_text)
             is_ai_processed = rewritten is not None
-            
+
             if rewritten:
                 logger.info(f"✓ AI processed: {rewritten.get('title_fr', '')[:50]}...")
             else:
-                logger.warning(f"✗ AI failed, using fallback for: {raw_payload.get('title', '')[:50]}...")
-                rewritten = self._fallback_process(raw_payload)
+                if source_language == "fr":
+                    # French source: fallback is OK (content already in French)
+                    logger.warning(f"✗ AI failed, using FR fallback for: {raw_payload.get('title', '')[:50]}...")
+                    rewritten = self._fallback_process(raw_payload)
+                else:
+                    # Non-French source: DO NOT publish untranslated content
+                    # Don't mark as processed → will be retried next cycle when LLM may be available
+                    logger.warning(f"✗ AI unavailable for {source_language} article, deferring: {raw_payload.get('title', '')[:50]}...")
+                    return None
             
             # Skip based on AI decision (off-topic)
             if rewritten.get("skip") is True:
@@ -435,7 +508,8 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown)
                 category=category,
                 country=country,
                 keywords=search_query,
-                existing_url=existing_image
+                existing_url=existing_image,
+                source_url=raw_item.get("url", "")
             )
             
             # Generate slug

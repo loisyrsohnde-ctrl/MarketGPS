@@ -4,11 +4,11 @@ Editorial Scorer — Intelligence-driven article clustering and scoring.
 Ce module:
 1. Groupe les articles par sujet via chevauchement de mots-clés
 2. Calcule un score éditorial composé de:
-   - 40% Source Diversity (nombre de sources par topic)
+   - 30% Source Diversity (nombre de sources par topic)
    - 25% Verified Engagement (interactions validées)
    - 15% Topic Importance (keywords et entities)
    - 10% Freshness (age de l'article)
-   - 10% Geographic Relevance (pertinence géographique)
+   - 20% Geographic Relevance (pertinence géographique, priorité francophone)
 3. Marque les articles avec score éditorial et cluster ID
 4. Retourne les top articles triés par score éditorial
 
@@ -36,11 +36,12 @@ logger = logging.getLogger(__name__)
 ENABLE_EDITORIAL_SCORER = os.environ.get("ENABLE_EDITORIAL_SCORER", "true").lower() == "true"
 
 # Weights (must sum to 1.0)
-W_SOURCE_DIVERSITY = float(os.environ.get("ED_W_SOURCE_DIVERSITY", "0.40"))
+# Rebalanced: geo_relevance 10%→20% to prioritize francophone content
+W_SOURCE_DIVERSITY = float(os.environ.get("ED_W_SOURCE_DIVERSITY", "0.30"))
 W_VERIFIED_ENGAGEMENT = float(os.environ.get("ED_W_VERIFIED_ENGAGEMENT", "0.25"))
 W_TOPIC_IMPORTANCE = float(os.environ.get("ED_W_TOPIC_IMPORTANCE", "0.15"))
 W_FRESHNESS = float(os.environ.get("ED_W_FRESHNESS", "0.10"))
-W_GEO_RELEVANCE = float(os.environ.get("ED_W_GEO_RELEVANCE", "0.10"))
+W_GEO_RELEVANCE = float(os.environ.get("ED_W_GEO_RELEVANCE", "0.20"))
 
 # Top-K config
 TOP_K_EDITORIAL = int(os.environ.get("ED_TOP_K", "30"))
