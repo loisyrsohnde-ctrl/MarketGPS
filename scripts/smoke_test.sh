@@ -158,6 +158,70 @@ news_response=$(curl -sf --max-time $TIMEOUT "$API_URL/api/news" 2>/dev/null) &&
 echo ""
 
 # ========================================
+# Security Tests
+# ========================================
+echo "🔒 SECURITY TESTS"
+echo "────────────────────────────────────"
+
+# Security headers
+headers=$(curl -sI --max-time $TIMEOUT "$API_URL/health" 2>/dev/null)
+
+echo "$headers" | grep -qi "x-content-type-options: nosniff" && {
+    pass "X-Content-Type-Options header present"
+} || {
+    fail "X-Content-Type-Options header missing"
+}
+
+echo "$headers" | grep -qi "x-frame-options" && {
+    pass "X-Frame-Options header present"
+} || {
+    fail "X-Frame-Options header missing"
+}
+
+echo "$headers" | grep -qi "strict-transport-security" && {
+    pass "HSTS header present"
+} || {
+    warn "HSTS header missing (may be handled by reverse proxy)"
+}
+
+echo "$headers" | grep -qi "content-security-policy" && {
+    pass "CSP header present"
+} || {
+    fail "CSP header missing"
+}
+
+echo "$headers" | grep -qi "referrer-policy" && {
+    pass "Referrer-Policy header present"
+} || {
+    warn "Referrer-Policy header missing"
+}
+
+# CORS: verify evil origin is rejected
+cors_response=$(curl -sI --max-time $TIMEOUT \
+    -H "Origin: http://evil.com" \
+    "$API_URL/health" 2>/dev/null)
+
+echo "$cors_response" | grep -qi "access-control-allow-origin: http://evil.com" && {
+    fail "CORS allows evil.com origin!"
+} || {
+    pass "CORS rejects unauthorized origin"
+}
+
+# Admin endpoint without key should return 403
+admin_status=$(curl -sf -o /dev/null -w "%{http_code}" --max-time $TIMEOUT \
+    "$API_URL/admin/auth/check" 2>/dev/null) || admin_status="000"
+
+if [ "$admin_status" = "403" ]; then
+    pass "Admin endpoint requires authentication (HTTP 403)"
+elif [ "$admin_status" = "422" ]; then
+    pass "Admin endpoint validates input (HTTP 422)"
+else
+    warn "Admin endpoint returned unexpected status: $admin_status"
+fi
+
+echo ""
+
+# ========================================
 # Summary
 # ========================================
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

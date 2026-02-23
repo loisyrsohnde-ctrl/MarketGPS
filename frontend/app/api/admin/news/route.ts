@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Use the API URL environment variable or fall back to localhost
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-const ADMIN_KEY = process.env.ADMIN_API_KEY || process.env.NEXT_PUBLIC_ADMIN_KEY || 'marketgps-admin-2024';
+const ADMIN_KEY = process.env.ADMIN_API_KEY || process.env.NEXT_PUBLIC_ADMIN_KEY || '';
 
 export async function GET(request: NextRequest) {
   try {

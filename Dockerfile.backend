@@ -13,10 +13,11 @@ ENV PYTHONPATH=/app:/app/backend
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install runtime dependencies and create non-root user
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system appuser && useradd --system --gid appuser appuser
 
 # Copy requirements
 COPY backend/requirements.txt backend/requirements.txt
@@ -62,8 +63,12 @@ COPY data/universe/ data/universe/
 # Scripts (expand_universe.py, etc.)
 COPY scripts/ scripts/
 
-# Create data/logs directories
-RUN mkdir -p /app/data /app/logs /app/data/parquet
+# Create data/logs directories and set ownership
+RUN mkdir -p /app/data /app/logs /app/data/parquet && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
 
 # IMPORTANT: on se place dans backend
 WORKDIR /app/backend
@@ -71,8 +76,8 @@ WORKDIR /app/backend
 EXPOSE 8000
 
 # Health check
-# HEALTHCHECK --interval=30s --timeout=30s --start-period=90s --retries=3 \
-#    CMD curl -f http://localhost:8000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=30s --start-period=90s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
-# 1 worker pour debug (évite les problèmes multiprocess)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Production: 2 workers (adjust based on VPS CPU cores)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

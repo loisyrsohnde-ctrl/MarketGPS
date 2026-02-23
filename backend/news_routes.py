@@ -581,7 +581,7 @@ async def check_article_saved(
 # Internal Pipeline Ingest Endpoint
 # ═══════════════════════════════════════════════════════════════════════════════
 
-INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "mgps-internal-pipeline-2026")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 
 
 class ArticleIngest(BaseModel):

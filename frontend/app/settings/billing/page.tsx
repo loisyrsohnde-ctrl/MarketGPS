@@ -119,7 +119,13 @@ function BillingContent() {
       const data = await response.json();
 
       if (data.url) {
-        window.location.href = data.url;
+        const { validateExternalUrl } = await import('@/lib/safe-redirect');
+        const safeUrl = validateExternalUrl(data.url);
+        if (safeUrl) {
+          window.location.href = safeUrl;
+        } else {
+          throw new Error('URL de paiement invalide');
+        }
       }
     } catch (error) {
       console.error('Checkout error:', error);
@@ -149,7 +155,13 @@ function BillingContent() {
       const data = await response.json();
 
       if (data.url) {
-        window.location.href = data.url;
+        const { validateExternalUrl } = await import('@/lib/safe-redirect');
+        const safeUrl = validateExternalUrl(data.url);
+        if (safeUrl) {
+          window.location.href = safeUrl;
+        } else {
+          throw new Error('URL du portail invalide');
+        }
       }
     } catch (error) {
       console.error('Portal error:', error);

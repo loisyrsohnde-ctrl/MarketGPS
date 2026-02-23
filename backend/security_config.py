@@ -10,15 +10,17 @@ from typing import List
 # CORS Configuration
 # ============================================================================
 
-DEFAULT_ALLOWED_ORIGINS: List[str] = [
-    # Production domains - MarketGPS
+# Production origins only - dev origins added dynamically via get_allowed_origins()
+PRODUCTION_ORIGINS: List[str] = [
     "https://marketgps.online",
     "https://app.marketgps.online",
     "https://api.marketgps.online",
-    # Legacy domains - Afristocks
     "https://afristocks.eu",
     "https://app.afristocks.eu",
-    # Local development
+]
+
+# Development origins - only included when ENV != production
+_DEV_ORIGINS: List[str] = [
     "http://localhost:8501",
     "http://127.0.0.1:8501",
     "http://localhost:3000",
@@ -26,6 +28,8 @@ DEFAULT_ALLOWED_ORIGINS: List[str] = [
     "http://localhost:3001",
     "http://127.0.0.1:3001",
 ]
+
+DEFAULT_ALLOWED_ORIGINS: List[str] = PRODUCTION_ORIGINS.copy()
 
 # Allowed HTTP methods
 ALLOWED_METHODS: List[str] = [
@@ -89,9 +93,9 @@ HSTS_HEADER: str = "max-age=31536000; includeSubDomains"
 # frame-ancestors 'none': Prevent embedding in frames
 CSP_HEADER: str = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+    "script-src 'self' 'unsafe-inline'; "
     "style-src 'self' 'unsafe-inline'; "
-    "img-src 'self' data: https:; "
+    "img-src 'self' data: https: blob:; "
     "font-src 'self' data:; "
     "connect-src 'self' https:; "
     "frame-ancestors 'none'; "
@@ -117,10 +121,18 @@ PERMISSIONS_POLICY: str = (
 )
 
 
+def _is_production() -> bool:
+    """Check if running in production."""
+    env = os.environ.get("ENV", "").lower()
+    app_env = os.environ.get("APP_ENV", "").lower()
+    return env in ("prod", "production") or app_env in ("prod", "production")
+
+
 def get_allowed_origins() -> List[str]:
     """
     Get list of allowed CORS origins.
-    Combines default origins with any specified in CORS_ORIGINS environment variable.
+    In production: only production origins + CORS_ORIGINS env var.
+    In development: also includes localhost origins.
 
     Environment Variable:
         CORS_ORIGINS: Comma-separated list of additional allowed origins
@@ -129,7 +141,11 @@ def get_allowed_origins() -> List[str]:
     Returns:
         List of allowed origin URLs
     """
-    origins = DEFAULT_ALLOWED_ORIGINS.copy()
+    origins = PRODUCTION_ORIGINS.copy()
+
+    # Include dev origins only in non-production environments
+    if not _is_production():
+        origins.extend(_DEV_ORIGINS)
 
     # Add extra origins from environment variable (comma-separated)
     env_origins = os.environ.get("CORS_ORIGINS", "")

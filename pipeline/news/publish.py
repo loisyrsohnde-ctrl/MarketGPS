@@ -35,7 +35,7 @@ logger = get_logger(__name__)
 
 # Backend API configuration for remote publishing
 BACKEND_API_URL = os.getenv("BACKEND_API_URL", "").rstrip("/")
-INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "mgps-internal-pipeline-2026")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 
 # Try to import LLM libraries
 try:

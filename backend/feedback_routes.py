@@ -413,8 +413,8 @@ async def list_feedbacks(
     """
     List all feedbacks (admin only).
     """
-    expected_key = os.environ.get("ADMIN_KEY", "marketgps-admin-2024")
-    if admin_key != expected_key:
+    from admin_auth import verify_admin as _verify_admin
+    if not _verify_admin(admin_key):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     try:
@@ -481,8 +481,8 @@ async def test_feedback_email(
     Test endpoint to send a test feedback email.
     Requires admin key for security.
     """
-    expected_key = os.environ.get("ADMIN_KEY", "marketgps-admin-2024")
-    if admin_key != expected_key:
+    from admin_auth import verify_admin as _verify_admin
+    if not _verify_admin(admin_key):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     template = get_feedback_email_template(

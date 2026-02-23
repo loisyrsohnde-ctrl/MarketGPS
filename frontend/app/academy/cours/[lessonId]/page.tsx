@@ -159,7 +159,14 @@ export default function LessonPage() {
               >
                 <div
                   dangerouslySetInnerHTML={{
-                    __html: lesson.content_html,
+                    __html: (() => {
+                      // Sanitize HTML to prevent XSS attacks
+                      if (typeof window !== 'undefined') {
+                        const DOMPurify = require('isomorphic-dompurify');
+                        return DOMPurify.sanitize(lesson.content_html);
+                      }
+                      return lesson.content_html;
+                    })(),
                   }}
                 />
               </div>

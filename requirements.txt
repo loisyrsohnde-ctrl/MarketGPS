@@ -1,44 +1,45 @@
 # MarketGPS v13.0 - Supabase Auth + Stripe Billing
-# Python 3.10+
+# Python 3.11
+# All dependencies pinned for reproducible builds
 
 # Web Framework
-streamlit>=1.32.0
+streamlit==1.52.2
 
 # Data Processing
-pandas>=2.0.0
-numpy>=1.24.0
-scipy>=1.10.0
-pyarrow>=14.0.0
+pandas==2.3.3
+numpy==2.4.1
+scipy==1.17.0
+pyarrow==22.0.0
 
 # Data Providers
-yfinance>=0.2.36
+yfinance==1.0
 
 # HTTP Client
-requests>=2.31.0
-httpx>=0.25.0
+requests==2.32.5
+httpx==0.28.1
 
 # Visualization
-plotly>=5.18.0
+plotly==6.5.1
 
 # Database
 # sqlite3 is built-in
 
 # Authentication (Supabase)
-supabase>=2.0.0
-gotrue>=2.0.0
+supabase==2.27.1
+gotrue==2.12.4
 
 # Configuration
-python-dotenv>=1.0.0
+python-dotenv==1.2.1
 
 # Scheduling (optional)
-apscheduler>=3.10.0
+apscheduler==3.11.2
 
 # Utilities
-tenacity>=8.2.0
+tenacity==9.1.2
 
 # News Pipeline
-feedparser>=6.0.0
-google-generativeai>=0.3.0
-openai>=1.0.0
-duckduckgo-search>=6.0.0
-beautifulsoup4>=4.12.0
+feedparser==6.0.12
+google-generativeai==0.8.6
+openai==2.21.0
+duckduckgo-search==8.1.1
+beautifulsoup4==4.14.3

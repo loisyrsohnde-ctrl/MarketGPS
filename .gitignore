@@ -1,6 +1,9 @@
 venv/
 .venv/
 __pycache__/
+
+# Claude Code
+.claude/
 *.py[cod]
 backend/logs/
 logs/

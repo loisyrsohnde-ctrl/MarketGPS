@@ -26,6 +26,10 @@ from dotenv import load_dotenv
 _env_file = Path(__file__).parent / ".env"
 load_dotenv(_env_file)
 
+# Validate environment variables early (before any service initialization)
+from env_validator import validate_env
+validate_env()
+
 from fastapi import FastAPI, Request, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -360,9 +364,47 @@ async def run_startup_seed():
 # Create FastAPI app
 app = FastAPI(
     title="MarketGPS API",
-    description="Institutional-grade financial intelligence platform API",
+    description=(
+        "Institutional-grade financial intelligence platform.\n\n"
+        "MarketGPS provides quantitative scoring, portfolio analytics, "
+        "strategy building, and market news — all behind a secure, "
+        "rate-limited API with Supabase JWT authentication.\n\n"
+        "## Authentication\n"
+        "Most endpoints require a **Bearer** token obtained from Supabase Auth. "
+        "Pass it via the `Authorization: Bearer <token>` header.\n\n"
+        "## Rate Limits\n"
+        "Free tier: **10 requests/day** | Pro tier: **200 requests/day**\n\n"
+        "## Base URL\n"
+        "`https://api.marketgps.online`"
+    ),
     version="15.0.0",
     lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_tags=[
+        {"name": "Health", "description": "Server health and readiness checks"},
+        {"name": "Assets", "description": "Asset search, scores, explorer, and market data"},
+        {"name": "Strategies", "description": "Investment strategy templates and compositions"},
+        {"name": "Barbell Strategy", "description": "Barbell portfolio construction (core + satellite)"},
+        {"name": "Portfolio", "description": "Portfolio accounts, positions, and CSV import"},
+        {"name": "News", "description": "Market news articles and sentiment"},
+        {"name": "Billing", "description": "Stripe checkout, portal, and subscription management"},
+        {"name": "Users", "description": "User profile and preferences"},
+        {"name": "Notifications", "description": "User alerts and notification preferences"},
+        {"name": "Gamification", "description": "Points, badges, streaks, and leaderboards"},
+        {"name": "AI Concierge", "description": "AI-powered investment assistant"},
+        {"name": "Backtest", "description": "Historical strategy backtesting"},
+        {"name": "Feedback", "description": "User feedback and feature requests"},
+        {"name": "Admin Dashboard", "description": "Admin-only endpoints (requires X-Admin-Key)"},
+        {"name": "Admin News", "description": "Admin news pipeline management"},
+    ],
+    contact={
+        "name": "MarketGPS Team",
+        "url": "https://marketgps.online",
+    },
+    license_info={
+        "name": "Proprietary",
+    },
 )
 
 # Import security configuration
@@ -460,18 +502,8 @@ if admin_workflow_router:
 # Request/Response Models
 # ============================================================================
 
-class CheckoutRequest(BaseModel):
-    plan: str  # 'monthly' or 'yearly'
-    success_url: Optional[str] = None
-    cancel_url: Optional[str] = None
-
-
-class CheckoutResponse(BaseModel):
-    checkout_url: str
-
-
-class PortalResponse(BaseModel):
-    portal_url: str
+# Import shared schemas (billing models used by checkout/portal endpoints below)
+from schemas.billing import CheckoutRequest, CheckoutResponse, PortalResponse
 
 
 class HealthResponse(BaseModel):
@@ -483,17 +515,17 @@ class HealthResponse(BaseModel):
 # Health Check
 # ============================================================================
 
-@app.get("/health", response_model=HealthResponse)
+@app.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint. Returns 200 if the server is running."""
     return {"status": "healthy", "version": "15.0.0"}
 
 
-@app.get("/health/extended")
+@app.get("/health/extended", tags=["Health"])
 async def health_check_extended():
     """
-    Extended health check with database connectivity and counts.
-    Useful for monitoring and debugging.
+    Extended health check with database connectivity and service status.
+    Returns asset/news counts and service availability flags.
     """
     from storage.sqlite_store import SQLiteStore
     
@@ -593,8 +625,8 @@ def get_current_user_id_safe(
     return user_id
 
 
-@app.post("/billing/checkout-session", response_model=CheckoutResponse)
-@app.post("/api/billing/checkout-session", response_model=CheckoutResponse)
+@app.post("/billing/checkout-session", response_model=CheckoutResponse, tags=["Billing"])
+@app.post("/api/billing/checkout-session", response_model=CheckoutResponse, tags=["Billing"])
 async def create_checkout_session(
     request: CheckoutRequest,
     user_id: str = Depends(get_current_user_id_safe),
@@ -668,8 +700,8 @@ async def create_checkout_session(
             status_code=500, detail="Failed to create checkout session")
 
 
-@app.post("/billing/portal-session", response_model=PortalResponse)
-@app.post("/api/billing/portal-session", response_model=PortalResponse)
+@app.post("/billing/portal-session", response_model=PortalResponse, tags=["Billing"])
+@app.post("/api/billing/portal-session", response_model=PortalResponse, tags=["Billing"])
 async def create_portal_session(
     user_id: str = Depends(get_current_user_id_safe),
 ):
@@ -715,8 +747,8 @@ async def create_portal_session(
 # Stripe Webhook (Public but signature-verified)
 # ============================================================================
 
-@app.post("/billing/webhook")
-@app.post("/api/billing/webhook")
+@app.post("/billing/webhook", tags=["Billing"])
+@app.post("/api/billing/webhook", tags=["Billing"])
 async def stripe_webhook(
     request: Request,
     stripe_signature: str = Header(None, alias="Stripe-Signature"),

@@ -136,21 +136,22 @@ export interface AccountCreateRequest {
 // API CLIENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const getAuthHeaders = (): HeadersInit => {
-  // Get auth token from localStorage (Supabase session)
+const getAuthHeaders = async (): Promise<HeadersInit> => {
+  // Get auth token from Supabase client (secure session management)
   if (typeof window !== 'undefined') {
     try {
-      const session = localStorage.getItem('supabase.auth.token');
-      if (session) {
-        const parsed = JSON.parse(session);
-        if (parsed?.currentSession?.access_token) {
-          return {
-            'Authorization': `Bearer ${parsed.currentSession.access_token}`,
-          };
-        }
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        return {
+          'Authorization': `Bearer ${session.access_token}`,
+        };
       }
     } catch {
-      // Ignore parsing errors
+      // Ignore session errors
     }
   }
   return {};

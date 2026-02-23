@@ -909,9 +909,9 @@ async def grant_pro_subscription(
     import os
     from datetime import datetime, timedelta
 
-    # Simple admin key protection
-    expected_key = os.environ.get("ADMIN_KEY", "marketgps-admin-2024")
-    if admin_key != expected_key:
+    # Admin key protection (centralized)
+    from admin_auth import verify_admin as _verify_admin
+    if not _verify_admin(admin_key):
         raise HTTPException(status_code=403, detail="Invalid admin key")
 
     try:

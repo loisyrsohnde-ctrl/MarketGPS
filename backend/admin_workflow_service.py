@@ -51,17 +51,7 @@ def get_publisher():
 # Admin Key Verification
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def verify_admin(admin_key: Optional[str]) -> bool:
-    """Verify admin access key."""
-    expected = os.environ.get("ADMIN_KEY", "marketgps-admin-2024")
-    return admin_key == expected
-
-
-def require_admin(admin_key: Optional[str] = Header(None, alias="X-Admin-Key")):
-    """Dependency to require admin access."""
-    if not verify_admin(admin_key):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return True
+from admin_auth import verify_admin, require_admin
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
