@@ -122,20 +122,10 @@ def _ensure_subscription_tables(store: SQLiteStore):
             "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('subscriptions', 'stripe_events')"
         ).fetchall()
 
-        # Ensure academy_access column exists (additive migration for existing deployments)
-        if len(tables) >= 2:
-            try:
-                cols = [c[1] for c in conn.execute("PRAGMA table_info(subscriptions)").fetchall()]
-                if "academy_access" not in cols:
-                    conn.execute("ALTER TABLE subscriptions ADD COLUMN academy_access INTEGER DEFAULT 0")
-                    logger.info("Added academy_access column to subscriptions table")
-            except Exception as e:
-                logger.debug(f"academy_access column check: {e}")
-
         if len(tables) < 2:
-            # Run migration
+            # Run migration to create tables
             migration_path = os.path.join(
-                os.path.dirname(__file__), 
+                os.path.dirname(__file__),
                 "..", "storage", "migrations", "add_subscription_tables.sql"
             )
             if os.path.exists(migration_path):
@@ -160,7 +150,7 @@ def _ensure_subscription_tables(store: SQLiteStore):
                         created_at TEXT DEFAULT (datetime('now')),
                         updated_at TEXT DEFAULT (datetime('now'))
                     );
-                    
+
                     CREATE TABLE IF NOT EXISTS stripe_events (
                         event_id TEXT PRIMARY KEY,
                         event_type TEXT NOT NULL,
@@ -168,7 +158,7 @@ def _ensure_subscription_tables(store: SQLiteStore):
                         payload_hash TEXT,
                         status TEXT DEFAULT 'processed'
                     );
-                    
+
                     CREATE TABLE IF NOT EXISTS systemeio_sync_queue (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         user_id TEXT NOT NULL,
@@ -184,6 +174,15 @@ def _ensure_subscription_tables(store: SQLiteStore):
                     );
                 """)
                 logger.info("✅ Subscription tables created (inline)")
+
+        # ALWAYS check for academy_access column (whether tables are new or existing)
+        try:
+            cols = [c[1] for c in conn.execute("PRAGMA table_info(subscriptions)").fetchall()]
+            if "academy_access" not in cols:
+                conn.execute("ALTER TABLE subscriptions ADD COLUMN academy_access INTEGER DEFAULT 0")
+                logger.info("Added academy_access column to subscriptions table")
+        except Exception as e:
+            logger.warning(f"academy_access column check/migration failed: {e}")
 
 
 def get_subscription(user_id: str, db: SQLiteStore) -> Optional[Dict[str, Any]]:

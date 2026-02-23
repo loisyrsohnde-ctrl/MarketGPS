@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     cancel_at_period_end INTEGER DEFAULT 0,      -- 1 if scheduled to cancel
     canceled_at TEXT,                            -- When cancellation was requested
     grace_period_end TEXT,                       -- past_due grace period end (48h after payment failure)
+    academy_access INTEGER DEFAULT 0,            -- 1 if user has QuantAI Academy access (purchased or admin-granted)
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
