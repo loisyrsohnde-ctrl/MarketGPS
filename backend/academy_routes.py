@@ -301,15 +301,18 @@ async def seed_lesson_contents(
         rel_path = video_path.relative_to(base)
         parts_list = list(rel_path.parts)
 
-        # Try to extract Part/Module/Lesson numbers from directory structure
+        # Try to extract Part/Module/Lesson numbers from directory structure ONLY
+        # (exclude the filename to avoid false matches like "PyTorch - Part 4" in video names)
         # Common patterns:
+        # "Part 01-Module 01-Lesson 01_Name/video.mp4"
         # "Part 1 - Name/Module 01 - Name/Lesson 01 - Name/video.mp4"
-        # "Part 01/Module 01_Name/Lesson 01_Name/01. Video Title.mp4"
         part_num = None
         module_num = None
         lesson_num = None
 
-        for part in parts_list:
+        # Only iterate directory segments, NOT the filename (last element)
+        dir_parts = parts_list[:-1] if len(parts_list) > 1 else parts_list
+        for part in dir_parts:
             part_match = re.search(r'Part\s*(\d+)', part, re.IGNORECASE)
             if part_match:
                 part_num = int(part_match.group(1))

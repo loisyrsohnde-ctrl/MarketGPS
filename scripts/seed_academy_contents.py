@@ -83,7 +83,10 @@ def scan_videos(videos_dir: Path):
         module_num = None
         lesson_num = None
 
-        for segment in parts_list:
+        # Only iterate directory segments, NOT the filename (last element)
+        # to avoid false matches like "PyTorch - Part 4" in video names
+        dir_segments = parts_list[:-1] if len(parts_list) > 1 else parts_list
+        for segment in dir_segments:
             pm = re.search(r'Part\s*(\d+)', segment, re.IGNORECASE)
             if pm:
                 part_num = int(pm.group(1))
