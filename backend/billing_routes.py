@@ -535,7 +535,10 @@ async def create_academy_checkout_session(
     """
     Create Stripe Checkout Session for QuantAI Academy formation.
 
-    Price: 499 EUR (full price) or 199 EUR (annual subscribers get automatic discount).
+    Pricing logic:
+    - Non-subscribers: 499 EUR (full price)
+    - Active subscribers (monthly or annual): 199 EUR (300 EUR discount via coupon)
+    - Users who already have academy_access: rejected (already purchased)
     """
     stripe = get_stripe()
     db = get_db()
@@ -544,20 +547,21 @@ async def create_academy_checkout_session(
         raise HTTPException(status_code=500, detail="Academy price not configured")
 
     try:
-        # Get or create Stripe customer
+        # Get subscription to check access
         subscription = get_subscription(user_id, db)
+
+        # If user already has academy access (purchased or admin-granted), reject
+        if subscription and subscription.get("academy_access", 0):
+            raise HTTPException(
+                status_code=400,
+                detail="Vous avez deja acces a la formation."
+            )
+
+        # Get or create Stripe customer
         stripe_customer_id = subscription.get("stripe_customer_id") if subscription else None
 
         if not stripe_customer_id:
-            # Get user email from Supabase
-            try:
-                from supabase_admin import SupabaseAdmin
-                admin = SupabaseAdmin()
-                user_data = admin.get_user_profile(user_id)
-                email = user_data.get("email") if user_data else None
-            except Exception as e:
-                logger.warning(f"Failed to retrieve email: {e}")
-                email = None
+            email = _get_user_email(user_id)
 
             customer = stripe.Customer.create(
                 email=email,
@@ -566,16 +570,13 @@ async def create_academy_checkout_session(
             stripe_customer_id = customer.id
             upsert_subscription(user_id, {"stripe_customer_id": stripe_customer_id}, db)
 
-        # Check if user has an active annual subscription → apply discount
+        # Check if user has an active subscription → apply 300 EUR discount (499→199)
         discounts = []
-        is_annual_subscriber = False
-        if subscription:
-            plan = subscription.get("plan", "free")
-            status = subscription.get("status", "inactive")
-            if plan in ("annual", "yearly", "YEARLY") and status in ("active", "trialing"):
-                is_annual_subscriber = True
-                if STRIPE_COUPON_ID_ACADEMY_ANNUAL:
-                    discounts = [{"coupon": STRIPE_COUPON_ID_ACADEMY_ANNUAL}]
+        is_subscriber = False
+        if subscription and is_subscription_active(subscription):
+            is_subscriber = True
+            if STRIPE_COUPON_ID_ACADEMY_ANNUAL:
+                discounts = [{"coupon": STRIPE_COUPON_ID_ACADEMY_ANNUAL}]
 
         session_params = {
             "customer": stripe_customer_id,
@@ -585,11 +586,11 @@ async def create_academy_checkout_session(
             "success_url": f"{FRONTEND_URL}/academy?purchased=1",
             "cancel_url": f"{FRONTEND_URL}/academy?canceled=1",
             "client_reference_id": user_id,
-            "allow_promotion_codes": True,
+            "allow_promotion_codes": not is_subscriber,  # No promo codes if already discounted
             "metadata": {
                 "user_id": user_id,
                 "product": "academy",
-                "is_annual_subscriber": str(is_annual_subscriber),
+                "is_subscriber": str(is_subscriber),
             },
         }
 
@@ -600,10 +601,12 @@ async def create_academy_checkout_session(
 
         logger.info(
             f"Created Academy checkout session {session.id} for user {user_id}, "
-            f"annual_discount={'yes' if is_annual_subscriber else 'no'}"
+            f"subscriber_discount={'yes' if is_subscriber else 'no'}"
         )
         return CheckoutResponse(url=session.url)
 
+    except HTTPException:
+        raise
     except stripe.error.StripeError as e:
         logger.error(f"Stripe error in academy checkout: {e}")
         raise HTTPException(status_code=500, detail=f"Stripe error: {str(e)}")
@@ -662,6 +665,7 @@ async def get_my_subscription(
         cancel_at_period_end=bool(subscription.get("cancel_at_period_end", 0)),
         is_active=is_subscription_active(subscription),
         grace_period_remaining_hours=grace_remaining,
+        # Academy access: only if manually granted or purchased standalone
         has_academy=bool(subscription.get("academy_access", 0)),
     )
 
@@ -1118,6 +1122,116 @@ async def handle_dispute_created(data: dict, db: SQLiteStore):
     }, db)
     
     logger.warning(f"⚠️ DISPUTE created, subscription canceled: user={user_id}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ADMIN ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class GrantAcademyRequest(BaseModel):
+    user_id: str
+    grant: bool = True  # True to grant, False to revoke
+
+
+@router.post("/admin/grant-academy")
+async def admin_grant_academy(
+    request: GrantAcademyRequest,
+    x_admin_key: Optional[str] = Header(None),
+):
+    """
+    Admin endpoint to manually grant or revoke Academy access for a user.
+
+    Requires X-Admin-Key header.
+    """
+    from admin_auth import verify_admin
+
+    if not verify_admin(x_admin_key):
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    db = get_db()
+
+    upsert_subscription(request.user_id, {
+        "academy_access": 1 if request.grant else 0,
+    }, db)
+
+    action = "granted" if request.grant else "revoked"
+    logger.info(f"Admin {action} Academy access for user {request.user_id}")
+
+    return {"status": "ok", "user_id": request.user_id, "academy_access": request.grant}
+
+
+@router.get("/admin/academy-users")
+async def admin_list_academy_users(
+    x_admin_key: Optional[str] = Header(None),
+):
+    """
+    Admin endpoint to list all users with Academy access (subscribed or manual).
+    """
+    from admin_auth import verify_admin
+
+    if not verify_admin(x_admin_key):
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    db = get_db()
+
+    with db._get_connection() as conn:
+        # Users with active subscriptions OR manually granted academy access
+        rows = conn.execute("""
+            SELECT user_id, plan, status, academy_access, updated_at
+            FROM subscriptions
+            WHERE status IN ('active', 'trialing') OR academy_access = 1
+            ORDER BY updated_at DESC
+        """).fetchall()
+
+        cols = [c[1] for c in conn.execute("PRAGMA table_info(subscriptions)").fetchall()]
+
+    users = []
+    for row in rows:
+        user_dict = dict(zip(cols, row))
+        users.append({
+            "user_id": user_dict.get("user_id"),
+            "plan": user_dict.get("plan", "free"),
+            "status": user_dict.get("status", "inactive"),
+            "academy_access_manual": bool(user_dict.get("academy_access", 0)),
+            "has_academy": user_dict.get("status") in ("active", "trialing") or bool(user_dict.get("academy_access", 0)),
+            "updated_at": user_dict.get("updated_at"),
+        })
+
+    return {"users": users, "total": len(users)}
+
+
+@router.post("/admin/batch-grant-academy")
+async def admin_batch_grant_academy(
+    x_admin_key: Optional[str] = Header(None),
+):
+    """
+    Admin endpoint to grant Academy access to ALL currently active subscribers.
+    Use this once to reward existing subscribers with free Academy access.
+    """
+    from admin_auth import verify_admin
+
+    if not verify_admin(x_admin_key):
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    db = get_db()
+
+    with db._get_connection() as conn:
+        # Grant academy_access to all active subscribers who don't already have it
+        result = conn.execute("""
+            UPDATE subscriptions
+            SET academy_access = 1, updated_at = datetime('now')
+            WHERE status IN ('active', 'trialing')
+              AND (academy_access IS NULL OR academy_access = 0)
+        """)
+        updated_count = result.rowcount
+
+    logger.info(f"Admin batch-granted Academy access to {updated_count} active subscribers")
+
+    return {
+        "status": "ok",
+        "granted_count": updated_count,
+        "message": f"Academy access granted to {updated_count} active subscribers",
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

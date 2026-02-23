@@ -33,7 +33,7 @@ const PART_TITLES_FR = [
 export default function AcademyPage() {
   const router = useRouter();
   const { isGuest, isFree, isSubscriber, isAuthenticated } = useAccessLevel();
-  const { plan, hasAcademy } = useSubscription();
+  const { plan, hasAcademy, isActive: isSubscriptionActive } = useSubscription();
   const { session } = useAuth();
   const [parts, setParts] = useState<AcademyPart[]>([]);
   const [userProgress, setUserProgress] = useState<AcademyUserProgress[]>([]);
@@ -85,6 +85,10 @@ export default function AcademyPage() {
       router.push('/login?redirect=/academy');
       return;
     }
+    // Subscribers already have access — no checkout needed
+    if (isSubscriptionActive) {
+      return;
+    }
     setCheckoutLoading(true);
     try {
       const response = await fetch(`${API_URL}/api/billing/academy/checkout-session`, {
@@ -110,9 +114,7 @@ export default function AcademyPage() {
     } finally {
       setCheckoutLoading(false);
     }
-  }, [session, router]);
-
-  const isAnnualSubscriber = plan === 'annual' || plan === ('yearly' as any);
+  }, [session, router, isSubscriptionActive]);
 
   const getPartProgress = (partIndex: number) => {
     const partLessons = userProgress.filter((p) => {
@@ -210,111 +212,7 @@ export default function AcademyPage() {
             </motion.div>
           )}
 
-          {/* Purchase CTA - Show if user hasn't purchased Academy */}
-          {!hasAcademy && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.25 }}
-              className="max-w-2xl"
-            >
-              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-500/10 via-purple-600/5 to-transparent border border-purple-500/30 p-8">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-
-                <div className="relative space-y-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                      <GraduationCap className="w-6 h-6 text-purple-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-text-primary mb-2">
-                        {isGuest
-                          ? 'Formation compl\u00e8te en Trading Algorithmique & IA'
-                          : 'Acc\u00e9dez \u00e0 la formation compl\u00e8te'
-                        }
-                      </h3>
-                      <p className="text-text-secondary text-sm leading-relaxed">
-                        10 modules progressifs couvrant Python, Machine Learning, NLP, et les strat&eacute;gies de trading quantitatives. Acc&egrave;s &agrave; vie, mises &agrave; jour incluses.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Pricing */}
-                  <div className="flex items-end gap-4">
-                    {isAnnualSubscriber ? (
-                      <>
-                        <div>
-                          <p className="text-sm text-text-muted line-through">499&nbsp;&euro;</p>
-                          <p className="text-4xl font-bold text-purple-400">199&nbsp;&euro;</p>
-                        </div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold">
-                            <Sparkles className="w-3.5 h-3.5" />
-                            -60% abonn&eacute; annuel
-                          </span>
-                          <span className="text-sm text-text-muted">Paiement unique</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-4xl font-bold text-purple-400">499&nbsp;&euro;</p>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm text-text-muted">Paiement unique &middot; Acc&egrave;s &agrave; vie</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Annual subscriber hint for non-annual users */}
-                  {isAuthenticated && !isAnnualSubscriber && (
-                    <p className="text-xs text-text-muted">
-                      <Crown className="w-3.5 h-3.5 inline mr-1 text-amber-400" />
-                      Les abonn&eacute;s Pro Annuel b&eacute;n&eacute;ficient d&apos;un tarif exclusif &agrave; <strong className="text-purple-400">199&nbsp;&euro;</strong> au lieu de 499&nbsp;&euro;.
-                      <Link href="/pricing" className="text-purple-400 ml-1 hover:underline">Voir les offres</Link>
-                    </p>
-                  )}
-
-                  {/* CTA Buttons */}
-                  <div className="flex gap-3">
-                    {isGuest ? (
-                      <>
-                        <Link href="/signup?redirect=/academy">
-                          <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white">
-                            <GraduationCap className="w-5 h-5 mr-2" />
-                            Cr&eacute;er un compte
-                          </Button>
-                        </Link>
-                        <Link href="/pricing">
-                          <Button variant="secondary" size="lg">Voir les offres</Button>
-                        </Link>
-                      </>
-                    ) : (
-                      <Button
-                        size="lg"
-                        className="bg-purple-600 hover:bg-purple-700 text-white"
-                        onClick={handleAcademyCheckout}
-                        disabled={checkoutLoading}
-                      >
-                        {checkoutLoading ? (
-                          <>
-                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                            Redirection...
-                          </>
-                        ) : (
-                          <>
-                            <GraduationCap className="w-5 h-5 mr-2" />
-                            Acheter la formation — {isAnnualSubscriber ? '199' : '499'}&nbsp;&euro;
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Academy owner badge */}
+          {/* Case 1: User already has Academy access (granted by admin or purchased) */}
           {hasAcademy && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -324,6 +222,178 @@ export default function AcademyPage() {
             >
               <CheckCircle2 className="w-5 h-5 text-purple-400" />
               <span className="text-sm font-medium text-purple-300">Acc&egrave;s complet &agrave; la formation</span>
+            </motion.div>
+          )}
+
+          {/* Case 2: Active subscriber WITHOUT academy → discounted price 199€ */}
+          {!hasAcademy && isSubscriptionActive && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.25 }}
+              className="max-w-2xl"
+            >
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-500/10 via-purple-600/5 to-transparent border border-purple-500/30 p-8">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+                <div className="relative space-y-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                      <GraduationCap className="w-6 h-6 text-purple-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-text-primary mb-2">
+                        Acc&eacute;dez &agrave; la formation compl&egrave;te
+                      </h3>
+                      <p className="text-text-secondary text-sm leading-relaxed">
+                        10 modules progressifs couvrant Python, Machine Learning, NLP, et les strat&eacute;gies de trading quantitatives. Acc&egrave;s &agrave; vie, mises &agrave; jour incluses.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-end gap-4">
+                    <div>
+                      <p className="text-sm text-text-muted line-through">499&nbsp;&euro;</p>
+                      <p className="text-4xl font-bold text-purple-400">199&nbsp;&euro;</p>
+                    </div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        -60% abonn&eacute;
+                      </span>
+                      <span className="text-sm text-text-muted">Paiement unique</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    size="lg"
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                    onClick={handleAcademyCheckout}
+                    disabled={checkoutLoading}
+                  >
+                    {checkoutLoading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                        Redirection...
+                      </>
+                    ) : (
+                      <>
+                        <GraduationCap className="w-5 h-5 mr-2" />
+                        Acheter la formation — 199&nbsp;&euro;
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Case 3: Non-subscriber without academy → full price 499€ */}
+          {!hasAcademy && !isSubscriptionActive && !isGuest && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.25 }}
+              className="max-w-2xl"
+            >
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-500/10 via-purple-600/5 to-transparent border border-purple-500/30 p-8">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+                <div className="relative space-y-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                      <GraduationCap className="w-6 h-6 text-purple-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-text-primary mb-2">
+                        Formation compl&egrave;te en Trading Algorithmique &amp; IA
+                      </h3>
+                      <p className="text-text-secondary text-sm leading-relaxed">
+                        10 modules progressifs couvrant Python, Machine Learning, NLP, et les strat&eacute;gies de trading quantitatives. Acc&egrave;s &agrave; vie, mises &agrave; jour incluses.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-end gap-4">
+                    <p className="text-4xl font-bold text-purple-400">499&nbsp;&euro;</p>
+                    <span className="text-sm text-text-muted mb-1">Paiement unique &middot; Acc&egrave;s &agrave; vie</span>
+                  </div>
+
+                  <p className="text-xs text-text-muted">
+                    <Crown className="w-3.5 h-3.5 inline mr-1 text-amber-400" />
+                    Les abonn&eacute;s Pro b&eacute;n&eacute;ficient d&apos;un tarif exclusif &agrave; <strong className="text-purple-400">199&nbsp;&euro;</strong>.
+                    <Link href="/pricing" className="text-purple-400 ml-1 hover:underline">Voir les offres</Link>
+                  </p>
+
+                  <div className="flex gap-3">
+                    <Button
+                      size="lg"
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                      onClick={handleAcademyCheckout}
+                      disabled={checkoutLoading}
+                    >
+                      {checkoutLoading ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                          Redirection...
+                        </>
+                      ) : (
+                        <>
+                          <GraduationCap className="w-5 h-5 mr-2" />
+                          Acheter la formation — 499&nbsp;&euro;
+                        </>
+                      )}
+                    </Button>
+                    <Link href="/pricing">
+                      <Button variant="secondary" size="lg">S&apos;abonner (-60%)</Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Case 4: Guest → signup CTA */}
+          {!hasAcademy && isGuest && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.25 }}
+              className="max-w-2xl"
+            >
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-500/10 via-purple-600/5 to-transparent border border-purple-500/30 p-8">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+                <div className="relative space-y-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                      <GraduationCap className="w-6 h-6 text-purple-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-text-primary mb-2">
+                        Formation compl&egrave;te en Trading Algorithmique &amp; IA
+                      </h3>
+                      <p className="text-text-secondary text-sm leading-relaxed">
+                        10 modules progressifs couvrant Python, Machine Learning, NLP, et les strat&eacute;gies de trading quantitatives. Acc&egrave;s &agrave; vie, mises &agrave; jour incluses.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-end gap-4">
+                    <p className="text-4xl font-bold text-purple-400">499&nbsp;&euro;</p>
+                    <span className="text-sm text-text-muted mb-1">Paiement unique &middot; Acc&egrave;s &agrave; vie</span>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Link href="/signup?redirect=/academy">
+                      <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white">
+                        <GraduationCap className="w-5 h-5 mr-2" />
+                        Cr&eacute;er un compte
+                      </Button>
+                    </Link>
+                    <Link href="/pricing">
+                      <Button variant="secondary" size="lg">Voir les offres</Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </motion.div>
           )}
         </div>

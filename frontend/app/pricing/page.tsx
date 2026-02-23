@@ -49,7 +49,7 @@ const plans = [
       'Export des données CSV',
       'Liste de suivi illimitée',
       'Support prioritaire',
-      'Alertes personnalisées',
+      'QuantAI Academy \u00e0 199\u20ac au lieu de 499\u20ac',
     ],
     cta: 'S\'abonner',
     ctaHref: '/signup?plan=monthly',
@@ -293,7 +293,7 @@ export default function PricingPage() {
                   <div className="px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                     <p className="text-xs text-emerald-400 font-medium">
                       <Crown className="w-3.5 h-3.5 inline mr-1" />
-                      199&nbsp;&euro; pour les abonn&eacute;s annuels
+                      199&nbsp;&euro; pour les abonn&eacute;s Pro
                     </p>
                   </div>
                   <Link href="/academy">
