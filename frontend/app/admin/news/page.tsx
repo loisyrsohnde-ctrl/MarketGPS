@@ -517,7 +517,7 @@ export default function NewsPage() {
                 {activeTab === 'viral' ? 'actualités' : 'articles classés'}
               </>
             ) : (
-              {"Aucun résultat"}
+              <span>Aucun r&eacute;sultat</span>
             )}
           </div>
         )}

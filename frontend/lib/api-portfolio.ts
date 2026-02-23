@@ -162,9 +162,10 @@ const apiRequest = async <T>(
   options: RequestInit = {}
 ): Promise<T> => {
   const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+  const authHeaders = await getAuthHeaders();
   const headers = {
     ...API_CONFIG.DEFAULT_HEADERS,
-    ...getAuthHeaders(),
+    ...authHeaders,
     ...(options.headers || {}),
   };
 
@@ -290,7 +291,7 @@ export async function previewCSV(
   }
 
   const url = `${API_CONFIG.BASE_URL}/api/portfolio/import/csv/preview`;
-  const headers = getAuthHeaders();
+  const headers = await getAuthHeaders();
 
   const response = await fetch(url, {
     method: 'POST',
@@ -333,7 +334,7 @@ export async function importCSV(
   }
 
   const url = `${API_CONFIG.BASE_URL}/api/portfolio/import/csv`;
-  const headers = getAuthHeaders();
+  const headers = await getAuthHeaders();
 
   const response = await fetch(url, {
     method: 'POST',
