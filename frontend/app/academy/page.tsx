@@ -80,7 +80,7 @@ export default function AcademyPage() {
     loadData();
   }, []);
 
-  const handleAcademyCheckout = useCallback(async () => {
+  const handleAcademyCheckout = useCallback(async (pricingTier: 'standard' | 'diaspora' = 'standard') => {
     if (!session?.access_token) {
       router.push('/login?redirect=/academy');
       return;
@@ -97,6 +97,7 @@ export default function AcademyPage() {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ pricing_tier: pricingTier }),
       });
 
       if (!response.ok) {
@@ -138,13 +139,15 @@ export default function AcademyPage() {
       router.push('/signup');
       return;
     }
-    // Academy purchasers get full access
+    // Academy purchasers get full access to all modules
     if (hasAcademy) {
       router.push(`/academy/cours?part=${partIndex + 1}`);
       return;
     }
-    if (!isSubscriber) {
-      router.push(`/academy/cours?part=${partIndex + 1}`);
+    // Free users can only access Module 1 (Part 1)
+    if (partIndex > 0) {
+      // Scroll to purchase section
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     router.push(`/academy/cours?part=${partIndex + 1}`);
@@ -267,7 +270,7 @@ export default function AcademyPage() {
                   <Button
                     size="lg"
                     className="bg-purple-600 hover:bg-purple-700 text-white"
-                    onClick={handleAcademyCheckout}
+                    onClick={() => handleAcademyCheckout('standard')}
                     disabled={checkoutLoading}
                   >
                     {checkoutLoading ? (
@@ -323,28 +326,39 @@ export default function AcademyPage() {
                     <Link href="/pricing" className="text-purple-400 ml-1 hover:underline">Voir les offres</Link>
                   </p>
 
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex gap-3">
+                      <Button
+                        size="lg"
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                        onClick={() => handleAcademyCheckout('standard')}
+                        disabled={checkoutLoading}
+                      >
+                        {checkoutLoading ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                            Redirection...
+                          </>
+                        ) : (
+                          <>
+                            <GraduationCap className="w-5 h-5 mr-2" />
+                            Acheter la formation — 499&nbsp;&euro;
+                          </>
+                        )}
+                      </Button>
+                      <Link href="/pricing">
+                        <Button variant="secondary" size="lg">S&apos;abonner (-60%)</Button>
+                      </Link>
+                    </div>
                     <Button
                       size="lg"
-                      className="bg-purple-600 hover:bg-purple-700 text-white"
-                      onClick={handleAcademyCheckout}
+                      variant="secondary"
+                      className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                      onClick={() => handleAcademyCheckout('diaspora')}
                       disabled={checkoutLoading}
                     >
-                      {checkoutLoading ? (
-                        <>
-                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                          Redirection...
-                        </>
-                      ) : (
-                        <>
-                          <GraduationCap className="w-5 h-5 mr-2" />
-                          Acheter la formation — 499&nbsp;&euro;
-                        </>
-                      )}
+                      Tarif diaspora africaine — 49&nbsp;&euro;
                     </Button>
-                    <Link href="/pricing">
-                      <Button variant="secondary" size="lg">S&apos;abonner (-60%)</Button>
-                    </Link>
                   </div>
                 </div>
               </div>
@@ -409,14 +423,9 @@ export default function AcademyPage() {
             const progress = getPartProgress(index);
             const lessonCount = part ? getPartLessonCount(part) : 0;
 
-            // Lock logic: Academy owners get everything unlocked
-            const isLocked = hasAcademy
-              ? false
-              : isGuest
-                ? true
-                : !isSubscriber
-                  ? index > 1
-                  : index > 0 && getPartProgress(index - 1) < 100;
+            // Lock logic: Only Module 1 (Part 1) has free content (first 2 lessons)
+            // All other modules require academy purchase (hasAcademy)
+            const isLocked = isGuest || (!hasAcademy && index > 0);
 
             return (
               <motion.button
@@ -432,7 +441,12 @@ export default function AcademyPage() {
                 )}
                 disabled={isLocked}
               >
-                {isLocked && <AcademyLockOverlay isLocked={true} />}
+                {isLocked && (
+                  <AcademyLockOverlay
+                    isLocked={true}
+                    message={isGuest ? 'Inscription requise' : 'Achetez la formation pour d\u00e9bloquer'}
+                  />
+                )}
 
                 <div className="space-y-4">
                   <div className="flex items-start justify-between">
@@ -447,10 +461,16 @@ export default function AcademyPage() {
                             Inscription requise
                           </span>
                         )}
-                        {!isGuest && !hasAcademy && !isSubscriber && index > 1 && (
+                        {!isGuest && !hasAcademy && index === 0 && (
                           <span className="inline-block px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 text-xs">
                             <GraduationCap className="w-3 h-3 inline mr-1" />
-                            Academy
+                            2 le&ccedil;ons gratuites
+                          </span>
+                        )}
+                        {!isGuest && !hasAcademy && index > 0 && (
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-surface text-text-muted text-xs">
+                            <Lock className="w-3 h-3 inline mr-1" />
+                            Acc&egrave;s premium
                           </span>
                         )}
                       </div>

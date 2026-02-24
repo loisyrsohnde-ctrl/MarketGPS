@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Lock, GraduationCap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AcademyVideoPlayer } from '@/components/academy/AcademyVideoPlayer';
 import { AcademyExercise } from '@/components/academy/AcademyExercise';
@@ -12,11 +12,32 @@ import {
   fetchParts,
 } from '@/lib/academy-api';
 import { AcademyLesson, AcademyPart } from '@/lib/academy-types';
+import { useSubscription } from '@/hooks/useSubscription';
+
+/**
+ * Check if a lesson is free based on its position in the course structure.
+ * Only Part 1, Module 1, Lessons 1-2 are free.
+ */
+function checkLessonFree(parts: AcademyPart[], lessonId: string): boolean {
+  for (let partIdx = 0; partIdx < parts.length; partIdx++) {
+    const part = parts[partIdx];
+    for (let modIdx = 0; modIdx < (part.modules?.length || 0); modIdx++) {
+      const mod = part.modules![modIdx];
+      for (let lesIdx = 0; lesIdx < (mod.lessons?.length || 0); lesIdx++) {
+        if (mod.lessons![lesIdx].id === lessonId) {
+          return partIdx === 0 && modIdx === 0 && lesIdx < 2;
+        }
+      }
+    }
+  }
+  return false;
+}
 
 export default function LessonPage() {
   const params = useParams();
   const router = useRouter();
   const lessonId = params.lessonId as string;
+  const { hasAcademy } = useSubscription();
 
   const [lesson, setLesson] = useState<AcademyLesson | null>(null);
   const [parts, setParts] = useState<AcademyPart[]>([]);
@@ -24,6 +45,7 @@ export default function LessonPage() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [nextLessonId, setNextLessonId] = useState<string | null>(null);
   const [previousLessonId, setPreviousLessonId] = useState<string | null>(null);
+  const [canAccess, setCanAccess] = useState(true);
   const dataLoaded = useRef(false);
 
   useEffect(() => {
@@ -36,6 +58,11 @@ export default function LessonPage() {
         const partsData = await fetchParts();
         setParts(partsData);
         findAdjacentLessons(partsData, lessonId);
+
+        // Check access: free lesson or academy purchased
+        const isFree = checkLessonFree(partsData, lessonId);
+        setCanAccess(hasAcademy || isFree);
+
         dataLoaded.current = true;
       } catch (error) {
         console.error('Failed to load lesson:', error);
@@ -45,7 +72,7 @@ export default function LessonPage() {
     };
 
     loadData();
-  }, [lessonId]);
+  }, [lessonId, hasAcademy]);
 
   const findAdjacentLessons = (parts: AcademyPart[], currentLessonId: string) => {
     let foundCurrent = false;
@@ -94,6 +121,39 @@ export default function LessonPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-text-primary/60">Lecon non trouvee</p>
+      </div>
+    );
+  }
+
+  // Access denied — show paywall
+  if (!canAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center space-y-6 p-8 rounded-xl bg-surface border border-glass-border">
+          <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8 text-purple-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-text-primary">Contenu Premium</h2>
+          <p className="text-text-secondary">
+            Cette le&ccedil;on fait partie de la formation compl&egrave;te QuantAI Academy.
+            Achetez la formation pour acc&eacute;der &agrave; tous les modules et le&ccedil;ons.
+          </p>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => router.push('/academy')}
+              className="w-full py-3 px-6 rounded-lg font-semibold bg-purple-600 hover:bg-purple-700 text-white transition-all flex items-center justify-center gap-2"
+            >
+              <GraduationCap className="w-5 h-5" />
+              Acheter la formation — 499&nbsp;&euro;
+            </button>
+            <button
+              onClick={() => router.push('/academy/cours?part=1')}
+              className="w-full py-3 px-6 rounded-lg font-semibold bg-surface hover:bg-glass-border text-text-primary border border-glass-border transition-all"
+            >
+              Voir les le&ccedil;ons gratuites
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
