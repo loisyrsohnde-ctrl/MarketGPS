@@ -11,7 +11,8 @@ export function useAdminDashboard() {
 
   const fetchMetrics = async () => {
     try {
-      setLoading(true);
+      // Only show skeleton on initial load, not on auto-refresh
+      if (!metrics) setLoading(true);
       const adminKey = localStorage.getItem('adminKey') || '';
 
       // Fetch both stats and diagnostics for comprehensive metrics

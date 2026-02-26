@@ -149,12 +149,13 @@ async def get_data_diagnostics(
                 cursor = conn.execute("SELECT COUNT(*) FROM news_articles")
                 total_articles = cursor.fetchone()[0]
 
-                # By region
+                # By country (was incorrectly querying non-existent 'region' column)
                 cursor = conn.execute("""
-                    SELECT region, COUNT(*) as count
+                    SELECT country, COUNT(*) as count
                     FROM news_articles
-                    WHERE region IS NOT NULL
-                    GROUP BY region
+                    WHERE country IS NOT NULL AND country != ''
+                    GROUP BY country
+                    ORDER BY count DESC
                 """)
                 by_region = {row[0]: row[1] for row in cursor.fetchall()}
 
@@ -180,6 +181,25 @@ async def get_data_diagnostics(
                 """)
                 this_week = cursor.fetchone()[0]
 
+                # Daily breakdown (last 7 days) for trend chart
+                cursor = conn.execute("""
+                    SELECT date(created_at) as day, COUNT(*) as count
+                    FROM news_articles
+                    WHERE created_at >= date('now', '-7 days')
+                    GROUP BY day
+                    ORDER BY day
+                """)
+                daily_breakdown = {row[0]: row[1] for row in cursor.fetchall()}
+
+                # By status for workflow pipeline
+                cursor = conn.execute("""
+                    SELECT status, COUNT(*) as count
+                    FROM news_articles
+                    WHERE status IS NOT NULL AND status != ''
+                    GROUP BY status
+                """)
+                by_status = {row[0]: row[1] for row in cursor.fetchall()}
+
                 diagnostics["news"] = {
                     "total_articles": total_articles,
                     "by_region": by_region,
@@ -187,6 +207,8 @@ async def get_data_diagnostics(
                     "last_article_published": last_published,
                     "articles_today": today,
                     "articles_this_week": this_week,
+                    "daily_breakdown": daily_breakdown,
+                    "by_status": by_status,
                 }
             except Exception as e:
                 diagnostics["news"] = {"error": str(e), "note": "news_articles table may not exist"}

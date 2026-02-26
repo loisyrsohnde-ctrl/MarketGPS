@@ -64,7 +64,7 @@ class NewsArticleResponse(BaseModel):
     published_at: Optional[str] = None
     category: Optional[str] = None
     language: Optional[str] = None
-    region: Optional[str] = None
+    country: Optional[str] = None
     total_interactions: Optional[int] = None
     status: Optional[str] = None
 
@@ -179,7 +179,7 @@ class RescoreResponse(BaseModel):
 
 @router.get("/news", response_model=NewsListResponse)
 async def list_news_articles(
-    region: Optional[str] = Query(None, description="Filter by region"),
+    country: Optional[str] = Query(None, description="Filter by country"),
     language: Optional[str] = Query(None, description="Filter by language"),
     minViralityScore: Optional[float] = Query(None, description="Minimum virality score"),
     page: int = Query(1, ge=1),
@@ -189,7 +189,7 @@ async def list_news_articles(
     List news articles with optional filters.
 
     Query params:
-    - region: Filter by region
+    - country: Filter by country
     - language: Filter by language
     - minViralityScore: Minimum virality score
     - page: Page number (default: 1)
@@ -206,9 +206,9 @@ async def list_news_articles(
         query = "SELECT * FROM news_articles WHERE 1=1"
         params = []
 
-        if region:
-            query += " AND region = ?"
-            params.append(region)
+        if country:
+            query += " AND country = ?"
+            params.append(country)
 
         if language:
             query += " AND language = ?"
@@ -416,18 +416,33 @@ async def list_scripts(
         scripts = video_svc.get_scripts(status=status, limit=limit, offset=offset)
 
         # Get total count
-        conn = db._get_conn()
-        cursor = conn.cursor()
+        with db._get_conn() as conn:
+            # Ensure table exists before querying
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS video_scripts (
+                    id TEXT PRIMARY KEY,
+                    article_id TEXT,
+                    title TEXT NOT NULL,
+                    hook TEXT,
+                    script_text TEXT,
+                    word_count INTEGER DEFAULT 0,
+                    estimated_duration_seconds INTEGER DEFAULT 0,
+                    sources_mentioned TEXT DEFAULT '[]',
+                    key_facts TEXT DEFAULT '[]',
+                    status TEXT DEFAULT 'draft',
+                    created_at TEXT DEFAULT (datetime('now')),
+                    updated_at TEXT DEFAULT (datetime('now'))
+                )
+            """)
 
-        count_query = "SELECT COUNT(*) FROM video_scripts WHERE 1=1"
-        count_params = []
+            count_query = "SELECT COUNT(*) FROM video_scripts WHERE 1=1"
+            count_params = []
 
-        if status:
-            count_query += " AND status = ?"
-            count_params.append(status)
+            if status:
+                count_query += " AND status = ?"
+                count_params.append(status)
 
-        total = cursor.execute(count_query, count_params).fetchone()[0]
-        conn.close()
+            total = conn.execute(count_query, count_params).fetchone()[0]
 
         return ScriptsListResponse(
             scripts=[

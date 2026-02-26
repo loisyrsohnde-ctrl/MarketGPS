@@ -12,7 +12,8 @@ export function useAdminStats() {
 
   const fetchStats = async () => {
     try {
-      setLoading(true);
+      // Only show skeleton on initial load, not on auto-refresh
+      if (!stats) setLoading(true);
       const adminKey = localStorage.getItem('adminKey') || '';
       const response = await fetch(`${API_BASE}/admin/stats`, {
         headers: { 'X-Admin-Key': adminKey },
