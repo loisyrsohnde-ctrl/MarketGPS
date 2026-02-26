@@ -171,17 +171,15 @@ async def get_dashboard_stats(
         except Exception as e:
             logger.debug(f"Error reading sources registry: {e}")
 
-        # Last pipeline run (from metrics file)
+        # Last pipeline run (from most recent article in database)
         try:
-            import json
-            from pathlib import Path
-            metrics_file = Path(__file__).parent.parent / "data" / "news_metrics.json"
-            if metrics_file.exists():
-                with open(metrics_file, 'r') as f:
-                    metrics = json.load(f)
-                    last_pipeline_run = metrics.get("last_run")
+            with db._get_conn() as conn:
+                cursor = conn.execute("SELECT MAX(created_at) FROM news_articles")
+                result = cursor.fetchone()
+                if result and result[0]:
+                    last_pipeline_run = result[0]
         except Exception as e:
-            logger.debug(f"Error reading pipeline metrics: {e}")
+            logger.debug(f"Error getting last pipeline run: {e}")
 
         return DashboardStats(
             total_users=total_users,
