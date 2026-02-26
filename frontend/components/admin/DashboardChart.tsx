@@ -39,6 +39,76 @@ export function DashboardChart({
   horizontal = false,
   showLegend = false,
 }: DashboardChartProps) {
+  const tooltipStyle = {
+    backgroundColor: '#1f2937',
+    border: 'none',
+    borderRadius: '8px',
+    color: '#f3f4f6',
+  };
+
+  const renderChart = () => {
+    if (type === 'bar') {
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            layout={horizontal ? 'vertical' : 'horizontal'}
+            margin={
+              horizontal
+                ? { top: 5, right: 30, left: 200, bottom: 5 }
+                : { top: 5, right: 30, left: 0, bottom: 5 }
+            }
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
+            {horizontal ? (
+              <>
+                <XAxis type="number" />
+                <YAxis dataKey={xKey} type="category" width={150} />
+              </>
+            ) : (
+              <>
+                <XAxis dataKey={xKey} />
+                <YAxis />
+              </>
+            )}
+            <Tooltip contentStyle={tooltipStyle} />
+            {showLegend && <Legend />}
+            <Bar dataKey={yKey} fill={color} radius={[8, 8, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      );
+    }
+
+    if (type === 'line') {
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
+            <XAxis dataKey={xKey} />
+            <YAxis />
+            <Tooltip contentStyle={tooltipStyle} />
+            {showLegend && <Legend />}
+            <Line type="monotone" dataKey={yKey} stroke={color} dot={false} strokeWidth={2} />
+          </LineChart>
+        </ResponsiveContainer>
+      );
+    }
+
+    // area
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
+          <XAxis dataKey={xKey} />
+          <YAxis />
+          <Tooltip contentStyle={tooltipStyle} />
+          {showLegend && <Legend />}
+          <Area type="monotone" dataKey={yKey} fill={color} stroke={color} fillOpacity={0.3} />
+        </AreaChart>
+      </ResponsiveContainer>
+    );
+  };
+
   if (!data || data.length === 0) {
     return (
       <div className="rounded-lg border border-gray-200 p-6 dark:border-gray-800">
@@ -60,104 +130,7 @@ export function DashboardChart({
         {title}
       </h3>
       <div className="mt-4" style={{ height }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <>
-            {type === 'bar' && (
-              <BarChart
-                data={data}
-                layout={horizontal ? 'vertical' : 'horizontal'}
-                margin={
-                  horizontal
-                    ? { top: 5, right: 30, left: 200, bottom: 5 }
-                    : { top: 5, right: 30, left: 0, bottom: 5 }
-                }
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#e5e7eb"
-                  className="dark:stroke-gray-700"
-                />
-                {horizontal ? (
-                  <>
-                    <XAxis type="number" />
-                    <YAxis dataKey={xKey} type="category" width={150} />
-                  </>
-                ) : (
-                  <>
-                    <XAxis dataKey={xKey} />
-                    <YAxis />
-                  </>
-                )}
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#1f2937',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: '#f3f4f6',
-                  }}
-                />
-                {showLegend && <Legend />}
-                <Bar dataKey={yKey} fill={color} radius={[8, 8, 0, 0]} />
-              </BarChart>
-            )}
-
-            {type === 'line' && (
-              <LineChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#e5e7eb"
-                  className="dark:stroke-gray-700"
-                />
-                <XAxis dataKey={xKey} />
-                <YAxis />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#1f2937',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: '#f3f4f6',
-                  }}
-                />
-                {showLegend && <Legend />}
-                <Line
-                  type="monotone"
-                  dataKey={yKey}
-                  stroke={color}
-                  dot={false}
-                  strokeWidth={2}
-                />
-              </LineChart>
-            )}
-
-            {type === 'area' && (
-              <AreaChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#e5e7eb"
-                  className="dark:stroke-gray-700"
-                />
-                <XAxis dataKey={xKey} />
-                <YAxis />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#1f2937',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: '#f3f4f6',
-                  }}
-                />
-                {showLegend && <Legend />}
-                <Area
-                  type="monotone"
-                  dataKey={yKey}
-                  fill={color}
-                  stroke={color}
-                  fillOpacity={0.3}
-                />
-              </AreaChart>
-            )}
-          </>
-        </ResponsiveContainer>
+        {renderChart()}
       </div>
     </div>
   );
