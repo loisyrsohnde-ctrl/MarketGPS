@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings, Save, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { useAdminSettings } from '@/hooks/useAdminSettings';
 import { AdminSettings } from '@/types/admin';
@@ -33,24 +33,36 @@ const DEFAULT_SETTINGS: AdminSettings = {
   },
 };
 
+/** Safely merge partial settings with defaults — never returns undefined sub-objects */
+function mergeWithDefaults(partial: any): AdminSettings {
+  return {
+    editorial: { ...DEFAULT_SETTINGS.editorial, ...(partial?.editorial || {}) },
+    notifications: { ...DEFAULT_SETTINGS.notifications, ...(partial?.notifications || {}) },
+    maintenance: { ...DEFAULT_SETTINGS.maintenance, ...(partial?.maintenance || {}) },
+    scraping: { ...DEFAULT_SETTINGS.scraping, ...(partial?.scraping || {}) },
+  };
+}
+
 export default function SettingsPage() {
   const { settings: loadedSettings, loading: isLoading, error, updateSettings: saveSettings, refetch } = useAdminSettings();
-  const [settings, setSettings] = useState<AdminSettings>(loadedSettings || DEFAULT_SETTINGS);
-  const [originalSettings, setOriginalSettings] = useState<AdminSettings>(loadedSettings || DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<AdminSettings>(DEFAULT_SETTINGS);
+  const [originalSettings, setOriginalSettings] = useState<AdminSettings>(DEFAULT_SETTINGS);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
-  // Deep merge loaded settings with defaults to ensure all nested properties exist
-  if (loadedSettings && JSON.stringify(loadedSettings) !== JSON.stringify(settings)) {
-    const merged: AdminSettings = {
-      editorial: { ...DEFAULT_SETTINGS.editorial, ...(loadedSettings.editorial || {}) },
-      notifications: { ...DEFAULT_SETTINGS.notifications, ...(loadedSettings.notifications || {}) },
-      maintenance: { ...DEFAULT_SETTINGS.maintenance, ...(loadedSettings.maintenance || {}) },
-      scraping: { ...DEFAULT_SETTINGS.scraping, ...(loadedSettings.scraping || {}) },
-    };
-    setSettings(merged);
-    setOriginalSettings(merged);
-  }
+  // Sync loaded settings into local state via useEffect (safe — never runs during render)
+  useEffect(() => {
+    if (loadedSettings && !initialized) {
+      const merged = mergeWithDefaults(loadedSettings);
+      setSettings(merged);
+      setOriginalSettings(merged);
+      setInitialized(true);
+    }
+  }, [loadedSettings, initialized]);
+
+  // Always compute safe settings for rendering — guaranteed to have all sub-objects
+  const s = mergeWithDefaults(settings);
 
   const handleChange = (path: string, value: any) => {
     const keys = path.split('.');
@@ -173,7 +185,7 @@ export default function SettingsPage() {
                 type="number"
                 min="0"
                 step="0.5"
-                value={settings.editorial.virality_threshold_2x}
+                value={s.editorial.virality_threshold_2x}
                 onChange={(e) =>
                   handleChange('editorial.virality_threshold_2x', parseFloat(e.target.value))
                 }
@@ -188,7 +200,7 @@ export default function SettingsPage() {
               <input
                 type="number"
                 min="1"
-                value={settings.scraping.max_articles_per_source}
+                value={s.scraping.max_articles_per_source}
                 onChange={(e) =>
                   handleChange('scraping.max_articles_per_source', parseInt(e.target.value))
                 }
@@ -200,7 +212,7 @@ export default function SettingsPage() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={settings.scraping.enable_automatic_ingestion}
+                  checked={s.scraping.enable_automatic_ingestion}
                   onChange={(e) =>
                     handleChange('scraping.enable_automatic_ingestion', e.target.checked)
                   }
@@ -218,7 +230,7 @@ export default function SettingsPage() {
               </label>
               <input
                 type="text"
-                value={settings.scraping.daily_ingest_times?.join(', ') || ''}
+                value={s.scraping.daily_ingest_times?.join(', ') || ''}
                 onChange={(e) =>
                   handleChange('scraping.daily_ingest_times', e.target.value.split(',').map(t => t.trim()))
                 }
@@ -244,7 +256,7 @@ export default function SettingsPage() {
                 Modèle IA pour Réécriture
               </label>
               <select
-                value={settings.editorial.rewrite_model}
+                value={s.editorial.rewrite_model}
                 onChange={(e) =>
                   handleChange('editorial.rewrite_model', e.target.value as 'openai' | 'gemini')
                 }
@@ -257,14 +269,14 @@ export default function SettingsPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Température ({settings.editorial.rewrite_temperature.toFixed(2)})
+                Température ({s.editorial.rewrite_temperature.toFixed(2)})
               </label>
               <input
                 type="range"
                 min="0"
                 max="1"
                 step="0.1"
-                value={settings.editorial.rewrite_temperature}
+                value={s.editorial.rewrite_temperature}
                 onChange={(e) =>
                   handleChange('editorial.rewrite_temperature', parseFloat(e.target.value))
                 }
@@ -280,7 +292,7 @@ export default function SettingsPage() {
                 Ligne Éditoriale
               </label>
               <textarea
-                value={settings.editorial.editorial_line}
+                value={s.editorial.editorial_line}
                 onChange={(e) =>
                   handleChange('editorial.editorial_line', e.target.value)
                 }
@@ -305,7 +317,7 @@ export default function SettingsPage() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={settings.notifications.alert_on_viral_break}
+                  checked={s.notifications.alert_on_viral_break}
                   onChange={(e) =>
                     handleChange('notifications.alert_on_viral_break', e.target.checked)
                   }
@@ -325,7 +337,7 @@ export default function SettingsPage() {
                 type="number"
                 min="0"
                 step="0.5"
-                value={settings.notifications.viral_threshold}
+                value={s.notifications.viral_threshold}
                 onChange={(e) =>
                   handleChange('notifications.viral_threshold', parseFloat(e.target.value))
                 }
@@ -339,7 +351,7 @@ export default function SettingsPage() {
               </label>
               <input
                 type="url"
-                value={settings.notifications.webhook_url}
+                value={s.notifications.webhook_url}
                 onChange={(e) =>
                   handleChange('notifications.webhook_url', e.target.value)
                 }
@@ -366,7 +378,7 @@ export default function SettingsPage() {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={settings.maintenance.is_under_maintenance}
+                    checked={s.maintenance.is_under_maintenance}
                     onChange={(e) =>
                       handleChange('maintenance.is_under_maintenance', e.target.checked)
                     }
@@ -389,7 +401,7 @@ export default function SettingsPage() {
               <input
                 type="number"
                 min="1"
-                value={settings.maintenance.api_rate_limit}
+                value={s.maintenance.api_rate_limit}
                 onChange={(e) =>
                   handleChange('maintenance.api_rate_limit', parseInt(e.target.value))
                 }
