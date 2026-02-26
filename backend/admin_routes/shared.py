@@ -126,31 +126,50 @@ from admin_auth import verify_admin, require_admin
 
 async def get_supabase_users() -> List[Dict[str, Any]]:
     """
-    Fetch users from Supabase Auth (READ-ONLY).
+    Fetch ALL users from Supabase Auth (READ-ONLY) with pagination.
     Uses the service role key to list all users.
+    Supabase returns max 50 users per page by default.
     """
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         logger.warning("Supabase credentials not configured for admin")
         return []
 
+    all_users = []
+    page = 1
+    per_page = 1000  # Supabase allows up to 1000 per page
+
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{SUPABASE_URL}/auth/v1/admin/users",
-                headers={
-                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
-                    "apikey": SUPABASE_SERVICE_KEY,
-                },
-                timeout=10.0,
-            )
+            while True:
+                response = await client.get(
+                    f"{SUPABASE_URL}/auth/v1/admin/users",
+                    headers={
+                        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                        "apikey": SUPABASE_SERVICE_KEY,
+                    },
+                    params={
+                        "page": page,
+                        "per_page": per_page,
+                    },
+                    timeout=15.0,
+                )
 
-            if response.status_code == 200:
-                data = response.json()
-                return data.get("users", [])
-            else:
-                logger.error(f"Supabase users fetch failed: {response.status_code}")
-                return []
+                if response.status_code == 200:
+                    data = response.json()
+                    users = data.get("users", [])
+                    all_users.extend(users)
+
+                    # If we got fewer users than per_page, we've reached the end
+                    if len(users) < per_page:
+                        break
+                    page += 1
+                else:
+                    logger.error(f"Supabase users fetch failed: {response.status_code}")
+                    break
+
+        logger.info(f"Fetched {len(all_users)} total users from Supabase")
+        return all_users
 
     except Exception as e:
         logger.error(f"Error fetching Supabase users: {e}")
-        return []
+        return all_users  # Return whatever we've collected so far
