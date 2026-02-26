@@ -37,6 +37,38 @@ router = APIRouter(prefix="/api/admin", tags=["Admin Workflow"])
 # Database store
 db = SQLiteStore()
 
+# Ensure admin_activity_log table exists
+def _ensure_activity_log_table():
+    """Create admin_activity_log table if it doesn't exist."""
+    try:
+        with db._get_conn() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS admin_activity_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    admin_id TEXT NOT NULL DEFAULT 'admin',
+                    action TEXT NOT NULL,
+                    resource_type TEXT NOT NULL,
+                    resource_id TEXT,
+                    details TEXT,
+                    changes_json TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_activity_log_action
+                ON admin_activity_log(action)
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_activity_log_created
+                ON admin_activity_log(created_at DESC)
+            """)
+            conn.commit()
+            logger.info("admin_activity_log table initialized")
+    except Exception as e:
+        logger.error(f"Error creating admin_activity_log table: {e}")
+
+_ensure_activity_log_table()
+
 # Initialize LLM-based publisher for rewriting
 publisher = None
 
