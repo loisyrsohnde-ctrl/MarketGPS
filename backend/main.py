@@ -56,18 +56,22 @@ from gamification_routes import router as gamification_router
 from viral_news_routes import router as viral_news_router
 from admin_news_api import router as admin_news_router
 from academy_routes import router as academy_router
-# Optional admin add-on services (safe import - won't crash server if missing deps)
+# Optional admin add-on services (safe import - each loaded independently)
 admin_search_router = None
 admin_settings_router = None
 admin_workflow_router = None
 try:
     from admin_search_service import router as admin_search_router
+except Exception as e:
+    print(f"[WARNING] Admin search service failed to import: {e}")
+try:
     from admin_settings_service import router as admin_settings_router
+except Exception as e:
+    print(f"[WARNING] Admin settings service failed to import: {e}")
+try:
     from admin_workflow_service import router as admin_workflow_router
 except Exception as e:
-    import traceback
-    print(f"[WARNING] Admin add-on services failed to import: {e}")
-    traceback.print_exc()
+    print(f"[WARNING] Admin workflow service failed to import: {e}")
 
 # Middleware imports (v15 institutional stack)
 from middleware import (

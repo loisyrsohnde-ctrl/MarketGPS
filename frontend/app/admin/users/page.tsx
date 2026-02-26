@@ -40,8 +40,9 @@ export default function UsersPage() {
 
       const data = await response.json();
 
-      // Backend returns UserSummary[] directly (not wrapped in {users, total})
+      // Backend returns {users: UserSummary[], total: number}
       const rawUsers = Array.isArray(data) ? data : (data.users || []);
+      const serverTotal = Array.isArray(data) ? data.length : (data.total || 0);
 
       // Map backend fields to frontend User type
       const mappedUsers: User[] = rawUsers.map((u: any) => ({
@@ -57,7 +58,7 @@ export default function UsersPage() {
       }));
 
       setUsers(mappedUsers);
-      setTotal(Array.isArray(data) ? data.length : (data.total || mappedUsers.length));
+      setTotal(serverTotal);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
@@ -195,7 +196,7 @@ export default function UsersPage() {
         <div className="text-sm text-gray-600 dark:text-gray-400">
           {total > 0 ? (
             <>
-              Affichage de <strong>1-{Math.min(20, total)}</strong> sur{' '}
+              Affichage de <strong>{(page - 1) * 20 + 1}-{Math.min(page * 20, total)}</strong> sur{' '}
               <strong>{total}</strong> utilisateur{total > 1 ? 's' : ''}
             </>
           ) : (

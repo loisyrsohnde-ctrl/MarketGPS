@@ -17,7 +17,7 @@ from .shared import (
 router = APIRouter()
 
 
-@router.get("/users", response_model=List[UserSummary])
+@router.get("/users")
 async def list_users(
     admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
     limit: int = Query(50, ge=1, le=500),
@@ -126,7 +126,8 @@ async def list_users(
         # Sort by creation date (newest first)
         users.sort(key=lambda x: x.created_at or "", reverse=True)
 
-        return users[offset:offset + limit]
+        total = len(users)
+        return {"users": users[offset:offset + limit], "total": total}
 
     except Exception as e:
         logger.error(f"Error listing users: {e}")

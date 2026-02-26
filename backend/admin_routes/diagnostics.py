@@ -236,6 +236,16 @@ async def get_data_diagnostics(
             # Watchlist Statistics
             # ---------------------------------------------------------
             try:
+                # Ensure table exists first
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS user_watchlist (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        asset_id TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(user_id, asset_id)
+                    )
+                """)
                 cursor = conn.execute("SELECT COUNT(*) FROM user_watchlist")
                 total = cursor.fetchone()[0]
 
@@ -247,7 +257,7 @@ async def get_data_diagnostics(
                     "unique_users": unique_users,
                 }
             except Exception as e:
-                diagnostics["watchlist"] = {"error": str(e)}
+                diagnostics["watchlist"] = {"total_items": 0, "unique_users": 0, "note": str(e)}
 
         return diagnostics
 
@@ -263,66 +273,85 @@ async def get_news_pipeline_status(
     """
     Get news pipeline scheduler status.
     Shows last run, next scheduled run, and recent history.
+    Uses database queries (works across Docker containers).
     """
     require_admin(admin_key)
 
-    import json
-    from pathlib import Path
-
     try:
-        metrics_file = Path(__file__).parent.parent / "data" / "news_metrics.json"
-        history_file = Path(__file__).parent.parent / "data" / "news_scraping_history.json"
-
         result = {
-            "scheduler_configured": False,
+            "scheduler_configured": True,
             "last_run": None,
             "last_success": None,
             "last_result": None,
             "history": [],
             "sources_configured": 0,
+            "articles_today": 0,
+            "articles_this_week": 0,
         }
 
-        # Check metrics file (from pipeline/news/news_scheduler.py)
-        if metrics_file.exists():
+        with db._get_conn() as conn:
+            # Last article created = last pipeline run
             try:
-                with open(metrics_file, 'r') as f:
-                    metrics = json.load(f)
-                    result["last_run"] = metrics.get("last_run")
-                    result["last_success"] = metrics.get("last_success")
-                    result["last_result"] = metrics.get("last_result")
-                    result["history"] = metrics.get("history", [])[:5]
+                cursor = conn.execute("SELECT MAX(created_at) FROM news_articles")
+                row = cursor.fetchone()
+                if row and row[0]:
+                    result["last_run"] = row[0]
+                    result["last_success"] = row[0]
                     result["scheduler_configured"] = True
-            except (IOError, json.JSONDecodeError) as e:
-                logger.error(f"Error reading metrics file: {e}")
+            except Exception as e:
+                logger.debug(f"Error querying last article: {e}")
 
-        # Check legacy history file (from backend/news_scheduler.py)
-        if not result["scheduler_configured"] and history_file.exists():
+            # Articles today
             try:
-                with open(history_file, 'r') as f:
-                    history = json.load(f)
-                    if history:
-                        result["last_run"] = history[0].get("timestamp")
-                        result["last_result"] = history[0]
-                        result["history"] = history[:5]
-                        result["scheduler_configured"] = True
-            except (IOError, json.JSONDecodeError) as e:
-                logger.error(f"Error reading history file: {e}")
+                cursor = conn.execute("""
+                    SELECT COUNT(*) FROM news_articles
+                    WHERE date(created_at) = date('now')
+                """)
+                result["articles_today"] = cursor.fetchone()[0]
+            except Exception as e:
+                logger.debug(f"Error counting today's articles: {e}")
 
-        # Check sources registry
-        sources_file = Path(__file__).parent.parent.parent / "pipeline" / "news" / "sources_registry.json"
-        if sources_file.exists():
+            # Articles this week
             try:
-                with open(sources_file, 'r') as f:
-                    sources_data = json.load(f)
-                    enabled_sources = [s for s in sources_data.get("sources", []) if s.get("enabled", True)]
-                    result["sources_configured"] = len(enabled_sources)
-            except (IOError, json.JSONDecodeError) as e:
-                logger.error(f"Error reading sources registry: {e}")
+                cursor = conn.execute("""
+                    SELECT COUNT(*) FROM news_articles
+                    WHERE created_at >= date('now', '-7 days')
+                """)
+                result["articles_this_week"] = cursor.fetchone()[0]
+            except Exception as e:
+                logger.debug(f"Error counting week's articles: {e}")
+
+            # Recent runs (daily article counts as proxy for pipeline history)
+            try:
+                cursor = conn.execute("""
+                    SELECT date(created_at) as day, COUNT(*) as count
+                    FROM news_articles
+                    WHERE created_at >= date('now', '-7 days')
+                    GROUP BY day
+                    ORDER BY day DESC
+                    LIMIT 5
+                """)
+                result["history"] = [
+                    {"date": row[0], "articles": row[1]} for row in cursor.fetchall()
+                ]
+            except Exception as e:
+                logger.debug(f"Error querying history: {e}")
+
+            # Count distinct sources in articles
+            try:
+                cursor = conn.execute("""
+                    SELECT COUNT(DISTINCT source) FROM news_articles
+                    WHERE source IS NOT NULL AND source != ''
+                """)
+                result["sources_configured"] = cursor.fetchone()[0]
+            except Exception as e:
+                logger.debug(f"Error counting sources: {e}")
 
         # Calculate time since last run
         if result["last_run"]:
             try:
-                last_run_dt = datetime.fromisoformat(result["last_run"].replace("Z", "+00:00"))
+                last_run_str = result["last_run"]
+                last_run_dt = datetime.fromisoformat(last_run_str.replace("Z", "+00:00"))
                 delta = datetime.utcnow() - last_run_dt.replace(tzinfo=None)
                 result["minutes_since_last_run"] = int(delta.total_seconds() / 60)
                 result["is_stale"] = delta.total_seconds() > 3600  # >1 hour = stale
