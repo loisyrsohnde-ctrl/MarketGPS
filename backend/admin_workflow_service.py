@@ -25,7 +25,9 @@ bootstrap()
 
 from storage.sqlite_store import SQLiteStore
 from core.config import get_logger
-from pipeline.news.publish import NewsPublisher
+# NOTE: NewsPublisher import is lazy (inside get_publisher) because
+# pipeline.news.publish is not available in the backend Docker container.
+# Only the /rewrite endpoint needs it; activity log and other endpoints work without it.
 
 logger = get_logger(__name__)
 
@@ -40,10 +42,18 @@ publisher = None
 
 
 def get_publisher():
-    """Get or initialize the NewsPublisher instance."""
+    """Get or initialize the NewsPublisher instance (lazy import)."""
     global publisher
     if not publisher:
-        publisher = NewsPublisher(store=db)
+        try:
+            from pipeline.news.publish import NewsPublisher
+            publisher = NewsPublisher(store=db)
+        except ImportError as e:
+            logger.error(f"NewsPublisher not available: {e}")
+            raise RuntimeError(
+                "NewsPublisher is not available in this environment. "
+                "The /rewrite endpoint requires the pipeline package."
+            )
     return publisher
 
 

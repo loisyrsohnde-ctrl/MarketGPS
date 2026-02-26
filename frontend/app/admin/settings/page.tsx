@@ -40,10 +40,16 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Update local settings when loaded settings change
+  // Deep merge loaded settings with defaults to ensure all nested properties exist
   if (loadedSettings && JSON.stringify(loadedSettings) !== JSON.stringify(settings)) {
-    setSettings(loadedSettings);
-    setOriginalSettings(loadedSettings);
+    const merged: AdminSettings = {
+      editorial: { ...DEFAULT_SETTINGS.editorial, ...(loadedSettings.editorial || {}) },
+      notifications: { ...DEFAULT_SETTINGS.notifications, ...(loadedSettings.notifications || {}) },
+      maintenance: { ...DEFAULT_SETTINGS.maintenance, ...(loadedSettings.maintenance || {}) },
+      scraping: { ...DEFAULT_SETTINGS.scraping, ...(loadedSettings.scraping || {}) },
+    };
+    setSettings(merged);
+    setOriginalSettings(merged);
   }
 
   const handleChange = (path: string, value: any) => {
