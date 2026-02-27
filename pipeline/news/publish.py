@@ -476,8 +476,10 @@ Réponds UNIQUEMENT en JSON valide STRICT (pas de commentaires, pas de markdown)
             else:
                 if source_language == "fr":
                     # French source: fallback is OK (content already in French)
+                    # Mark as AI-processed since French content doesn't need translation
                     logger.warning(f"✗ AI failed, using FR fallback for: {raw_payload.get('title', '')[:50]}...")
                     rewritten = self._fallback_process(raw_payload)
+                    is_ai_processed = True  # French content is ready as-is, no translation needed
                 else:
                     # Non-French source: DO NOT publish untranslated content
                     # Don't mark as processed → will be retried next cycle when LLM may be available

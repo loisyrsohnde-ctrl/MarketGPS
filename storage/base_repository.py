@@ -255,6 +255,18 @@ class BaseRepository:
                 CREATE INDEX IF NOT EXISTS idx_news_raw_items_processed ON news_raw_items(processed);
             """)
 
+            # Migration: Mark French-language articles as AI-processed since
+            # they don't need translation and should appear in the public feed.
+            # This fixes articles that were created via fallback mode with
+            # is_ai_processed=0 even though their content was already in French.
+            conn.execute("""
+                UPDATE news_articles
+                SET is_ai_processed = 1
+                WHERE language = 'fr'
+                  AND is_ai_processed = 0
+                  AND status = 'published'
+            """)
+
     def ensure_schema(self):
         """Ensure all tables exist (public method)."""
         self._init_schema()

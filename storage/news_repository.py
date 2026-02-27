@@ -60,9 +60,10 @@ class NewsRepository(BaseRepository):
         conditions = ["status = ?"]
         params = [status]
 
-        # Exclude non-AI-processed articles (untranslated English content from fallback)
-        # These articles went through _fallback_process() and are in their original language
-        conditions.append("(is_ai_processed = 1 OR is_ai_processed IS NULL)")
+        # Exclude untranslated English content from fallback processing.
+        # Allow: AI-processed articles (=1), legacy articles (IS NULL),
+        # and French-language articles (already readable, no translation needed).
+        conditions.append("(is_ai_processed = 1 OR is_ai_processed IS NULL OR language = 'fr')")
 
         if query:
             conditions.append("(title LIKE ? OR excerpt LIKE ? OR content_md LIKE ?)")
