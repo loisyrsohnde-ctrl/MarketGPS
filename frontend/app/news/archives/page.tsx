@@ -197,7 +197,8 @@ function ArchiveCard({ article }: { article: NewsArticle }) {
                     {new Date(article.published_at).toLocaleDateString('fr-FR', {
                       day: 'numeric',
                       month: 'short',
-                      year: 'numeric'
+                      year: 'numeric',
+                      timeZone: 'UTC'
                     })}
                   </span>
                 </>

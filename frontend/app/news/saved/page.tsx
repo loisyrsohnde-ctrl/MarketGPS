@@ -126,7 +126,8 @@ function SavedNewsCard({ article }: { article: NewsArticle }) {
                 <Clock className="w-3 h-3" />
                 {new Date(article.published_at).toLocaleDateString('fr-FR', {
                   day: 'numeric',
-                  month: 'short'
+                  month: 'short',
+                  timeZone: 'UTC'
                 })}
               </span>
             )}

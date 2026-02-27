@@ -62,7 +62,7 @@ function getTimeAgo(publishedAt: string | null): string {
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `Il y a ${diffHours}h`;
 
-    return published.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    return published.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
   } catch {
     return '';
   }

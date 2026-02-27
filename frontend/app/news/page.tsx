@@ -210,7 +210,8 @@ function HeroArticle({ article }: { article: NewsArticle }) {
                 {new Date(article.published_at).toLocaleDateString('fr-FR', {
                   day: 'numeric',
                   month: 'long',
-                  year: 'numeric'
+                  year: 'numeric',
+                  timeZone: 'UTC'
                 })}
               </span>
             )}
@@ -275,7 +276,8 @@ function SecondaryArticle({ article }: { article: NewsArticle }) {
               <span>
                 {new Date(article.published_at).toLocaleDateString('fr-FR', {
                   day: 'numeric',
-                  month: 'short'
+                  month: 'short',
+                  timeZone: 'UTC'
                 })}
               </span>
             </>
@@ -301,7 +303,8 @@ function LatestNewsItem({ article, index }: { article: NewsArticle; index: numbe
           {article.published_at ? (
             new Date(article.published_at).toLocaleTimeString('fr-FR', {
               hour: '2-digit',
-              minute: '2-digit'
+              minute: '2-digit',
+              timeZone: 'UTC'
             })
           ) : (
             `0${index + 1}:00`

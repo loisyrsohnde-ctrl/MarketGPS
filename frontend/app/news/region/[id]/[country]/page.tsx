@@ -52,7 +52,7 @@ function ArticleCard({ article }: { article: any }) {
             {article.published_at && (
               <>
                 <span>•</span>
-                <span>{new Date(article.published_at).toLocaleDateString('fr-FR')}</span>
+                <span>{new Date(article.published_at).toLocaleDateString('fr-FR', { timeZone: 'UTC' })}</span>
               </>
             )}
           </div>
