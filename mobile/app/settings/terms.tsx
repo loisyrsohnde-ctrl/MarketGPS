@@ -38,9 +38,16 @@ export default function TermsScreen() {
       
       <Text style={styles.heading}>4. Abonnement et paiement</Text>
       <Text style={styles.paragraph}>
-        Les abonnements Pro sont facturés mensuellement ou annuellement selon le 
-        plan choisi. Vous pouvez annuler votre abonnement à tout moment via le 
-        portail de gestion Stripe.
+        Les abonnements Pro MarketGPS sont disponibles en formule mensuelle ou annuelle.{'\n\n'}
+        Le paiement sera débité de votre compte Apple (iTunes) à la confirmation de l'achat.{'\n\n'}
+        L'abonnement se renouvelle automatiquement sauf si le renouvellement automatique est
+        désactivé au moins 24 heures avant la fin de la période en cours.{'\n\n'}
+        Votre compte sera débité pour le renouvellement dans les 24 heures précédant la fin
+        de la période en cours, au tarif du plan sélectionné.{'\n\n'}
+        Vous pouvez gérer vos abonnements et désactiver le renouvellement automatique dans
+        les Réglages {'>'} [votre nom] {'>'} Abonnements sur votre appareil Apple après l'achat.{'\n\n'}
+        Toute portion inutilisée d'une période d'essai gratuite, le cas échéant, sera perdue
+        lors de l'achat d'un abonnement.
       </Text>
       
       <Text style={styles.heading}>5. Limitation de responsabilité</Text>

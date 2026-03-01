@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { GlassCard } from '@/components/ui/glass-card';
 import { signUp } from '@/lib/supabase';
+import { track } from '@/lib/analytics';
+import { getApiBaseUrl } from '@/lib/config';
 import { Mail, Lock, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -41,7 +43,26 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      await signUp(email, password);
+      const result = await signUp(email, password);
+      track.signupCompleted();
+
+      // Trigger onboarding email drip
+      const userId = result?.user?.id;
+      if (userId) {
+        fetch(`${getApiBaseUrl()}/users/on-signup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, email }),
+        }).catch(() => {});
+      }
+
+      // If session exists, user is auto-confirmed → redirect directly
+      if (result?.session) {
+        router.push('/morning-brief');
+        return;
+      }
+
+      // Otherwise, email confirmation required → show "check your email" screen
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de l\'inscription');

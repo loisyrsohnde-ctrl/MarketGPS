@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { track } from '@/lib/analytics';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // useAuth Hook
@@ -52,6 +53,10 @@ export function useAuth() {
           isLoading: false,
           isAuthenticated: !!session,
         });
+        // Identify user in PostHog for analytics
+        if (session?.user) {
+          track.identifyUser(session.user.id, session.user.email ?? '', 'unknown');
+        }
       }
     );
 

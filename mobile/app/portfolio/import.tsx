@@ -95,7 +95,7 @@ export default function PortfolioImportScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
     } catch (error) {
-      console.error('File picker error:', error);
+      if (__DEV__) console.error('File picker error:', error);
       Alert.alert('Erreur', 'Impossible de lire le fichier');
     }
   };

@@ -943,7 +943,19 @@ async def import_csv(
     """
     user_id = _get_user_id(authorization)
     db = _get_db()
-    
+
+    # CSV import is Pro-only
+    try:
+        from billing_routes import get_subscription, is_subscription_active
+        sub = get_subscription(user_id, db)
+        if not is_subscription_active(sub):
+            raise HTTPException(
+                status_code=403,
+                detail="L'import CSV est réservé aux abonnés Pro. Passez à Pro pour importer votre portefeuille."
+            )
+    except ImportError:
+        pass  # billing module not available, allow import
+
     content = await file.read()
     file_hash = _compute_file_hash(content)
     

@@ -19,14 +19,14 @@ const ExpoSecureStoreAdapter = {
     try {
       await SecureStore.setItemAsync(key, value);
     } catch (error) {
-      console.error('SecureStore setItem error:', error);
+      if (__DEV__) console.error('SecureStore setItem error:', error);
     }
   },
   removeItem: async (key: string): Promise<void> => {
     try {
       await SecureStore.deleteItemAsync(key);
     } catch (error) {
-      console.error('SecureStore removeItem error:', error);
+      if (__DEV__) console.error('SecureStore removeItem error:', error);
     }
   },
 };

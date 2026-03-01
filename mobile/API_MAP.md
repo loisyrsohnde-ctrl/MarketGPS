@@ -92,9 +92,9 @@ Authorization: Bearer <supabase_jwt_token>
 
 | Endpoint | Méthode | Auth | Description | Écran Mobile |
 |----------|---------|------|-------------|--------------|
-| `/api/billing/me` | GET | Oui | Statut abonnement | Settings, Billing |
-| `/api/billing/checkout-session` | POST | Oui | Créer session Stripe | Checkout |
-| `/api/billing/portal-session` | POST | Oui | Créer portail Stripe | Billing |
+| `/users/entitlements` | GET | Oui | Statut abonnement | Settings, Billing |
+
+> **Note :** Les paiements iOS sont gérés via Apple In-App Purchases (`react-native-iap`). Les endpoints Stripe (`checkout-session`, `portal-session`) sont utilisés uniquement par le frontend web.
 
 ### 8. User
 

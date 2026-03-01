@@ -103,7 +103,7 @@ export function Paywall({ children }: PaywallProps) {
   // Not logged in - if on a guest-allowed route, show children (AccessGate handles gating)
   if (!isAuthenticated) {
     // Check if route allows guest access  
-    const guestAllowedRoutes = ['/dashboard', '/strategies', '/academy', '/news', '/asset', '/pricing', '/barbell'];
+    const guestAllowedRoutes = ['/morning-brief', '/dashboard', '/strategies', '/academy', '/news', '/asset', '/pricing', '/barbell'];
     const isGuestRoute = guestAllowedRoutes.some(
       route => pathname?.startsWith(route)
     );

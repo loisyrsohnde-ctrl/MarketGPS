@@ -14,8 +14,10 @@ import { PriceChart } from '@/components/charts/price-chart';
 import { QuickActions } from '@/components/asset/QuickActions';
 import { CreateAlertModal } from '@/components/alerts/CreateAlertModal';
 import { AssetComparator } from '@/components/asset/AssetComparator';
+import { AccessGate } from '@/components/AccessGate';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { api } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { cn, formatDate } from '@/lib/utils';
 import type { Asset, ChartPeriod } from '@/types';
 import {
@@ -184,6 +186,13 @@ export default function AssetDetailPage() {
     openComparator: () => setIsComparatorOpen(true),
     openAIChat: () => console.log('Open AI chat'),
   });
+
+  // Track score view in PostHog
+  useEffect(() => {
+    if (asset && asset.ticker !== 'UNKNOWN') {
+      track.scoreView(asset.ticker, asset.score_total ?? null);
+    }
+  }, [asset]);
 
   // Use asset data or default
   const displayAsset = asset || { ...defaultAsset, ticker };
@@ -440,25 +449,28 @@ export default function AssetDetailPage() {
           <ScoreGauge score={displayAsset.score_total} size="xl" />
         </GlassCard>
 
-        {/* Pillars with NUMBERS */}
-        <GlassCard>
-          <h2 className="text-lg font-semibold text-text-primary mb-6">Piliers du score</h2>
-          <div className="space-y-5">
-            <PillarBar label="Valeur" value={calculatedMetrics.value} icon="📈" />
-            <PillarBar label="Momentum" value={calculatedMetrics.momentum} icon="🚀" />
-            <PillarBar label="Sécurité" value={calculatedMetrics.safety} icon="🛡️" />
-          </div>
+        {/* Pillars with NUMBERS — Pro only */}
+        <AccessGate requiredLevel="subscriber" feature="Détail des piliers" blurContent>
+          <GlassCard>
+            <h2 className="text-lg font-semibold text-text-primary mb-6">Piliers du score</h2>
+            <div className="space-y-5">
+              <PillarBar label="Valeur" value={calculatedMetrics.value} icon="📈" />
+              <PillarBar label="Momentum" value={calculatedMetrics.momentum} icon="🚀" />
+              <PillarBar label="Sécurité" value={calculatedMetrics.safety} icon="🛡️" />
+            </div>
 
-          <div className="mt-6 pt-6 border-t border-glass-border">
-            <p className="text-sm text-text-muted">
-              Le score MarketGPS combine trois piliers pour évaluer le potentiel d&apos;un actif:
-              la valeur fondamentale, la dynamique de prix (momentum), et les métriques de sécurité.
-            </p>
-          </div>
-        </GlassCard>
+            <div className="mt-6 pt-6 border-t border-glass-border">
+              <p className="text-sm text-text-muted">
+                Le score MarketGPS combine trois piliers pour évaluer le potentiel d&apos;un actif:
+                la valeur fondamentale, la dynamique de prix (momentum), et les métriques de sécurité.
+              </p>
+            </div>
+          </GlassCard>
+        </AccessGate>
       </div>
 
-      {/* KPIs - ALL NUMERIC */}
+      {/* KPIs - ALL NUMERIC — Pro only */}
+      <AccessGate requiredLevel="subscriber" feature="Indicateurs détaillés" blurContent>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <GlassCard padding="md">
           <div className="space-y-2">
@@ -559,8 +571,10 @@ export default function AssetDetailPage() {
           </div>
         </GlassCard>
       </div>
+      </AccessGate>
 
-      {/* Detailed Metrics - Technical Indicators */}
+      {/* Detailed Metrics - Technical Indicators — Pro only */}
+      <AccessGate requiredLevel="subscriber" feature="Métriques techniques" blurContent>
       <GlassCard>
         <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
           <Zap className="w-5 h-5 text-accent" />
@@ -628,6 +642,7 @@ export default function AssetDetailPage() {
           </div>
         </div>
       </GlassCard>
+      </AccessGate>
 
       {/* Chart with period selector */}
       <GlassCard>

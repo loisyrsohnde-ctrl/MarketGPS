@@ -657,8 +657,8 @@ export default function StrategiesPage() {
         </>
       )}
 
-      {/* My Strategies Section - requires account */}
-      <AccessGate requiredLevel="free" feature="Mes Stratégies personnalisées" inline>
+      {/* My Strategies Section - requires Pro subscription */}
+      <AccessGate requiredLevel="subscriber" feature="Mes Stratégies personnalisées" inline>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

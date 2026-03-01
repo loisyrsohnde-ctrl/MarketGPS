@@ -34,6 +34,7 @@ export async function signUp(email: string, password: string, metadata?: Record<
     password,
     options: {
       data: metadata,
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
     },
   });
   

@@ -601,8 +601,8 @@ class GamificationService:
             logger.error(f"Error generating weekly objectives: {e}")
             return []
 
-    def generate_daily_objectives(self, user_id: str, num_objectives: int = 3) -> List[Objective]:
-        """Generate daily objectives for a user"""
+    def generate_daily_objectives(self, user_id: str, num_objectives: int = 2) -> List[Objective]:
+        """Generate daily objectives: 1 mandatory (view score) + 1 random from pool"""
         try:
             # Clear old daily objectives
             with self.db._get_connection() as conn:
@@ -612,8 +612,12 @@ class GamificationService:
                 """, (user_id,))
                 conn.commit()
 
-            # Select random objectives from pool
-            selected = random.sample(DAILY_OBJECTIVES_POOL, min(num_objectives, len(DAILY_OBJECTIVES_POOL)))
+            # Always include the mandatory objective + 1 random
+            from config.gamification_config import DAILY_OBJECTIVE_MANDATORY
+            selected = [DAILY_OBJECTIVE_MANDATORY]
+            pool_remaining = [o for o in DAILY_OBJECTIVES_POOL if o["action"] != DAILY_OBJECTIVE_MANDATORY["action"]]
+            if pool_remaining:
+                selected.append(random.choice(pool_remaining))
 
             objectives = []
             expires_at = datetime.utcnow() + timedelta(days=1)

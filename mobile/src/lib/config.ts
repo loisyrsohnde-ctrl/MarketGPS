@@ -9,19 +9,16 @@ export const Config = {
   // Supabase
   SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL || '',
   SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
-  
-  // Stripe
-  STRIPE_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
-  
-  // Web URLs
+
+  // Web URL (used for auth redirects only - NOT for payment links)
   WEB_URL: process.env.EXPO_PUBLIC_WEB_URL || 'https://app.marketgps.online',
-  
+
   // App
   APP_SCHEME: 'marketgps',
   
   // Feature Flags
-  ENABLE_OFFLINE_MODE: true,
-  ENABLE_BIOMETRIC_AUTH: true,
+  ENABLE_OFFLINE_MODE: false,
+  ENABLE_BIOMETRIC_AUTH: false,
   
   // Cache TTL (in ms)
   CACHE_TTL: {

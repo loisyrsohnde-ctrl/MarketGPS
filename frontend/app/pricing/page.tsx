@@ -296,6 +296,11 @@ export default function PricingPage() {
                       199&nbsp;&euro; pour les abonn&eacute;s Pro
                     </p>
                   </div>
+                  <div className="px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <p className="text-xs text-amber-400 font-medium">
+                      49&nbsp;&euro; — Tarif diaspora africaine
+                    </p>
+                  </div>
                   <Link href="/academy">
                     <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white">
                       D&eacute;couvrir la formation

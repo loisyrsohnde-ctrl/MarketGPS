@@ -35,22 +35,30 @@ export function SubscriptionGate({
     return <>{children}</>;
   }
 
-  // Not authenticated - show login prompt
+  // Not authenticated - show upgrade prompt (Apple requires purchase without mandatory registration)
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
         <View style={styles.iconContainer}>
-          <Ionicons name="lock-closed-outline" size={32} color="#64748B" />
+          <Ionicons name="diamond-outline" size={32} color="#19D38C" />
         </View>
-        <Text style={styles.title}>Connexion requise</Text>
+        <Text style={styles.title}>Fonctionnalité Pro</Text>
         <Text style={styles.description}>
-          Connectez-vous pour accéder à {feature}
+          Passez à Pro pour accéder à {feature}
         </Text>
         <TouchableOpacity
           style={styles.button}
+          onPress={() => router.push('/checkout')}
+        >
+          <Text style={styles.buttonText}>Passer à Pro</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.loginLink}
           onPress={() => router.push('/(auth)/login')}
         >
-          <Text style={styles.buttonText}>Se connecter</Text>
+          <Text style={styles.loginLinkText}>
+            Déjà un compte ? Se connecter
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -148,5 +156,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#0A0F1C',
+  },
+  loginLink: {
+    marginTop: 16,
+    paddingVertical: 8,
+  },
+  loginLinkText: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textDecorationLine: 'underline',
   },
 });

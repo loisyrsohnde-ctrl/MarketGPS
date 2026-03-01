@@ -152,7 +152,7 @@ export default function PortfolioPositionsScreen() {
         const results = await api.searchAssets(query, undefined, 10);
         setSearchResults(results);
       } catch (error) {
-        console.error('Search error:', error);
+        if (__DEV__) console.error('Search error:', error);
       } finally {
         setIsSearching(false);
       }

@@ -69,7 +69,7 @@ export default function AssetDetailScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     },
     onError: (error) => {
-      console.error('Watchlist add error:', error);
+      if (__DEV__) console.error('Watchlist add error:', error);
       Alert.alert('Erreur', 'Impossible d\'ajouter cet actif à votre watchlist');
     },
   });
@@ -82,7 +82,7 @@ export default function AssetDetailScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     },
     onError: (error) => {
-      console.error('Watchlist remove error:', error);
+      if (__DEV__) console.error('Watchlist remove error:', error);
       Alert.alert('Erreur', 'Impossible de retirer cet actif de votre watchlist');
     },
   });

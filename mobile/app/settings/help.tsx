@@ -33,7 +33,7 @@ const FAQ = [
   },
   {
     question: "Comment annuler mon abonnement ?",
-    answer: "Allez dans Plus > Abonnement > Gérer mon abonnement. Vous serez redirigé vers le portail Stripe où vous pouvez modifier ou annuler votre abonnement.",
+    answer: "Allez dans Plus > Abonnement > Gérer mon abonnement. Vous serez redirigé vers les réglages d'abonnements Apple où vous pouvez modifier ou annuler votre abonnement.",
   },
 ];
 
@@ -41,11 +41,7 @@ export default function HelpScreen() {
   const handleEmail = () => {
     Linking.openURL('mailto:support@marketgps.online');
   };
-  
-  const handleWebsite = () => {
-    Linking.openURL('https://marketgps.online');
-  };
-  
+
   return (
     <ScrollView
       style={styles.container}
@@ -61,13 +57,7 @@ export default function HelpScreen() {
               <Ionicons name="mail-outline" size={24} color="#19D38C" />
             </View>
             <Text style={styles.contactText}>Email</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.contactCard} onPress={handleWebsite}>
-            <View style={styles.contactIcon}>
-              <Ionicons name="globe-outline" size={24} color="#19D38C" />
-            </View>
-            <Text style={styles.contactText}>Site web</Text>
+            <Text style={styles.contactSubtext}>support@marketgps.online</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -137,6 +127,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#F1F5F9',
+  },
+  contactSubtext: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 4,
   },
   faqCard: {
     marginBottom: 12,

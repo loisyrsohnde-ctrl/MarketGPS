@@ -172,7 +172,7 @@ export default function StrategyCreateScreen() {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
-      console.error('Simulation error:', error);
+      if (__DEV__) console.error('Simulation error:', error);
       // Show mock results for demo
       setSimulationResult({
         annualized_return: 0.085,

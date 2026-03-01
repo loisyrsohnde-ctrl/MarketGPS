@@ -326,39 +326,28 @@ export default function AcademyPage() {
                     <Link href="/pricing" className="text-purple-400 ml-1 hover:underline">Voir les offres</Link>
                   </p>
 
-                  <div className="flex flex-col gap-3">
-                    <div className="flex gap-3">
-                      <Button
-                        size="lg"
-                        className="bg-purple-600 hover:bg-purple-700 text-white"
-                        onClick={() => handleAcademyCheckout('standard')}
-                        disabled={checkoutLoading}
-                      >
-                        {checkoutLoading ? (
-                          <>
-                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                            Redirection...
-                          </>
-                        ) : (
-                          <>
-                            <GraduationCap className="w-5 h-5 mr-2" />
-                            Acheter la formation — 499&nbsp;&euro;
-                          </>
-                        )}
-                      </Button>
-                      <Link href="/pricing">
-                        <Button variant="secondary" size="lg">S&apos;abonner (-60%)</Button>
-                      </Link>
-                    </div>
+                  <div className="flex gap-3">
                     <Button
                       size="lg"
-                      variant="secondary"
-                      className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                      onClick={() => handleAcademyCheckout('diaspora')}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                      onClick={() => handleAcademyCheckout('standard')}
                       disabled={checkoutLoading}
                     >
-                      Tarif diaspora africaine — 49&nbsp;&euro;
+                      {checkoutLoading ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                          Redirection...
+                        </>
+                      ) : (
+                        <>
+                          <GraduationCap className="w-5 h-5 mr-2" />
+                          Acheter la formation — 499&nbsp;&euro;
+                        </>
+                      )}
                     </Button>
+                    <Link href="/pricing">
+                      <Button variant="secondary" size="lg">S&apos;abonner (-60%)</Button>
+                    </Link>
                   </div>
                 </div>
               </div>

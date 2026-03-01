@@ -36,17 +36,7 @@ export default function DashboardScreen() {
     isError: hasTopScoredError,
   } = useQuery({
     queryKey: ['topScored', selectedScope],
-    queryFn: async () => {
-      console.log('[Dashboard] Fetching top scored for scope:', selectedScope);
-      try {
-        const result = await api.getTopScored({ limit: 10, market_scope: selectedScope });
-        console.log('[Dashboard] Got', result?.data?.length || 0, 'assets');
-        return result;
-      } catch (err) {
-        console.error('[Dashboard] Error fetching top scored:', err);
-        throw err;
-      }
-    },
+    queryFn: () => api.getTopScored({ limit: 10, market_scope: selectedScope }),
     retry: 2,
     staleTime: 60000,
   });
@@ -54,17 +44,7 @@ export default function DashboardScreen() {
   // Fetch scope counts with error handling
   const { data: counts, error: countsError } = useQuery({
     queryKey: ['scopeCounts'],
-    queryFn: async () => {
-      console.log('[Dashboard] Fetching scope counts...');
-      try {
-        const result = await api.getScopeCounts();
-        console.log('[Dashboard] Scope counts:', result);
-        return result;
-      } catch (err) {
-        console.error('[Dashboard] Error fetching counts:', err);
-        throw err;
-      }
-    },
+    queryFn: () => api.getScopeCounts(),
     retry: 2,
     staleTime: 300000,
   });

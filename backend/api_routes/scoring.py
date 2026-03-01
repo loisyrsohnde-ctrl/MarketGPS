@@ -38,6 +38,23 @@ async def calculate_score_on_demand(
         return result
 
     except QuotaExceededError as e:
+        # Return cached score if available instead of hard 403
+        try:
+            cached = db.query("SELECT * FROM scores_latest WHERE ticker = ?", (ticker,))
+            if cached:
+                row = cached[0] if isinstance(cached, list) else cached
+                return {
+                    "ticker": ticker,
+                    "score_total": row.get("score_total"),
+                    "score_value": row.get("score_value"),
+                    "score_momentum": row.get("score_momentum"),
+                    "score_safety": row.get("score_safety"),
+                    "from_cache": True,
+                    "quota_exceeded": True,
+                    "message": str(e),
+                }
+        except Exception:
+            pass
         raise HTTPException(status_code=403, detail={"error": "quota_exceeded", "message": str(e)})
     except AssetNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

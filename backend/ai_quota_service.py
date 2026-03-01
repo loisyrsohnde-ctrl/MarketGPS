@@ -39,9 +39,9 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Default quota limits
-DEFAULT_OPENAI_LIMIT = 50
-DEFAULT_GEMINI_LIMIT = 50
+# Default quota limits (free tier: 3 messages to create urgency → Pro)
+DEFAULT_OPENAI_LIMIT = 3
+DEFAULT_GEMINI_LIMIT = 3
 
 # AI Provider types
 AIProvider = Literal["openai", "gemini"]

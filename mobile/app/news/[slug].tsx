@@ -50,7 +50,7 @@ export default function NewsArticleScreen() {
         url: article.source_url,
       });
     } catch (error) {
-      console.error('Share error:', error);
+      if (__DEV__) console.error('Share error:', error);
     }
   };
   

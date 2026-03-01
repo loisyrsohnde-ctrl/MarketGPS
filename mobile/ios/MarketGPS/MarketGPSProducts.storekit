@@ -1,0 +1,70 @@
+{
+  "identifier" : "MarketGPSProducts",
+  "type" : "AutoRenewableSubscription",
+  "version" : 3,
+  "subscriptionGroups" : [
+    {
+      "id" : "MarketGPS_Pro",
+      "localizations" : [
+        {
+          "description" : "Abonnement MarketGPS Pro",
+          "displayName" : "MarketGPS Pro",
+          "locale" : "fr"
+        }
+      ],
+      "name" : "MarketGPS Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "monthly_001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Accès Pro mensuel à MarketGPS",
+              "displayName" : "Pro Mensuel",
+              "locale" : "fr"
+            }
+          ],
+          "name" : "Pro Mensuel",
+          "productID" : "com.marketgps.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro Monthly",
+          "subscriptionGroupID" : "MarketGPS_Pro",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "99.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "annual_001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Accès Pro annuel à MarketGPS (2 mois offerts)",
+              "displayName" : "Pro Annuel",
+              "locale" : "fr"
+            }
+          ],
+          "name" : "Pro Annuel",
+          "productID" : "com.marketgps.pro.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Pro Annual",
+          "subscriptionGroupID" : "MarketGPS_Pro",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        }
+      ]
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "MarketGPS",
+    "_developerTeamID" : ""
+  }
+}

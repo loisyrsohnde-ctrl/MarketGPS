@@ -1038,3 +1038,23 @@ async def get_ai_quota_status(
             quotas["openai"].get("remaining", 0) == 0 or quotas["gemini"].get("remaining", 0) == 0
         ) else None,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# On-Signup Hook — triggers email drip onboarding
+# ═══════════════════════════════════════════════════════════════════════════
+
+class OnSignupRequest(BaseModel):
+    user_id: str
+    email: str
+
+
+@router.post("/on-signup")
+async def on_signup(body: OnSignupRequest):
+    """Called after signup to schedule the 7-day onboarding email drip."""
+    try:
+        from email_drip_service import schedule_drip_sequence
+        schedule_drip_sequence(body.user_id, body.email, db)
+        return {"status": "ok", "message": f"Drip sequence scheduled for {body.email}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

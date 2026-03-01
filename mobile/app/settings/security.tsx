@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card, Input, Button } from '@/components/ui';
 import { useIsAuthenticated, useAuthStore } from '@/store/auth';
 import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/api';
 
 export default function SecurityScreen() {
   const router = useRouter();
@@ -66,35 +67,42 @@ export default function SecurityScreen() {
     }
   };
   
+  const [deletePassword, setDeletePassword] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const handleDeleteAccount = () => {
-    Alert.alert(
+    Alert.prompt(
       'Supprimer le compte',
-      'Cette action est irréversible. Toutes vos données seront supprimées.',
+      'Cette action est irréversible. Entrez votre mot de passe pour confirmer.',
       [
         { text: 'Annuler', style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: 'Supprimer définitivement',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Confirmation',
-              'Êtes-vous vraiment sûr ?',
-              [
-                { text: 'Annuler', style: 'cancel' },
-                {
-                  text: 'Supprimer définitivement',
-                  style: 'destructive',
-                  onPress: async () => {
-                    // Note: Full account deletion requires backend support
-                    await signOut();
-                    router.replace('/(auth)/login');
-                  },
-                },
-              ]
-            );
+          onPress: async (password?: string) => {
+            if (!password) {
+              Alert.alert('Erreur', 'Le mot de passe est requis.');
+              return;
+            }
+            setIsDeleting(true);
+            try {
+              await api.deleteAccount(password);
+              await signOut();
+              router.replace('/(auth)/login');
+            } catch (error) {
+              Alert.alert(
+                'Erreur',
+                (error as Error).message || 'Impossible de supprimer le compte.'
+              );
+            } finally {
+              setIsDeleting(false);
+            }
           },
         },
-      ]
+      ],
+      'secure-text',
+      '',
+      'default'
     );
   };
   

@@ -633,7 +633,7 @@ class APIClient {
       };
     } catch (error) {
       // Return default free plan on error
-      console.warn('Failed to fetch subscription status, defaulting to free:', error);
+      if (__DEV__) console.warn('Failed to fetch subscription status, defaulting to free:', error);
       return {
         user_id: '',
         plan: 'free',
@@ -644,19 +644,6 @@ class APIClient {
         grace_period_remaining_hours: null,
       };
     }
-  }
-  
-  async createCheckoutSession(plan: 'monthly' | 'annual'): Promise<{ url: string }> {
-    return this.fetch('/api/billing/checkout-session', {
-      method: 'POST',
-      body: JSON.stringify({ plan }),
-    });
-  }
-  
-  async createPortalSession(): Promise<{ url: string }> {
-    return this.fetch('/api/billing/portal-session', {
-      method: 'POST',
-    });
   }
   
   // ─────────────────────────────────────────────────────────────────────────
@@ -838,6 +825,14 @@ class APIClient {
     return this.fetch('/api/portfolio/import/csv', {
       method: 'POST',
       body: JSON.stringify({ account_id: accountId, csv_content: csvContent }),
+    });
+  }
+
+  // Account deletion
+  async deleteAccount(password: string): Promise<{ success: boolean }> {
+    return this.fetch('/api/users/delete-account', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
     });
   }
 }

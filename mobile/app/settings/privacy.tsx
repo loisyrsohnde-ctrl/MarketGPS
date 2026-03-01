@@ -30,9 +30,9 @@ export default function PrivacyScreen() {
       
       <Text style={styles.heading}>3. Stockage et sécurité</Text>
       <Text style={styles.paragraph}>
-        Vos données sont stockées de manière sécurisée via Supabase avec 
-        chiffrement. Les données de paiement sont traitées par Stripe et ne 
-        sont jamais stockées sur nos serveurs.
+        Vos données sont stockées de manière sécurisée via Supabase avec
+        chiffrement. Les données de paiement sont traitées par Apple (via
+        les achats intégrés) et ne sont jamais stockées sur nos serveurs.
       </Text>
       
       <Text style={styles.heading}>4. Partage des données</Text>

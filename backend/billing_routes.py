@@ -68,6 +68,7 @@ STRIPE_PRICE_ID_ANNUAL = (
 
 # Academy / QuantAI Trading formation
 STRIPE_PRICE_ID_ACADEMY = os.environ.get("STRIPE_PRICE_ID_ACADEMY", "")
+STRIPE_PRICE_ID_ACADEMY_DIASPORA = os.environ.get("STRIPE_PRICE_ID_ACADEMY_DIASPORA", "")
 STRIPE_COUPON_ID_ACADEMY_ANNUAL = os.environ.get("STRIPE_COUPON_ID_ACADEMY_ANNUAL", "")
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -527,15 +528,20 @@ async def create_checkout_session(
         raise HTTPException(status_code=500, detail=f"Stripe error: {str(e)}")
 
 
+class AcademyCheckoutRequest(BaseModel):
+    pricing_tier: str = "standard"  # "standard" (499€) or "diaspora" (49€)
+
+
 @router.post("/academy/checkout-session", response_model=CheckoutResponse)
 async def create_academy_checkout_session(
+    body: AcademyCheckoutRequest = AcademyCheckoutRequest(),
     user_id: str = Depends(get_current_user_id),
 ):
     """
     Create Stripe Checkout Session for QuantAI Academy formation.
 
     Pricing logic:
-    - Non-subscribers: 499 EUR (full price)
+    - Non-subscribers: 499 EUR (full price) or 49 EUR (diaspora)
     - Active subscribers (monthly or annual): 199 EUR (300 EUR discount via coupon)
     - Users who already have academy_access: rejected (already purchased)
     """
@@ -569,10 +575,14 @@ async def create_academy_checkout_session(
             stripe_customer_id = customer.id
             upsert_subscription(user_id, {"stripe_customer_id": stripe_customer_id}, db)
 
-        # Check if user has an active subscription → apply 300 EUR discount (499→199)
+        # Determine price ID and discounts
         discounts = []
         is_subscriber = False
-        if subscription and is_subscription_active(subscription):
+        price_id = STRIPE_PRICE_ID_ACADEMY
+
+        if body.pricing_tier == "diaspora" and STRIPE_PRICE_ID_ACADEMY_DIASPORA:
+            price_id = STRIPE_PRICE_ID_ACADEMY_DIASPORA
+        elif subscription and is_subscription_active(subscription):
             is_subscriber = True
             if STRIPE_COUPON_ID_ACADEMY_ANNUAL:
                 discounts = [{"coupon": STRIPE_COUPON_ID_ACADEMY_ANNUAL}]
@@ -581,7 +591,7 @@ async def create_academy_checkout_session(
             "customer": stripe_customer_id,
             "mode": "payment",
             "payment_method_types": ["card"],
-            "line_items": [{"price": STRIPE_PRICE_ID_ACADEMY, "quantity": 1}],
+            "line_items": [{"price": price_id, "quantity": 1}],
             "success_url": f"{FRONTEND_URL}/academy?purchased=1",
             "cancel_url": f"{FRONTEND_URL}/academy?canceled=1",
             "client_reference_id": user_id,
@@ -590,6 +600,7 @@ async def create_academy_checkout_session(
                 "user_id": user_id,
                 "product": "academy",
                 "is_subscriber": str(is_subscriber),
+                "pricing_tier": body.pricing_tier,
             },
         }
 
@@ -600,7 +611,7 @@ async def create_academy_checkout_session(
 
         logger.info(
             f"Created Academy checkout session {session.id} for user {user_id}, "
-            f"subscriber_discount={'yes' if is_subscriber else 'no'}"
+            f"tier={body.pricing_tier}, subscriber_discount={'yes' if is_subscriber else 'no'}"
         )
         return CheckoutResponse(url=session.url)
 
@@ -889,6 +900,23 @@ async def handle_checkout_completed(data: dict, db: SQLiteStore):
             logger.info(f"Sent Academy discount email to annual subscriber {user_email}")
         except Exception as e:
             logger.warning(f"Failed to send academy discount email: {e}")
+
+    # Unlock unlimited AI for Pro subscribers
+    try:
+        from ai_quota_service import AIQuotaService
+        quota_svc = AIQuotaService(db)
+        quota_svc.set_limit_disabled(user_id, "openai", True)
+        quota_svc.set_limit_disabled(user_id, "gemini", True)
+        logger.info(f"AI quotas unlocked for Pro user {user_id}")
+    except Exception as e:
+        logger.warning(f"Failed to unlock AI quotas: {e}")
+
+    # Cancel pending drip emails (user converted to Pro)
+    try:
+        from email_drip_service import cancel_pending_drips
+        cancel_pending_drips(user_id, db)
+    except Exception as e:
+        logger.warning(f"Failed to cancel drip emails: {e}")
 
     logger.info(f"Checkout completed: user={user_id}, plan={plan}")
 

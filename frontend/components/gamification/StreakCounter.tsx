@@ -1,18 +1,21 @@
 'use client';
 
-import { Flame } from 'lucide-react';
+import { Flame, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 
 interface StreakCounterProps {
   days: number;
   multiplier: number;
   isActive?: boolean;
+  hasActivityToday?: boolean;
 }
 
 export function StreakCounter({
   days,
   multiplier,
   isActive = true,
+  hasActivityToday = true,
 }: StreakCounterProps) {
   // Color intensity based on streak length
   const getStreakColor = (days: number) => {
@@ -31,8 +34,28 @@ export function StreakCounter({
     return 'bg-red-600/10 border-red-600/40';
   };
 
+  const streakAtRisk = days > 0 && !hasActivityToday;
+
   return (
     <div className="space-y-2">
+      {/* Streak at risk warning */}
+      {streakAtRisk && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30"
+        >
+          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <p className="text-xs text-amber-300">
+            Votre s&eacute;rie de <strong>{days} jours</strong> est en danger !{' '}
+            <Link href="/dashboard" className="text-amber-400 underline">
+              Consultez un score
+            </Link>{' '}
+            pour la maintenir.
+          </p>
+        </motion.div>
+      )}
+
       {/* Streak Card */}
       <div
         className={`
@@ -74,9 +97,9 @@ export function StreakCounter({
 
             {/* Streak Info */}
             <div>
-              <p className="text-xs text-text-muted">Current Streak</p>
+              <p className="text-xs text-text-muted">S&eacute;rie en cours</p>
               <p className={`text-2xl font-bold ${getStreakColor(days)}`}>
-                {days} {days === 1 ? 'day' : 'days'}
+                {days} {days === 1 ? 'jour' : 'jours'}
               </p>
             </div>
           </div>
@@ -88,7 +111,7 @@ export function StreakCounter({
               animate={{ scale: 1 }}
               className="px-3 py-1 rounded-full bg-accent/20 text-accent text-sm font-bold"
             >
-              ×{multiplier.toFixed(1)}
+              &times;{multiplier.toFixed(1)}
             </motion.div>
           )}
         </div>
@@ -97,11 +120,11 @@ export function StreakCounter({
       {/* Streak Info */}
       {days > 0 ? (
         <p className="text-xs text-accent text-center">
-          Keep it up! {multiplier > 1 ? `Earning ${((multiplier - 1) * 100).toFixed(0)}% bonus XP!` : ''}
+          Continuez ! {multiplier > 1 ? `Bonus XP : +${((multiplier - 1) * 100).toFixed(0)}%` : ''}
         </p>
       ) : (
         <p className="text-xs text-text-muted text-center">
-          Complete an action today to start your streak!
+          Consultez un score pour d&eacute;marrer votre s&eacute;rie !
         </p>
       )}
     </div>

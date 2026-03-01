@@ -447,34 +447,39 @@ WEEKLY_OBJECTIVES_POOL = [
 # DAILY OBJECTIVES POOL
 # ═══════════════════════════════════════════════════════════════════════════
 
+# Simplified: each objective = 1 trivial action (< 10 seconds)
+# This maximizes streak maintenance and daily habit formation
+
+# This objective is ALWAYS included every day
+DAILY_OBJECTIVE_MANDATORY = {
+    "title": "Consulter 1 score",
+    "description": "Consultez le score d'un actif",
+    "action": "view_asset",
+    "target": 1,
+    "points_reward": 5
+}
+
 DAILY_OBJECTIVES_POOL = [
     {
-        "title": "Daily Login",
-        "description": "Log in today",
+        "title": "Connexion du jour",
+        "description": "Connectez-vous aujourd'hui",
         "action": "login",
         "target": 1,
-        "points_reward": 10
+        "points_reward": 5
     },
     {
-        "title": "Quick Check",
-        "description": "View 3 assets today",
-        "action": "view_asset",
-        "target": 3,
-        "points_reward": 15
-    },
-    {
-        "title": "One Analysis",
-        "description": "Analyze at least 1 asset today",
-        "action": "analyze",
-        "target": 1,
-        "points_reward": 20
-    },
-    {
-        "title": "News Update",
-        "description": "Read 2 news articles",
+        "title": "Lire une actu",
+        "description": "Lisez un article d'actualité",
         "action": "read_news",
-        "target": 2,
-        "points_reward": 15
+        "target": 1,
+        "points_reward": 5
+    },
+    {
+        "title": "Morning Brief",
+        "description": "Consultez votre briefing du matin",
+        "action": "view_brief",
+        "target": 1,
+        "points_reward": 10
     },
 ]
 
