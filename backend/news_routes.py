@@ -39,6 +39,7 @@ class NewsArticleSummary(BaseModel):
     tags: Optional[List[str]]
     country: Optional[str]
     image_url: Optional[str]
+    video_url: Optional[str] = None
     source_name: str
     published_at: Optional[str]
     category: Optional[str] = None
@@ -73,6 +74,7 @@ class NewsArticleSummary(BaseModel):
             tags=tags,
             country=row.get("country"),
             image_url=row.get("image_url"),
+            video_url=row.get("video_url"),
             source_name=row.get("source_name", "Unknown"),
             published_at=row.get("published_at"),
             category=row.get("category"),
@@ -95,13 +97,14 @@ class NewsArticleFull(BaseModel):
     country: Optional[str]
     language: str
     image_url: Optional[str]
+    video_url: Optional[str] = None
     source_name: str
     source_url: str
     canonical_url: Optional[str]
     published_at: Optional[str]
     view_count: int
     is_saved: bool = False
-    
+
     @classmethod
     def from_db(cls, row: dict, is_saved: bool = False) -> "NewsArticleFull":
         """Create from database row."""
@@ -111,14 +114,14 @@ class NewsArticleFull(BaseModel):
                 tldr = json.loads(row["tldr_json"])
             except json.JSONDecodeError as e:
                 logger.warning(f"Error parsing tldr JSON: {e}")
-        
+
         tags = None
         if row.get("tags_json"):
             try:
                 tags = json.loads(row["tags_json"])
             except json.JSONDecodeError as e:
                 logger.warning(f"Error parsing tags JSON: {e}")
-        
+
         return cls(
             id=row["id"],
             slug=row["slug"],
@@ -130,6 +133,7 @@ class NewsArticleFull(BaseModel):
             country=row.get("country"),
             language=row.get("language", "fr"),
             image_url=row.get("image_url"),
+            video_url=row.get("video_url"),
             source_name=row.get("source_name", "Unknown"),
             source_url=row.get("source_url", ""),
             canonical_url=row.get("canonical_url"),

@@ -31,6 +31,7 @@ services:
       - ./data/sqlite:/app/data/sqlite  # SQLite database directory
       - ./data/logos:/app/data/logos:ro  # Logo images
       - ./data/academy-videos:/app/data/academy-videos:ro  # Academy course videos
+      - ./data/article-videos:/app/data/article-videos  # Article video uploads
       # Logs
       - backend_logs:/app/logs
     env_file:

@@ -69,7 +69,7 @@ COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 # Create data/logs directories and set ownership
-RUN mkdir -p /app/data /app/logs /app/data/parquet /app/data/sqlite && \
+RUN mkdir -p /app/data /app/logs /app/data/parquet /app/data/sqlite /app/data/article-videos && \
     chown -R appuser:appuser /app
 
 # NOTE: Do NOT set USER here — entrypoint.sh runs as root to fix

@@ -39,6 +39,7 @@ interface NewsArticle {
   country: string | null;
   language: string;
   image_url: string | null;
+  video_url: string | null;
   source_name: string;
   source_url: string;
   canonical_url: string | null;
@@ -329,8 +330,20 @@ export default function ArticlePage() {
         </div>
       </header>
       
-      {/* Featured image */}
-      {article.image_url && (
+      {/* Featured media: video takes priority over image */}
+      {article.video_url ? (
+        <div className="aspect-video rounded-xl overflow-hidden bg-black">
+          <video
+            src={`${API_BASE}${article.video_url}`}
+            controls
+            preload="metadata"
+            className="w-full h-full object-contain"
+            poster={article.image_url || undefined}
+          >
+            Votre navigateur ne supporte pas la lecture de vidéos.
+          </video>
+        </div>
+      ) : article.image_url ? (
         <div className="aspect-video rounded-xl overflow-hidden bg-bg-elevated">
           <img
             src={article.image_url}
@@ -338,7 +351,7 @@ export default function ArticlePage() {
             className="w-full h-full object-cover"
           />
         </div>
-      )}
+      ) : null}
       
       {/* TL;DR */}
       {article.tldr && article.tldr.length > 0 && (

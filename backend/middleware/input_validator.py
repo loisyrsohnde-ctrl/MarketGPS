@@ -154,9 +154,13 @@ class InputValidationMiddleware(BaseHTTPMiddleware):
         # Determine if this is a file upload or large-payload internal endpoint
         is_file_upload = self._is_file_upload_endpoint(request)
         is_large_internal = path.startswith("/api/news/ingest")
-        max_body_size = (
-            self.max_file_upload_size if (is_file_upload or is_large_internal) else self.max_request_body_size
-        )
+        is_video_upload = path.startswith("/api/article-videos/upload")
+        if is_video_upload:
+            max_body_size = 500 * 1024 * 1024  # 500 MB for video uploads
+        elif is_file_upload or is_large_internal:
+            max_body_size = self.max_file_upload_size
+        else:
+            max_body_size = self.max_request_body_size
 
         # Validate request body size
         content_length = request.headers.get("content-length")

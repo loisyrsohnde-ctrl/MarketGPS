@@ -208,7 +208,8 @@ class BaseRepository:
                     view_count INTEGER DEFAULT 0,
                     engagement_score REAL DEFAULT 0.0,
                     is_breaking_news INTEGER DEFAULT 0,
-                    importance_level TEXT DEFAULT 'normal'
+                    importance_level TEXT DEFAULT 'normal',
+                    video_url TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS news_raw_items (
@@ -266,6 +267,12 @@ class BaseRepository:
                   AND is_ai_processed = 0
                   AND status = 'published'
             """)
+
+            # Migration: Add video_url column (idempotent for existing databases)
+            try:
+                conn.execute("ALTER TABLE news_articles ADD COLUMN video_url TEXT")
+            except Exception:
+                pass  # Column already exists
 
     def ensure_schema(self):
         """Ensure all tables exist (public method)."""

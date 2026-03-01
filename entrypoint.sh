@@ -16,5 +16,10 @@ if [ -d "/app/logs" ]; then
     chown -R appuser:appuser /app/logs 2>/dev/null || true
 fi
 
+# Fix ownership on article-videos directory
+if [ -d "/app/data/article-videos" ]; then
+    chown -R appuser:appuser /app/data/article-videos 2>/dev/null || true
+fi
+
 # Drop privileges and run the command as appuser
 exec gosu appuser "$@"

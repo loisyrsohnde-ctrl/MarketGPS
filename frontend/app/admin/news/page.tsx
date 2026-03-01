@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useViralNews } from '@/hooks/useViralNews';
 import { useEditorialScores } from '@/hooks/useEditorialScores';
 import { NewsTable } from '@/components/admin/NewsTable';
@@ -19,6 +19,8 @@ import {
   Link2,
   CheckCircle2,
   XCircle,
+  Video,
+  Upload,
 } from 'lucide-react';
 
 type TabType = 'viral' | 'editorial';
@@ -37,6 +39,15 @@ export default function NewsPage() {
   const [articleUrl, setArticleUrl] = useState('');
   const [urlGenerating, setUrlGenerating] = useState(false);
   const [urlResult, setUrlResult] = useState<{ success: boolean; message: string; title?: string } | null>(null);
+
+  // ── Video Article state ──────────────────────────────────────────────────
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoSubject, setVideoSubject] = useState('');
+  const [videoContext, setVideoContext] = useState('');
+  const [videoGenerating, setVideoGenerating] = useState(false);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+  const [videoResult, setVideoResult] = useState<{ success: boolean; message: string; title?: string; slug?: string } | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   // ── Viral News state ──────────────────────────────────────────────────────
   const [minViralityScore, setMinViralityScore] = useState<number>();
@@ -97,6 +108,93 @@ export default function NewsPage() {
       setUrlResult({ success: false, message: 'Erreur de connexion au serveur' });
     } finally {
       setUrlGenerating(false);
+    }
+  };
+
+  // ── Video Article handler ────────────────────────────────────────────────
+  const handleGenerateVideoArticle = async () => {
+    if (!videoFile || !videoSubject.trim()) return;
+    setVideoGenerating(true);
+    setVideoResult(null);
+    setVideoUploadProgress(0);
+
+    const API_BASE = getApiBaseUrl();
+    const adminKey = localStorage.getItem('adminKey') || '';
+
+    try {
+      // Step 1: Upload the video file
+      const formData = new FormData();
+      formData.append('file', videoFile);
+
+      const xhr = new XMLHttpRequest();
+      const uploadResult = await new Promise<{ success: boolean; video_url?: string; size_mb?: number; detail?: string }>((resolve, reject) => {
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            setVideoUploadProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        });
+        xhr.addEventListener('load', () => {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(data);
+            } else {
+              resolve({ success: false, detail: data.detail || 'Erreur upload' });
+            }
+          } catch {
+            resolve({ success: false, detail: 'Erreur de parsing' });
+          }
+        });
+        xhr.addEventListener('error', () => reject(new Error('Network error')));
+        xhr.open('POST', `${API_BASE}/api/article-videos/upload`);
+        xhr.setRequestHeader('X-Admin-Key', adminKey);
+        xhr.send(formData);
+      });
+
+      if (!uploadResult.success || !uploadResult.video_url) {
+        setVideoResult({
+          success: false,
+          message: uploadResult.detail || 'Erreur lors de l\'upload de la vidéo',
+        });
+        return;
+      }
+
+      setVideoUploadProgress(100);
+
+      // Step 2: Generate the article with AI
+      const genResponse = await fetch(`${API_BASE}/api/admin/generate-video-article`, {
+        method: 'POST',
+        headers: {
+          'X-Admin-Key': adminKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subject: videoSubject.trim(),
+          context: videoContext.trim(),
+          video_url: uploadResult.video_url,
+        }),
+      });
+      const genData = await genResponse.json();
+
+      setVideoResult({
+        success: genData.success,
+        message: genData.message,
+        title: genData.title,
+        slug: genData.slug,
+      });
+
+      if (genData.success) {
+        setVideoFile(null);
+        setVideoSubject('');
+        setVideoContext('');
+        if (videoInputRef.current) videoInputRef.current.value = '';
+        await refetch();
+      }
+    } catch (err) {
+      setVideoResult({ success: false, message: 'Erreur de connexion au serveur' });
+    } finally {
+      setVideoGenerating(false);
+      setVideoUploadProgress(0);
     }
   };
 
@@ -319,6 +417,145 @@ export default function NewsPage() {
               <p>{urlResult.message}</p>
               {urlResult.title && (
                 <p className="font-medium mt-0.5">{urlResult.title}</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Video Article Generator */}
+      <div className="rounded-lg border border-purple-200 bg-purple-50/50 p-5 dark:border-purple-900/40 dark:bg-purple-900/10">
+        <div className="flex items-center gap-2 mb-3">
+          <Video className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+            {"Article Vidéo"}
+          </h3>
+        </div>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          {"Uploadez une vidéo, décrivez le sujet et le contexte. L'IA génère un article complet qui accompagne la vidéo."}
+        </p>
+
+        <div className="space-y-3">
+          {/* Video file input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Fichier vidéo
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept=".mp4,.webm,.m4v"
+                onChange={(e) => {
+                  setVideoFile(e.target.files?.[0] || null);
+                  setVideoResult(null);
+                }}
+                className="flex-1 text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200 dark:file:bg-purple-900/30 dark:file:text-purple-300"
+              />
+              {videoFile && (
+                <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  {(videoFile.size / (1024 * 1024)).toFixed(1)} MB
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Subject input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Sujet de la vidéo
+            </label>
+            <input
+              type="text"
+              value={videoSubject}
+              onChange={(e) => {
+                setVideoSubject(e.target.value);
+                setVideoResult(null);
+              }}
+              placeholder="Ex: L'essor de la fintech mobile au Sénégal"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+            />
+          </div>
+
+          {/* Context textarea */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Contexte additionnel <span className="text-gray-400 font-normal">(optionnel)</span>
+            </label>
+            <textarea
+              value={videoContext}
+              onChange={(e) => setVideoContext(e.target.value)}
+              rows={3}
+              placeholder="Décrivez le contenu de la vidéo, les points clés abordés, les intervenants..."
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 resize-none"
+            />
+          </div>
+
+          {/* Upload progress */}
+          {videoGenerating && videoUploadProgress > 0 && videoUploadProgress < 100 && (
+            <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+              <div
+                className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${videoUploadProgress}%` }}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Upload : {videoUploadProgress}%
+              </p>
+            </div>
+          )}
+          {videoGenerating && videoUploadProgress >= 100 && (
+            <p className="text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {"Génération de l'article en cours..."}
+            </p>
+          )}
+
+          {/* Generate button */}
+          <button
+            onClick={handleGenerateVideoArticle}
+            disabled={videoGenerating || !videoFile || !videoSubject.trim()}
+            className="rounded-lg bg-purple-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-purple-500 dark:hover:bg-purple-600 flex items-center gap-2"
+          >
+            {videoGenerating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {videoUploadProgress < 100 ? 'Upload...' : 'Génération...'}
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4" />
+                {"Générer l'article vidéo"}
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Result */}
+        {videoResult && (
+          <div className={`mt-3 flex items-start gap-2 rounded-md px-3 py-2 text-sm ${
+            videoResult.success
+              ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+          }`}>
+            {videoResult.success ? (
+              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+            ) : (
+              <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            )}
+            <div>
+              <p>{videoResult.message}</p>
+              {videoResult.title && (
+                <p className="font-medium mt-0.5">{videoResult.title}</p>
+              )}
+              {videoResult.slug && (
+                <a
+                  href={`/news/${videoResult.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-purple-700 dark:text-purple-300 underline text-xs mt-1 inline-block"
+                >
+                  {"Voir l'article →"}
+                </a>
               )}
             </div>
           </div>

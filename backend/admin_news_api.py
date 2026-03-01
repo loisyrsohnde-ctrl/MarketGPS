@@ -1249,3 +1249,282 @@ def _generate_from_url_sync(url: str) -> GenerateFromURLResponse:
             success=False,
             message=f"Erreur lors de l'insertion : {str(e)[:200]}"
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# POST /api/admin/generate-video-article - Generate article from video subject
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class GenerateVideoArticleRequest(BaseModel):
+    """Request to generate an article from a video subject and context."""
+    subject: str
+    context: str
+    video_url: str
+    country: Optional[str] = None
+
+
+class GenerateVideoArticleResponse(BaseModel):
+    """Response after generating video article."""
+    success: bool
+    article_id: Optional[int] = None
+    title: Optional[str] = None
+    slug: Optional[str] = None
+    message: str
+
+
+@router.post("/generate-video-article", response_model=GenerateVideoArticleResponse)
+async def generate_video_article(request: GenerateVideoArticleRequest):
+    """
+    Generate a full French article to accompany a video.
+
+    The admin provides:
+    - subject: Video topic/title
+    - context: Additional context about the video
+    - video_url: URL path of the uploaded video (from /api/article-videos/upload)
+
+    The AI generates an article (800-1200 words) that complements the video.
+    The article is published immediately with the embedded video URL.
+    """
+    import asyncio
+
+    if not request.subject.strip():
+        raise HTTPException(status_code=400, detail="Le sujet de la vidéo est requis")
+    if not request.video_url.strip():
+        raise HTTPException(status_code=400, detail="L'URL de la vidéo est requise")
+
+    # Validate video_url format
+    if not request.video_url.startswith("/api/article-videos/"):
+        raise HTTPException(status_code=400, detail="URL de vidéo invalide")
+
+    # Check that the video file exists on disk
+    import os
+    videos_base = os.environ.get("ARTICLE_VIDEOS_PATH", "/app/data/article-videos")
+    filename = request.video_url.replace("/api/article-videos/", "")
+    filepath = os.path.join(videos_base, filename)
+    if not os.path.isfile(filepath):
+        raise HTTPException(status_code=400, detail="Fichier vidéo introuvable sur le serveur")
+
+    try:
+        result = await asyncio.to_thread(
+            _generate_video_article_sync,
+            request.subject.strip(),
+            request.context.strip(),
+            request.video_url.strip(),
+            request.country,
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating video article: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _generate_video_article_sync(
+    subject: str,
+    context: str,
+    video_url: str,
+    country_override: Optional[str] = None,
+) -> GenerateVideoArticleResponse:
+    """Generate an article from a video subject using LLM (runs in threadpool)."""
+    import json
+    import re
+    import time
+    from datetime import datetime
+
+    try:
+        from pipeline.news.publish import NewsPublisher
+    except ImportError as e:
+        logger.error(f"Cannot import NewsPublisher: {e}")
+        return GenerateVideoArticleResponse(
+            success=False,
+            message="Pipeline module not available on this server"
+        )
+
+    publisher = NewsPublisher(store=db)
+
+    if not publisher.llm_provider:
+        return GenerateVideoArticleResponse(
+            success=False,
+            message="Aucun LLM disponible. Configurez OPENAI_API_KEY ou GEMINI_API_KEY."
+        )
+
+    # Build prompt for video article generation
+    prompt = f"""Tu es un Rédacteur en Chef senior pour "MarketGPS", un média économique et financier de référence couvrant l'Afrique et les marchés internationaux.
+
+SUJET DE LA VIDÉO : {subject}
+
+CONTEXTE ADDITIONNEL : {context}
+
+LANGUE OBLIGATOIRE : FRANÇAIS. L'article DOIT être intégralement en français.
+
+INSTRUCTIONS :
+Cet article accompagnera une vidéo sur le sujet ci-dessus. L'article doit :
+1. Être complémentaire à la vidéo (approfondir, contextualiser, fournir des données).
+2. Commencer par un paragraphe d'accroche qui situe le sujet.
+3. NE PAS simplement décrire la vidéo, mais apporter de la valeur ajoutée écrite.
+
+STYLE : Journalistique premium (niveau Jeune Afrique / Les Échos).
+- Commence par un LEAD percutant.
+- INTERDIT : "Introduction", "Conclusion", "En résumé", "dans cette vidéo".
+- Ton factuel, analytique et engageant.
+
+CONTENU (800-1200 mots) :
+- Contextualise : historique, enjeux, pourquoi c'est important maintenant.
+- Chiffres & données : intègre des données pertinentes, comparaisons.
+- Acteurs clés : entreprises, dirigeants, institutions impliquées.
+- Impact marché : conséquences économiques, financières, business.
+- Perspectives : scénarios futurs, implications.
+- Utilise le **gras** pour les noms d'entreprises et chiffres clés.
+- Structure avec 2-3 sous-titres en ## markdown.
+
+IMAGE SEARCH : Génère une requête de recherche d'image précise en anglais.
+
+Réponds UNIQUEMENT en JSON valide :
+{{
+  "skip": false,
+  "title_fr": "Titre accrocheur en français (max 100 caractères)",
+  "excerpt_fr": "Résumé de 2-3 phrases en français",
+  "content_md": "Article complet en markdown (800-1200 mots, EN FRANÇAIS)",
+  "category": "Finance|Tech|Business|Startup|Régulation|Énergie|Marchés",
+  "sentiment": "positive|neutral|negative",
+  "image_search_query": "requête image en anglais",
+  "tldr": ["Point clé 1", "Point clé 2", "Point clé 3"]
+}}"""
+
+    try:
+        if publisher.llm_provider == "openai" and publisher.openai_client:
+            response = publisher.openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=6000,
+                temperature=0.7
+            )
+            text = response.choices[0].message.content
+        elif publisher.llm_provider == "gemini":
+            response = publisher.gemini_model.generate_content(prompt)
+            text = response.text
+        else:
+            return GenerateVideoArticleResponse(
+                success=False,
+                message="Aucun LLM configuré"
+            )
+
+        # Parse JSON response
+        json_str = text.strip()
+        if "```json" in json_str:
+            json_str = json_str.split("```json")[1].split("```")[0].strip()
+        elif "```" in json_str:
+            json_str = json_str.split("```")[1].split("```")[0].strip()
+
+        try:
+            rewritten = json.loads(json_str)
+        except json.JSONDecodeError:
+            json_match = re.search(r'\{[\s\S]*\}', text)
+            if json_match:
+                rewritten = json.loads(json_match.group())
+            else:
+                return GenerateVideoArticleResponse(
+                    success=False,
+                    message="Erreur de parsing de la réponse LLM"
+                )
+
+        if rewritten.get("skip"):
+            return GenerateVideoArticleResponse(
+                success=False,
+                message="Le LLM a estimé que ce sujet est hors-thème pour MarketGPS."
+            )
+
+        if not rewritten.get("title_fr") or not rewritten.get("content_md"):
+            return GenerateVideoArticleResponse(
+                success=False,
+                message="Réponse LLM incomplète (titre ou contenu manquant)"
+            )
+
+    except Exception as e:
+        logger.error(f"LLM generation failed for video article '{subject}': {e}")
+        return GenerateVideoArticleResponse(
+            success=False,
+            message=f"Erreur LLM : {str(e)[:200]}"
+        )
+
+    # Detect country and tags
+    content_for_detection = f"{rewritten.get('title_fr', '')} {rewritten.get('content_md', '')}"
+    country = country_override or publisher._detect_country(content_for_detection, None)
+    tags = publisher._extract_tags(content_for_detection, [])
+    category = rewritten.get("category") or (tags[0].capitalize() if tags else "Actualité")
+
+    # Fetch cover image
+    try:
+        from pipeline.news.image_fetcher import fetch_article_image
+        image_url = fetch_article_image(
+            title=rewritten.get("title_fr", subject),
+            category=category,
+            country=country,
+            keywords=rewritten.get("image_search_query"),
+            existing_url=None
+        )
+    except Exception as e:
+        logger.warning(f"Image fetch failed: {e}")
+        image_url = None
+
+    # Generate slug
+    base_slug = publisher._generate_slug(rewritten.get("title_fr", "video-article"))
+    slug = f"{base_slug}-{int(time.time())}"
+
+    title_fr = rewritten.get("title_fr", subject)
+    now = datetime.utcnow().isoformat()
+
+    # Insert into database with video_url
+    try:
+        conn = db._get_conn()
+        cursor = conn.execute("""
+            INSERT INTO news_articles (
+                slug, title, excerpt, content_md, tldr_json,
+                tags_json, country, language, image_url, video_url, source_name,
+                source_url, canonical_url, published_at, status,
+                category, sentiment, is_ai_processed,
+                engagement_score, is_breaking_news, importance_level
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            slug,
+            title_fr,
+            rewritten.get("excerpt_fr", ""),
+            rewritten.get("content_md", ""),
+            json.dumps(rewritten.get("tldr")) if rewritten.get("tldr") else None,
+            json.dumps(tags) if tags else None,
+            country,
+            "fr",
+            image_url,
+            video_url,
+            "MarketGPS Rédaction",
+            None,
+            None,
+            now,
+            "published",
+            category,
+            rewritten.get("sentiment", "neutral"),
+            1,
+            0.95,
+            0,
+            "high",
+        ))
+        conn.commit()
+        article_id = cursor.lastrowid
+        conn.close()
+
+        logger.info(f"Video article generated: {title_fr[:60]}... (slug: {slug})")
+        return GenerateVideoArticleResponse(
+            success=True,
+            article_id=article_id,
+            title=title_fr,
+            slug=slug,
+            message="Article vidéo généré et publié avec succès"
+        )
+    except Exception as e:
+        logger.error(f"Failed to insert video article: {e}")
+        return GenerateVideoArticleResponse(
+            success=False,
+            message=f"Erreur lors de l'insertion : {str(e)[:200]}"
+        )

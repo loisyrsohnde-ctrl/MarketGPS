@@ -146,7 +146,7 @@ class NewsRepository(BaseRepository):
         offset = (page - 1) * page_size
         data_sql = f"""
             SELECT id, slug, title, excerpt, tldr_json, tags_json, country,
-                   image_url, source_name, source_url, published_at, created_at, view_count,
+                   image_url, video_url, source_name, source_url, published_at, created_at, view_count,
                    category, sentiment, engagement_score, is_breaking_news, importance_level
             FROM news_articles
             WHERE {where_clause}
@@ -170,7 +170,7 @@ class NewsRepository(BaseRepository):
         """Get a single news article by slug."""
         sql = """
             SELECT id, slug, title, excerpt, content_md, tldr_json, tags_json,
-                   country, language, image_url, source_name, source_url,
+                   country, language, image_url, video_url, source_name, source_url,
                    canonical_url, published_at, created_at, view_count
             FROM news_articles
             WHERE slug = ? AND status = 'published'
@@ -293,11 +293,11 @@ class NewsRepository(BaseRepository):
         sql = """
             INSERT INTO news_articles (
                 slug, raw_item_id, title, excerpt, content_md, tldr_json,
-                tags_json, country, language, image_url, source_name,
+                tags_json, country, language, image_url, video_url, source_name,
                 source_url, canonical_url, published_at, status,
                 category, sentiment, is_ai_processed,
                 engagement_score, is_breaking_news, importance_level
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         try:
@@ -313,6 +313,7 @@ class NewsRepository(BaseRepository):
                     article.get("country"),
                     article.get("language", "fr"),
                     article.get("image_url"),
+                    article.get("video_url"),
                     article.get("source_name"),
                     article.get("source_url"),
                     article.get("canonical_url"),
