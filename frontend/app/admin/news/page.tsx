@@ -145,8 +145,12 @@ export default function NewsPage() {
             resolve({ success: false, detail: 'Erreur de parsing' });
           }
         });
-        xhr.addEventListener('error', () => reject(new Error('Network error')));
+        xhr.addEventListener('error', () => {
+          console.error('[VideoArticle] XHR error — status:', xhr.status, 'readyState:', xhr.readyState, 'URL:', `${API_BASE}/api/article-videos/upload`);
+          reject(new Error(`Network error (status=${xhr.status}, state=${xhr.readyState})`));
+        });
         xhr.open('POST', `${API_BASE}/api/article-videos/upload`);
+        console.log('[VideoArticle] Uploading to:', `${API_BASE}/api/article-videos/upload`);
         xhr.setRequestHeader('X-Admin-Key', adminKey);
         xhr.send(formData);
       });
@@ -191,7 +195,9 @@ export default function NewsPage() {
         await refetch();
       }
     } catch (err) {
-      setVideoResult({ success: false, message: 'Erreur de connexion au serveur' });
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error('[VideoArticle] Error:', errMsg, err);
+      setVideoResult({ success: false, message: `Erreur: ${errMsg}` });
     } finally {
       setVideoGenerating(false);
       setVideoUploadProgress(0);
