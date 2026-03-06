@@ -49,7 +49,7 @@ const plans = [
       'Export des données CSV',
       'Liste de suivi illimitée',
       'Support prioritaire',
-      'QuantAI Academy \u00e0 199\u20ac au lieu de 499\u20ac',
+      'QuantAI Academy \u00e0 199,99\u20ac au lieu de 499,99\u20ac',
     ],
     cta: 'S\'abonner',
     ctaHref: '/signup?plan=monthly',
@@ -65,7 +65,7 @@ const plans = [
     features: [
       'Tout le plan Pro',
       '\u00c9conomisez 70\u20ac/an',
-      'QuantAI Academy \u00e0 199\u20ac au lieu de 499\u20ac',
+      'QuantAI Academy \u00e0 199,99\u20ac au lieu de 499,99\u20ac',
       'Acc\u00e8s anticip\u00e9 nouvelles features',
       'Support d\u00e9di\u00e9',
       'API access (bient\u00f4t)',
@@ -287,13 +287,13 @@ export default function PricingPage() {
                 </div>
                 <div className="flex-shrink-0 text-center space-y-4 md:pt-8">
                   <div>
-                    <p className="text-4xl font-bold text-purple-400">499&nbsp;&euro;</p>
+                    <p className="text-4xl font-bold text-purple-400">499,99&nbsp;&euro;</p>
                     <p className="text-sm text-text-muted mt-1">Paiement unique</p>
                   </div>
                   <div className="px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                     <p className="text-xs text-emerald-400 font-medium">
                       <Crown className="w-3.5 h-3.5 inline mr-1" />
-                      199&nbsp;&euro; pour les abonn&eacute;s Pro
+                      199,99&nbsp;&euro; pour les abonn&eacute;s annuels — 300&euro; d&apos;&eacute;conomie
                     </p>
                   </div>
                   <div className="px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">

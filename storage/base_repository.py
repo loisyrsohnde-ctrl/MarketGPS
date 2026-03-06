@@ -268,11 +268,21 @@ class BaseRepository:
                   AND status = 'published'
             """)
 
-            # Migration: Add video_url column (idempotent for existing databases)
-            try:
-                conn.execute("ALTER TABLE news_articles ADD COLUMN video_url TEXT")
-            except Exception:
-                pass  # Column already exists
+            # Migration: Add missing columns (idempotent for existing databases)
+            for col_def in [
+                "video_url TEXT",
+                "category TEXT",
+                "sentiment TEXT DEFAULT 'neutral'",
+                "engagement_score REAL DEFAULT 0.0",
+                "is_breaking_news INTEGER DEFAULT 0",
+                "importance_level TEXT DEFAULT 'normal'",
+            ]:
+                try:
+                    col_name = col_def.split()[0]
+                    conn.execute(f"ALTER TABLE news_articles ADD COLUMN {col_def}")
+                    logger.info(f"Migration: added column {col_name} to news_articles")
+                except Exception:
+                    pass  # Column already exists
 
     def ensure_schema(self):
         """Ensure all tables exist (public method)."""
