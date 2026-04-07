@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { VideoScript } from '@/types/admin';
 import { ScriptEditor } from '@/components/admin/ScriptEditor';
 import { ArrowLeft } from 'lucide-react';
 
-export default function EditScriptPage({ params }: { params: { id: string } }) {
+export default function EditScriptPage() {
+  const params = useParams<{ id: string }>();
   const router = useRouter();
   const [script, setScript] = useState<VideoScript | null>(null);
   const [loading, setLoading] = useState(true);

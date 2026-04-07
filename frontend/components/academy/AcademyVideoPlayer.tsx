@@ -41,7 +41,7 @@ export function AcademyVideoPlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSubtitles, setShowSubtitles] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout>();
+  const controlsTimeoutRef = useRef<NodeJS.Timeout>(null);
 
   const togglePlay = () => {
     if (videoRef.current) {
